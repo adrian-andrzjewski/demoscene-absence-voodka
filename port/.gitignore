@@ -1,0 +1,15 @@
+# Build outputs (VS + CMake)
+build/
+bin/
+
+# Generated data archive (recreated deterministically by the voodka_data target)
+data/vodka.dat
+
+# Generated vs-dev helper script
+build_vs_env.cmd
+
+# Visual Studio baggage
+.vs/
+*.user
+*.suo
+*.VC.db
