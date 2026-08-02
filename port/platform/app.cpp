@@ -90,7 +90,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     // ---- run the demo core (assembly) --------------------------------------
     // demo core is provided by the NASM objects (Phases 3-4). Fallback here is
     // a software test pattern so the platform builds/runs standalone.
-    int rcode = DemoStart32(nullptr, 0);
+    int rcode = DemoStart32(vk::arena(), 64ull * 1024 * 1024);
 
     vk::audioShutdown();
     vk::logFlush();

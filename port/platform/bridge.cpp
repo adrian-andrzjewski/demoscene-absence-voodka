@@ -60,10 +60,14 @@ void vk_set_palette(const uint8_t* rgb) {
     }
     vk::setPalette(r, g, b);
 }
+void vk_get_palette(uint8_t* out) {
+    vk::currentPalette(out);
+}
 void vk_present_frame(void) { vk::presentFrame(); }
 void* vk_backbuffer_ptr(void) { return vk::arena() + vk::kBackbufferOffset; }
 void* vk_framebuffer_ptr(void) { return vk::arena() + vk::kFramebufferOffset; }
 uint32_t vk_framebuffer_offset(void) { return vk::kFramebufferOffset; }
+uint32_t vk_backbuffer_offset(void) { return vk::kBackbufferOffset; }
 
 int  vk_audio_play()        { return vk::audioPlay(); }
 int  vk_audio_stop()        { return vk::audioStop(); }

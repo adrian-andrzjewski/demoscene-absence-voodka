@@ -49,6 +49,7 @@ extern const uint32_t kFramebufferOffset;   // arena offset of presented frame
 extern const uint32_t kBackbufferOffset;    // arena offset of offscreen buffer
 bool initPresent(void* hwnd, int w, int h); // create D3D11 swapchain + resources
 void setPalette(const uint8_t r[256], const uint8_t g[256], const uint8_t b[256]);
+void currentPalette(uint8_t out[768]);  // copy current 6->8 stored palette
 void presentFrame();                      // palette+frame -> D3D11 -> present
 
 // ---- timing ----------------------------------------------------------------

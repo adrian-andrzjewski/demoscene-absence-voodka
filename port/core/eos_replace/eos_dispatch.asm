@@ -46,6 +46,8 @@ section .text
 ; explicitly per service so flags/registers stay predictable.
 
 eos_dispatch:
+        push    rbp
+        mov     rbp, rsp
         push    rbx
         push    rsi
         push    rdi
@@ -53,7 +55,8 @@ eos_dispatch:
         push    r13
         push    r14
         push    r15
-        sub     rsp, 0x28          ; shadow space + one qword
+        ; 8 pushes (incl rbp) -> rsp%16==8; sub 0x28 -> 0 at call sites
+        sub     rsp, 0x28
 
         cmp     eax, EOS_QUERY_MEMORY
         je      .query_mem
@@ -175,4 +178,5 @@ eos_dispatch:
         pop     rdi
         pop     rsi
         pop     rbx
+        pop     rbp
         ret

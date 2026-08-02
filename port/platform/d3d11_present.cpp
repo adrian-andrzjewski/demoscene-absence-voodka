@@ -145,11 +145,17 @@ bool initPresent(void* hwnd, int winW, int winH) {
 }
 
 void setPalette(const uint8_t r[256], const uint8_t g[256], const uint8_t b[256]) {
+    // store RAW VGA values (0..63) - the demo's fade math works in 6-bit
+    // space exactly like the original; scaling happens at upload time.
     for (int i = 0; i < 256; i++) {
-        g_pal[i * 3 + 0] = r[i];
-        g_pal[i * 3 + 1] = g[i];
-        g_pal[i * 3 + 2] = b[i];
+        g_pal[i * 3 + 0] = r[i] & 63;
+        g_pal[i * 3 + 1] = g[i] & 63;
+        g_pal[i * 3 + 2] = b[i] & 63;
     }
+}
+
+void currentPalette(uint8_t out[768]) {
+    memcpy(out, g_pal, 768);
 }
 
 void presentFrame() {
@@ -165,13 +171,16 @@ void presentFrame() {
         }
         g_ctx->Unmap(g_indexTex, 0);
     }
-    // upload palette
+    // upload palette (raw 6-bit -> 8-bit at present time, like the VGA DAC)
     if (SUCCEEDED(g_ctx->Map(g_palTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &m))) {
         uint8_t* pd = (uint8_t*)m.pData;
         for (int i = 0; i < 256; i++) {
-            pd[i * 4 + 0] = g_pal[i * 3 + 0];
-            pd[i * 4 + 1] = g_pal[i * 3 + 1];
-            pd[i * 4 + 2] = g_pal[i * 3 + 2];
+            int rr = (g_pal[i * 3 + 0] * 255) / 63;
+            int gg = (g_pal[i * 3 + 1] * 255) / 63;
+            int bb = (g_pal[i * 3 + 2] * 255) / 63;
+            pd[i * 4 + 0] = (uint8_t)(rr > 255 ? 255 : rr);
+            pd[i * 4 + 1] = (uint8_t)(gg > 255 ? 255 : gg);
+            pd[i * 4 + 2] = (uint8_t)(bb > 255 ? 255 : bb);
             pd[i * 4 + 3] = 255;
         }
         g_ctx->Unmap(g_palTex, 0);

@@ -95,10 +95,4 @@
         call    eos_dispatch
 %endmacro
 
-%macro GetModPos 0
-        mov     eax, EOS_GET_INFO
-        call    eos_dispatch
-        movzx   eax, bl
-%endmacro
-
 %endif ; EOS_INC
