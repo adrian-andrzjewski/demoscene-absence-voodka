@@ -76,6 +76,17 @@ int  vk_audio_stop()        { return vk::audioStop(); }
 void vk_audio_clear()       { }
 void vk_audio_set_pattern(int pos) { (void)pos; }
 
+// seeking: returns actual ModPos (rows) reached.
+uint32_t vk_audio_seek_rows(uint32_t rows) { return vk::audioSeekRows(rows); }
+uint32_t vk_audio_seek_ms(int ms)           { return vk::audioSeekMs(ms); }
+uint32_t vk_audio_seek_order(int order)     { return vk::audioSeekOrder(order); }
+
+// entry-part selector: 0 = run the full part1..part8 sequence (default),
+// 1..8 = run only that part. Set by app.cpp before DemoStart32.
+static int g_entry_part = 0;
+void vk_set_entry_part(int part) { g_entry_part = part; }
+int  vk_get_entry_part()         { return g_entry_part; }
+
 // trace hook from NASM (simple %s/%x/%d formatting via platform logger)
 void vk_log_printf(const char* fmt, ...) {
     char buf[512];

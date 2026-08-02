@@ -11,7 +11,11 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <string>
+
+// bridge symbols (extern "C"): select which part the assembly core runs
+extern "C" void vk_set_entry_part(int part);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -106,6 +110,57 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     if (!vk::initPresent(hwnd, kWinW, kWinH)) {
         vk::logPrint("[app] D3D11 init failed\n");
         return 1;
+    }
+
+    // ---- entry-point seeking -----------------------------------------------
+    // The demo may begin from a scene in the middle of the timeline; the music
+    // must start at the matching song position. Units:
+    //   --modpos N  absolute ModPos (cumulative rows; the demo's timeline)
+    //   --ms N      milliseconds from the start of the module
+    //   --order N   order-list index (pattern start, row 0)
+    //   --part N    scene/part index (maps to a ModPos, see table below)
+    // At most one seek selector is honored; the first present wins.
+    {
+        std::string cmd = lpCmd ? lpCmd : "";
+        auto numAfter = [&](const char* flag) -> long {
+            auto p = cmd.find(flag);
+            if (p == std::string::npos) return -1;
+            std::string rest = cmd.substr(p + std::strlen(flag));
+            size_t st = rest.find_first_not_of(" \t\"=");
+            if (st == std::string::npos) return -1;
+            return (long)strtoul(rest.c_str() + st, nullptr, 0);
+        };
+        // Scene start ModPos (calibration): part N begins where part N-1 ends.
+        // Values follow the parts' own exit thresholds in the assembly.
+        static const uint32_t kPartStartModPos[9] = {
+            0x0000,  // part 1
+            0x0400,  // part 2
+            0x0B40,  // part 3
+            0x0D40,  // part 4
+            0x1200,  // part 5
+            0x1B40,  // part 6
+            0x1C40,  // part 7
+            0x2040,  // part 8
+            0x2640,  // end
+        };
+        long v;
+        if ((v = numAfter("--modpos")) >= 0) {
+            uint32_t reached = vk::audioSeekRows((uint32_t)v);
+            vk::logPrint("[app] seek --modpos %ld -> reached ModPos %u\n", v, reached);
+        } else if ((v = numAfter("--ms")) >= 0) {
+            uint32_t reached = vk::audioSeekMs((int)v);
+            vk::logPrint("[app] seek --ms %ld -> reached ModPos %u\n", v, reached);
+        } else if ((v = numAfter("--order")) >= 0) {
+            uint32_t reached = vk::audioSeekOrder((int)v);
+            vk::logPrint("[app] seek --order %ld -> reached ModPos %u\n", v, reached);
+        } else if ((v = numAfter("--part")) >= 1 && v <= 8) {
+            uint32_t reached = vk::audioSeekRows(kPartStartModPos[v - 1]);
+            vk::logPrint("[app] seek --part %ld -> ModPos 0x%x reached %u\n", v,
+                         kPartStartModPos[v - 1], reached);
+            vk_set_entry_part((int)v);
+        } else {
+            vk::logPrint("[app] no entry seek (module starts at beginning)\n");
+        }
     }
 
     // ---- run the demo core (assembly) --------------------------------------

@@ -184,6 +184,10 @@ void presentFrame() {
     if (!g_ctx) return;
     static long cnt = 0;
     if ((cnt++ & 0x3fff) == 0) logPrint("[d3d] presentFrame #%ld\n", cnt);
+    // Pump Win32 messages so the window stays responsive and input (keyboard)
+    // reaches the demo. The assembly loop never touches Windows itself, so this
+    // is the single per-frame opportunity to service the message queue.
+    vk::updateInput();
     const uint8_t* frame = arena() + kFramebufferOffset;
     recPush(frame);
 

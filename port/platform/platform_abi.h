@@ -80,6 +80,19 @@ uint32_t getModPos();         // Get_Info: song-position scalar for sync
 uint32_t getModLength();      // total positions, for calibration
 void     audioPump();         // must be called periodically from main loop
 
+// ---- seeking ----------------------------------------------------------------
+// The demo timeline is ModPos = cumulative pattern-rows since playback start
+// (monotonic across module loops). Seek can be expressed in several units:
+//   audioSeekRows(modpos) : absolute ModPos (rows). Primary API.
+//   audioSeekMs(ms)       : milliseconds from module start (incl. loops).
+//   audioSeekOrder(order) : order-list index (pattern start, row 0).
+// All return the actual ModPos (rows) reached, or 0 on failure. After a seek,
+// getModPos() and the running demo both start from the new point, keeping
+// audio and visuals synchronized regardless of entry position.
+uint32_t audioSeekRows(uint32_t rows);
+uint32_t audioSeekMs(int ms);
+uint32_t audioSeekOrder(int order);
+
 // ---- logging ---------------------------------------------------------------
 void logInit();                        // open debugger + voodka.log (once)
 void logPrint(const char* fmt, ...);      // printf-style to debugger+file

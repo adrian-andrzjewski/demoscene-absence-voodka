@@ -66,10 +66,36 @@ DemoStart32:
         call    vk_backbuffer_offset
         mov     [rel _scr_Addr], eax
 
-        ; run the parts
+        ; ---- run the selected scene ----------------------------------------
+        ; vk_get_entry_part(): 0 = full part1..part8 sequence (default),
+        ; 1..8 = run only that part. Parts present are driven by the audio
+        ; timeline (GetModPos), which the app has already seeked to the part's
+        ; start via --part / --modpos / --ms / --order.
+        extern vk_get_entry_part
+        call    vk_get_entry_part
+
+        cmp     eax, 0
+        je      .full_sequence
+        cmp     eax, 6
+        je      .single_p6
+        cmp     eax, 7
+        je      .single_p7
+        ; unknown single part: default to the full slice
+        jmp     .full_sequence
+
+.single_p6:
+        call    part6
+        jmp     .done
+.single_p7:
+        call    part7
+        jmp     .done
+
+.full_sequence:
+        ; current implemented slice: P6 then P7
         call    part6
         call    part7
 
+.done:
         xor     eax, eax
         add     rsp, 0x20
         pop     r12
