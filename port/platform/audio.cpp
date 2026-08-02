@@ -28,6 +28,7 @@ HANDLE      g_thread = nullptr;
 HANDLE      g_stop = nullptr;
 volatile long g_playing = 0;
 volatile long g_order = 0, g_row = 0;
+CRITICAL_SECTION g_xmpCs = {};   // serializes ALL libxmp access (not thread-safe)
 
 IAudioClient*       g_ac = nullptr;
 IAudioRenderClient* g_arc = nullptr;
@@ -44,7 +45,9 @@ uint32_t getModPos() {
 uint32_t getModLength() {
     if (!g_xmp) return 0;
     xmp_module_info mi;
+    EnterCriticalSection(&g_xmpCs);
     xmp_get_module_info(g_xmp, &mi);
+    LeaveCriticalSection(&g_xmpCs);
     return mi.mod ? mi.mod->len : 0;
 }
 
@@ -64,7 +67,10 @@ static DWORD WINAPI renderThread(LPVOID) {
             while (n > 0) {
                 int want = n;
                 if (g_playing) {
-                    if (xmp_play_buffer(g_xmp, (short*)p, (long)(want * 2), 0) != 0) {
+                    EnterCriticalSection(&g_xmpCs);
+                    int rc = xmp_play_buffer(g_xmp, (short*)p, (long)(want * 2), 0);
+                    LeaveCriticalSection(&g_xmpCs);
+                    if (rc != 0) {
                         InterlockedExchange(&g_playing, 0);
                         memset(p, 0, (size_t)want * 2 * sizeof(short));
                     }
@@ -94,7 +100,10 @@ static DWORD WINAPI renderThread(LPVOID) {
         while (n > 0) {
             int want = n;
             if (g_playing) {
-                if (xmp_play_buffer(g_xmp, (short*)p, (long)(want * 2), 0) != 0) {
+                EnterCriticalSection(&g_xmpCs);
+                int rc2 = xmp_play_buffer(g_xmp, (short*)p, (long)(want * 2), 0);
+                LeaveCriticalSection(&g_xmpCs);
+                if (rc2 != 0) {
                     InterlockedExchange(&g_playing, 0);
                     memset(p, 0, (size_t)want * 2 * sizeof(short));
                 }
@@ -114,13 +123,36 @@ void audioPump() {
     if (!g_xmp) return;
     if (!InterlockedCompareExchange(&g_playing, 1, 0)) return;
     xmp_frame_info fi;
+    EnterCriticalSection(&g_xmpCs);
     xmp_get_frame_info(g_xmp, &fi);
+    LeaveCriticalSection(&g_xmpCs);
     InterlockedExchange(&g_order, fi.pos);
     InterlockedExchange(&g_row, fi.row);
 }
 
 int audioInit(const char* modPath, int) {
     if (!modPath) return 0;
+    // When VOODKA_NOAUDIO is set (diagnostics), don't start a thread at all.
+    if (GetEnvironmentVariableA("VOODKA_NOAUDIO", nullptr, 0) > 0) {
+        logPrint("[audio] audio disabled (VOODKA_NOAUDIO)\n");
+        // still create the context so ModPos advances via silent playback
+        InitializeCriticalSection(&g_xmpCs);
+        g_xmp = xmp_create_context();
+        if (!g_xmp) return 0;
+        FILE* f = fopen(modPath, "rb");
+        if (f) {
+            fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, 0, SEEK_SET);
+            std::vector<uint8_t> buf((size_t)sz);
+            size_t rd = fread(buf.data(), 1, (size_t)sz, f); fclose(f);
+            if (rd == (size_t)sz && xmp_load_module_from_memory(g_xmp, buf.data(), (long)sz) == 0) {
+                xmp_start_player(g_xmp, kSampleRate, 0);
+            }
+        }
+        logPrint("[audio] loaded order len=%lu (headless)\n", getModLength());
+        InterlockedExchange(&g_playing, 1);
+        return 1;
+    }
+    InitializeCriticalSection(&g_xmpCs);
     g_stop = CreateEventA(nullptr, TRUE, FALSE, nullptr);
 
     g_xmp = xmp_create_context();
@@ -185,10 +217,11 @@ void audioShutdown() {
     InterlockedExchange(&g_playing, 0);
     if (g_stop) SetEvent(g_stop);
     if (g_thread) WaitForSingleObject(g_thread, 3000);
-    if (g_xmp) { xmp_end_player(g_xmp); xmp_free_context(g_xmp); g_xmp = nullptr; }
+    if (g_xmp) { EnterCriticalSection(&g_xmpCs); xmp_end_player(g_xmp); xmp_free_context(g_xmp); g_xmp = nullptr; LeaveCriticalSection(&g_xmpCs); }
     if (g_arc) g_arc->Release();
     if (g_ac)  g_ac->Release();
     if (g_stop) CloseHandle(g_stop);
+    DeleteCriticalSection(&g_xmpCs);
     CoUninitialize();
 }
 

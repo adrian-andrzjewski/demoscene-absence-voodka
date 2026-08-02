@@ -44,10 +44,13 @@ DemoStart32:
         push    rbx
         push    rsi
         push    rdi
-        sub     rsp, 0x28
+        push    r12
+        ; 5 pushes (40): entry RSP%16==8 -> after pushes ==0; sub 0x20 keeps 0.
+        sub     rsp, 0x20
 
-        ; rcx = arenaBase -> Code32_addr
-        mov     [rel Code32_addr], rcx
+        ; preserve arenaBase (rcx = first arg) in r12 across all calls
+        mov     r12, rcx
+        mov     [rel Code32_addr], r12
 
         ; framebuffer_off = platform offset
         call    vk_framebuffer_offset
@@ -68,7 +71,8 @@ DemoStart32:
         call    part7
 
         xor     eax, eax
-        add     rsp, 0x28
+        add     rsp, 0x20
+        pop     r12
         pop     rdi
         pop     rsi
         pop     rbx

@@ -43,6 +43,17 @@ resolve_offset_macro_rdi:
         pop     rsi
         pop     rcx
         pop     rax
+        ; present the just-blitted frame (mirrors writing to VGA memory).
+        ; NOTE: this block is INLINED into a body with RSP%16==0; push rbp
+        ; makes it 8, so we subtract 0x28 (40) -> 8+40=48 ≡ 0 at the call.
+        push    rbp
+        mov     rbp, rsp
+        sub     rsp, 0x28
+        extern vk_present_frame
+        call    vk_present_frame
+        add     rsp, 0x28
+        mov     rsp, rbp
+        pop     rbp
 %endmacro
 
 %macro Screen0 0

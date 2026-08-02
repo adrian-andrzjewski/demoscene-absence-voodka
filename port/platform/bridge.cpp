@@ -11,6 +11,8 @@
 
 #include "platform_abi.h"
 #include <cstdint>
+#include <cstdio>
+#include <cstdarg>
 #include <cstring>
 
 using std::uint16_t;
@@ -47,7 +49,7 @@ uint64_t vk_selector_base(uint16_t handle) {
 }
 
 void     vk_wait_vbl()      { vk::waitVbl(); }
-uint32_t vk_get_modpos()    { return vk::getModPos(); }
+uint32_t vk_get_modpos()    { vk::audioPump(); return vk::getModPos(); }
 uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
 
 // palette + present helpers: take 768-byte buffer / nothing.
@@ -73,5 +75,14 @@ int  vk_audio_play()        { return vk::audioPlay(); }
 int  vk_audio_stop()        { return vk::audioStop(); }
 void vk_audio_clear()       { }
 void vk_audio_set_pattern(int pos) { (void)pos; }
+
+// trace hook from NASM (simple %s/%x/%d formatting via platform logger)
+void vk_log_printf(const char* fmt, ...) {
+    char buf[512];
+    va_list ap; va_start(ap, fmt);
+    std::vsnprintf(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    vk::logPrint("%s", buf);
+}
 
 } // extern "C"

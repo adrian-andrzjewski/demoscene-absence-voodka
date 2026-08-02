@@ -11,6 +11,7 @@
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -46,9 +47,28 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     return DefWindowProcW(h, m, w, l);
 }
 
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
+
+    // optional: --record <dir>  (deterministic frame+palette capture)
+    const char* recDir = nullptr;
+    {
+        std::string cmd = lpCmd ? lpCmd : "";
+        auto p = cmd.find("--record");
+        if (p != std::string::npos) {
+            std::string rest = cmd.substr(p + 8);
+            size_t st = rest.find_first_not_of(" \t\"");
+            if (st != std::string::npos) {
+                size_t sp = rest.find_first_of(" \t", st + 1);
+                std::string dir = rest.substr(st, sp == std::string::npos ? std::string::npos : sp - st);
+                while (!dir.empty() && dir.back() == '"') dir.pop_back();
+                if (!dir.empty()) recDir = _strdup(dir.c_str());
+            }
+        }
+        if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
+        else vk::logPrint("[app] no --record\n");
+    }
 
     // ---- register window ------------------------------------------------
     WNDCLASSW wc{};
@@ -81,6 +101,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
         return 1;
     }
     vk::timerInit();
+    vk::recInit(recDir);
     vk::audioInit("D:/Project/voodka2/music/amnezja2.mod", 44100);
     if (!vk::initPresent(hwnd, kWinW, kWinH)) {
         vk::logPrint("[app] D3D11 init failed\n");
@@ -88,10 +109,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     }
 
     // ---- run the demo core (assembly) --------------------------------------
-    // demo core is provided by the NASM objects (Phases 3-4). Fallback here is
-    // a software test pattern so the platform builds/runs standalone.
-    int rcode = DemoStart32(vk::arena(), 64ull * 1024 * 1024);
+    uint8_t* ab = vk::arena();
+    vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
+    int rcode = DemoStart32(ab, 64ull * 1024 * 1024);
 
+    vk::recClose();
     vk::audioShutdown();
     vk::logFlush();
     return rcode;

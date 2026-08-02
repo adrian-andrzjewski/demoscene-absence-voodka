@@ -34,11 +34,10 @@ void logPrint(const char* fmt, ...) {
     va_start(ap, fmt);
     std::vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
-    OutputDebugStringA(buf);
     if (g_log != INVALID_HANDLE_VALUE) {
         EnterCriticalSection(&g_logCs);
         DWORD wr = 0;
-        WriteFile(g_log, buf, (DWORD)strlen(buf), &wr, nullptr);
+        WriteFile(g_log, buf, (DWORD)std::strlen(buf), &wr, nullptr);
         LeaveCriticalSection(&g_logCs);
     }
 }

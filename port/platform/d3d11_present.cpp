@@ -10,7 +10,9 @@
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <windows.h>
+#include <cstdio>
 #include <cstring>
+#include <string>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -158,9 +160,32 @@ void currentPalette(uint8_t out[768]) {
     memcpy(out, g_pal, 768);
 }
 
+// ---- deterministic frame recorder (validation) ------------------------------
+// When VOODKA_RECORD_DIR is set, every presented frame's raw 320x200x8
+// framebuffer + 768-byte palette is appended to {dir}/{frame}.raw (index
+// bytes, 768 bytes) for offline diffing against the original.
+static FILE* g_rec = nullptr;
+
+void recInit(const char* dir) {
+    if (!dir) return;
+    std::string path = std::string(dir) + "\\frames.raw";
+    g_rec = fopen(path.c_str(), "wb");
+    if (g_rec) logPrint("[rec] recording frames to %s\n", path.c_str());
+}
+void recClose() { if (g_rec) { fclose(g_rec); g_rec = nullptr; } }
+static void recPush(const uint8_t* frame) {
+    if (!g_rec) return;
+    fwrite(frame, 1, kFramebufferBytes, g_rec);
+    fwrite(g_pal, 1, kPaletteBytes, g_rec);
+    fflush(g_rec);
+}
+
 void presentFrame() {
     if (!g_ctx) return;
+    static long cnt = 0;
+    if ((cnt++ & 0x3fff) == 0) logPrint("[d3d] presentFrame #%ld\n", cnt);
     const uint8_t* frame = arena() + kFramebufferOffset;
+    recPush(frame);
 
     // upload index texture from the arena framebuffer
     D3D11_MAPPED_SUBRESOURCE m{};

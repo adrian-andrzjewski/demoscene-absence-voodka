@@ -37,9 +37,11 @@ set(VOODKA_DAT "${CMAKE_SOURCE_DIR}/data/vodka.dat")
 
 add_executable(vodka_pack tools/vodka_pack/vodka_pack.cpp)
 add_executable(tabl2nasm  tools/vodka_pack/tabl2nasm.cpp)
+add_executable(frames2img  tools/validate/frames2img.cpp)
 if(MSVC)
     target_compile_options(vodka_pack PRIVATE /W4)
     target_compile_options(tabl2nasm  PRIVATE /W4)
+    target_compile_options(frames2img PRIVATE /W4)
 endif()
 
 add_custom_command(

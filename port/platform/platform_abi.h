@@ -51,6 +51,8 @@ bool initPresent(void* hwnd, int w, int h); // create D3D11 swapchain + resource
 void setPalette(const uint8_t r[256], const uint8_t g[256], const uint8_t b[256]);
 void currentPalette(uint8_t out[768]);  // copy current 6->8 stored palette
 void presentFrame();                      // palette+frame -> D3D11 -> present
+void recInit(const char* dir);            // enable deterministic frame recording
+void recClose();
 
 // ---- timing ----------------------------------------------------------------
 void     timerInit();          // start the 70Hz retrace emulation

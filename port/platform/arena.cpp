@@ -109,8 +109,11 @@ uint32_t loadInternalFile(const char* name) {
     // Only the demo's outer archive "voodka.dat" is requested by name; the
     // inner 76 files are resolved by the NASM core through the vodka macro.
     if (_stricmp(name, "voodka.dat") == 0 || _stricmp(name, "vodka.dat") == 0) {
-        uint32_t off = arenaAlloc((uint32_t)g_archive.size());
+        static uint32_t cached = 0;
+        if (cached) return cached;              // idempotent - one copy
+        uint32_t off = arenaAlloc((uint32_t)g_archive.size()) | uint32_t{0};
         memcpy(g_arena + off, g_archive.data(), g_archive.size());
+        cached = off;
         return off;
     }
     logPrint("[arena] loadInternalFile: unknown internal file '%s'\n", name);
