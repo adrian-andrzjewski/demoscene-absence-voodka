@@ -7,6 +7,7 @@ set(VOODKA_CORE_ASM
     inc/sin_tables.asm
     engine/engine.asm
     engine/txtr.asm
+    parts/p1.asm
     parts/p6.asm
     parts/p7.asm
 )

@@ -29,9 +29,12 @@ int main() {
         std::fprintf(f, "\tdd %d\n", sv(i));
     }
     std::fprintf(f, "\nglobal sinus\nsinus:\n");
-    for (int i = 0; i < 1024; i++) {
+    // NOTE: the engine reads cos as word sinus[256 + (angle&1023)] (byte
+    // offset 512 + idx*2), so it can touch indices 256..1279.  Emit two
+    // periods (2048 entries) so those reads stay within the table.
+    for (int i = 0; i < 2048; i++) {
         if (i % 8 == 0) std::fprintf(f, "\n");
-        std::fprintf(f, "\tdw %d\n", sv(i));
+        std::fprintf(f, "\tdw %d\n", sv(i % 1024));
     }
     std::fclose(f);
     return 0;

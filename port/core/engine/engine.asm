@@ -137,7 +137,15 @@ n_calc:
         push    r12
         push    r13
         push    r14
-        sub     rsp, 0x30
+        push    r15
+        ; n_calc decrements the points/faces globals in its loops (mirroring
+        ; the original `push points faces` / `pop faces points`); stash them
+        ; in r15 + a stack slot (r10/r11/r8/r9 are clobbered by the normalize
+        ; step below, so they can't hold the saved values).
+        mov     r15d, dword [rel points]
+        mov     eax, dword [rel faces]
+        push    rax                     ; saved faces (16 bytes below rbp area)
+        sub     rsp, 0x28
 
         ; inc_addr (word counts) = 0
         mov     eax, [rel inc_addr]
@@ -328,7 +336,14 @@ n_calc:
         dec     ecx
         jne     .fin_loop
 
-        add     rsp, 0x30
+        ; restore the points/faces globals (see prologue)
+        mov     [rel points], r15d
+        mov     eax, [rsp+0x28]         ; saved faces (right above our frame)
+        mov     [rel faces], eax
+
+        add     rsp, 0x28
+        pop     rax                     ; saved faces slot
+        pop     r15
         pop     r14
         pop     r13
         pop     r12

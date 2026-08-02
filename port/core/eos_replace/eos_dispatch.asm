@@ -113,12 +113,12 @@ eos_dispatch:
         jmp     .done_ok
 
 ; ---- allocate selector: rsi=real ptr (offset+Code32_addr), edi=limit
-;      -> bx = handle ----------------------------------------------------------
+;      -> ax = handle  (NOTE: result in ax, NOT bx - the epilogue restores
+;      rbx, which would clobber a bx result.  eax survives the pops.)
 .alloc_sel:
         mov     rcx, rsi
         mov     edx, edi
         call    vk_selector_alloc     ; (base, limit) -> eax handle
-        mov     bx, ax
         jmp     .done_ok
 
 ; ---- deallocate selector: bx = handle --------------------------------------
@@ -133,10 +133,9 @@ eos_dispatch:
         mov     eax, eax
         jmp     .done_ok
 
-; ---- get info: -> bl = song position (ModPos) ------------------------------
+; ---- get info: -> al = song position (ModPos)  (NOT bl - see .alloc_sel) ---
 .get_info:
         call    vk_get_modpos
-        mov     bl, al
         jmp     .done_ok
 
 ; ---- load internal file: edx = name ptr -> eax = arena offset --------------

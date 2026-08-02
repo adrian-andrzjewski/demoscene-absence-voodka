@@ -32,6 +32,11 @@ framebuffer_off: resd 1
 global _file_addr
 _file_addr: resd 1
 
+; normal-scale constant used by the engine's n_calc normalize step
+; (DEMO.AS^: `public len; len dd 0`; P1 sets it to 81)
+global len
+len: resd 1
+
 section .data align=16
 ; max-brightness VGA palette (768 bytes of 63) - used by every fade
 global white
@@ -48,7 +53,7 @@ GetModPos:
         sub     rsp, 0x28
         mov     eax, EOS_GET_INFO
         call    eos_dispatch
-        movzx   eax, bl
+        movzx   eax, al
         mov     [rel ModPos], ax
         add     rsp, 0x28
         pop     rbx

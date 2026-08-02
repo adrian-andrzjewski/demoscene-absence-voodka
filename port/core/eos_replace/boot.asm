@@ -34,6 +34,7 @@ extern _screen
 extern GetModPos
 extern ModPos
 
+extern part1
 extern part6
 extern part7
 
@@ -76,6 +77,8 @@ DemoStart32:
 
         cmp     eax, 0
         je      .full_sequence
+        cmp     eax, 1
+        je      .single_p1
         cmp     eax, 6
         je      .single_p6
         cmp     eax, 7
@@ -83,6 +86,9 @@ DemoStart32:
         ; unknown single part: default to the full slice
         jmp     .full_sequence
 
+.single_p1:
+        call    part1
+        jmp     .done
 .single_p6:
         call    part6
         jmp     .done
@@ -91,7 +97,8 @@ DemoStart32:
         jmp     .done
 
 .full_sequence:
-        ; current implemented slice: P6 then P7
+        ; current implemented slice: P1 then P6 then P7
+        call    part1
         call    part6
         call    part7
 
