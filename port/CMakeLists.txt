@@ -89,6 +89,25 @@ target_include_directories(engine_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform
 target_link_libraries(engine_selftest PRIVATE engine_core_objects)
 add_test(NAME engine.crosscheck COMMAND engine_selftest)
 
+# txtr_selftest: C++ reference vs the ported texture-mapped triangle rasterizer
+# (txtr.asm tm_face) through a second small shim. Compares byte-for-byte.
+add_library(txtr_core_objects STATIC
+    core/engine/txtr.asm
+    core/engine/txtr_selftest.asm
+)
+target_include_directories(txtr_core_objects PRIVATE
+    "${CMAKE_SOURCE_DIR}/core/eos_replace"
+    "${CMAKE_SOURCE_DIR}/core/inc"
+    "${CMAKE_SOURCE_DIR}/core/engine"
+)
+target_include_directories(txtr_core_objects PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/core/inc")
+
+add_executable(txtr_selftest tools/validate/txtr_selftest.cpp)
+target_compile_definitions(txtr_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(txtr_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(txtr_selftest PRIVATE txtr_core_objects)
+add_test(NAME txtr.crosscheck COMMAND txtr_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
