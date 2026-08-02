@@ -56,22 +56,28 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     vk::logPrint("[app] VOODKA x64 port starting\n");
 
     // optional: --record <dir>  (deterministic frame+palette capture)
+    //       and  --diag <dir>   (GPU readback diagnostics)
     const char* recDir = nullptr;
+    const char* diagDir = nullptr;
+    auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
+        std::string f = "--" + std::string(flag);
+        auto p = cmd.find(f);
+        if (p == std::string::npos) return nullptr;
+        std::string rest = cmd.substr(p + f.size());
+        size_t st = rest.find_first_not_of(" \t\"");
+        if (st == std::string::npos) return nullptr;
+        size_t sp = rest.find_first_of(" \t", st + 1);
+        std::string dir = rest.substr(st, sp == std::string::npos ? std::string::npos : sp - st);
+        while (!dir.empty() && dir.back() == '"') dir.pop_back();
+        return dir.empty() ? nullptr : _strdup(dir.c_str());
+    };
     {
         std::string cmd = lpCmd ? lpCmd : "";
-        auto p = cmd.find("--record");
-        if (p != std::string::npos) {
-            std::string rest = cmd.substr(p + 8);
-            size_t st = rest.find_first_not_of(" \t\"");
-            if (st != std::string::npos) {
-                size_t sp = rest.find_first_of(" \t", st + 1);
-                std::string dir = rest.substr(st, sp == std::string::npos ? std::string::npos : sp - st);
-                while (!dir.empty() && dir.back() == '"') dir.pop_back();
-                if (!dir.empty()) recDir = _strdup(dir.c_str());
-            }
-        }
+        recDir = argDirOf(cmd, "record");
+        diagDir = argDirOf(cmd, "diag");
         if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
         else vk::logPrint("[app] no --record\n");
+        if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
     }
 
     // ---- register window ------------------------------------------------
@@ -111,6 +117,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         vk::logPrint("[app] D3D11 init failed\n");
         return 1;
     }
+    vk::diagReadbackInit(diagDir);
 
     // ---- entry-point seeking -----------------------------------------------
     // The demo may begin from a scene in the middle of the timeline; the music
@@ -163,12 +170,27 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         }
     }
 
-    // ---- run the demo core (assembly) --------------------------------------
+    // ---- self-test or run the demo core (assembly) --------------------------
     uint8_t* ab = vk::arena();
-    vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
-    int rcode = DemoStart32(ab, 64ull * 1024 * 1024);
+    int rcode = 0;
+    bool selftest = std::string(lpCmd ? lpCmd : "").find("--selftest") != std::string::npos;
+    if (selftest) {
+        // present the built-in pattern a few times so the readback can be
+        // compared 1:1; bypasses the demo entirely
+        vk::logPrint("[app] SELF-TEST: rendering known pattern\n");
+        vk::selfTestPattern();
+        for (int i = 0; i < 60 && vk::diagReadbackEnabled(); i++) {
+            vk::presentFrame();
+            Sleep(16);
+        }
+        rcode = 0;
+    } else {
+        vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
+        rcode = DemoStart32(ab, 64ull * 1024 * 1024);
+    }
 
     vk::recClose();
+    vk::diagReadbackShutdown();
     vk::audioShutdown();
     vk::logFlush();
     return rcode;

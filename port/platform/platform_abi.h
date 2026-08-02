@@ -54,6 +54,18 @@ void presentFrame();                      // palette+frame -> D3D11 -> present
 void recInit(const char* dir);            // enable deterministic frame recording
 void recClose();
 
+// Presentation self-test: fills the arena framebuffer with a known pattern
+// and uploads a known palette, bypassing the demo, so the GPU readback can
+// be compared 1:1 against the expected image to isolate presentation bugs.
+void selfTestPattern();
+
+// Presentation diagnostics: when enabled, after each present the swapchain
+// back buffer is copied back to CPU and, along with the source framebuffer
+// and palette, saved to files for byte-level validation of the display path.
+void diagReadbackInit(const char* dir);   // start readback capture into dir
+void diagReadbackShutdown();
+bool diagReadbackEnabled();
+
 // ---- timing ----------------------------------------------------------------
 void     timerInit();          // start the 70Hz retrace emulation
 uint64_t getFrameCounter();   // VGA-retrace emulated counter

@@ -118,8 +118,9 @@ mieszanie:
         call    mieszanie
         lea     rsi, [rel white]
         call    pal_set
-        mov     edi, [rel _paleta]
-        add     rdi, qword [rel Code32_addr]
+        ; pal_set expects the palette pointer in rsi (not edi!)
+        mov     esi, [rel _paleta]
+        add     rsi, qword [rel Code32_addr]
         call    pal_set
 %%.frame_loop:
         woda
@@ -134,8 +135,6 @@ mieszanie:
         cmp     eax, [rel phase_exit]
         jle     %%.frame_loop
 %endmacro
-
-; ------------------------------------------------------------------- part7 --
 global part7
 part7:
         push    rbp
@@ -185,8 +184,8 @@ part7:
         call    mieszanie
         lea     rsi, [rel white]
         call    pal_set
-        mov     edi, [rel _paleta]
-        add     rdi, qword [rel Code32_addr]
+        mov     esi, [rel _paleta]
+        add     rsi, qword [rel Code32_addr]
         call    pal_set
 .seven_loop:
         woda
@@ -208,8 +207,8 @@ part7:
         lea     rdi, [rel white]
         call    pal_fadein10
         ; then re-apply the picture palette so base stays
-        mov     edi, [rel _paleta]
-        add     rdi, qword [rel Code32_addr]
+        mov     esi, [rel _paleta]
+        add     rsi, qword [rel Code32_addr]
         call    pal_set
 .seven_no_fade:
         movzx   eax, word [rel ModPos]

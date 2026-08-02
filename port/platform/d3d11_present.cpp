@@ -33,6 +33,7 @@ ID3D11VertexShader*     g_vs = nullptr;
 ID3D11PixelShader*      g_ps = nullptr;
 ID3D11SamplerState*     g_samp = nullptr;
 ID3D11RenderTargetView* g_rtv = nullptr;
+ID3D11RasterizerState*  g_ras = nullptr;
 D3D11_VIEWPORT          g_vp{};
 
 // platform-side copy of the 256-entry palette (fades update it constantly)
@@ -51,7 +52,8 @@ static const char kPS[] =
     "struct VSOut { float4 pos : SV_Position; float2 uv : TEX; };\n"
     "float4 main(VSOut i) : SV_Target {\n"
     "    float idx = IndexTex.Sample(S0, i.uv).r * 255.0;\n"
-    "    return PalTex.Sample(S0, float2(idx / 255.0, 0.0));\n"
+    "    // center each texel: index N -> palette texel N exactly\n"
+    "    return PalTex.Sample(S0, float2((idx + 0.5) / 256.0, 0.5));\n"
     "}\n";
 
 struct Vertex { float x, y, u, v; };
@@ -135,6 +137,15 @@ bool initPresent(void* hwnd, int winW, int winH) {
     smd.AddressU = smd.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
     g_dev->CreateSamplerState(&smd, &g_samp);
 
+    // Fullscreen quad is a plain 2D pass - disable back-face culling. Without
+    // this, the counter-clockwise triangle of the quad is culled by D3D's
+    // default (CW front) winding, so only half the frame is ever drawn.
+    D3D11_RASTERIZER_DESC rd{};
+    rd.FillMode = D3D11_FILL_SOLID;
+    rd.CullMode = D3D11_CULL_NONE;
+    rd.DepthClipEnable = TRUE;
+    g_dev->CreateRasterizerState(&rd, &g_ras);
+
     ID3D11Texture2D* back = nullptr;
     if (FAILED(g_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back))) {
         logPrint("[d3d] GetBuffer for RTV failed\n");
@@ -160,11 +171,103 @@ void currentPalette(uint8_t out[768]) {
     memcpy(out, g_pal, 768);
 }
 
+// ---- presentation self-test -------------------------------------------------
+// Writes a known 8-color quadrant pattern into the arena framebuffer and a
+// matching palette. After selfTestPattern() + presentFrame, the GPU readback
+// must show exactly these colors in the right quadrants/positions - any
+// deviation pinpoints an upload/sampling/present bug.
+void selfTestPattern() {
+    uint8_t* fb = arena() + kFramebufferOffset;
+    // palette: 8 entries -> red,green,blue,yellow,cyan,magenta,white,gray
+    static const uint8_t pal[8][3] = {
+        {63,0,0},{0,63,0},{0,0,63},{63,63,0},
+        {0,63,63},{63,0,63},{63,63,63},{31,31,31}
+    };
+    for (int i = 0; i < 256; i++) {
+        g_pal[i*3+0] = pal[i&7][0];
+        g_pal[i*3+1] = pal[i&7][1];
+        g_pal[i*3+2] = pal[i&7][2];
+    }
+    // fill 320x200 with pattern:
+    //   index = ((x/80) + ((y/50)*2)) & 7   -> 4x4 grid of 8 colors
+    for (int y = 0; y < kScreenH; y++)
+        for (int x = 0; x < kScreenW; x++)
+            fb[y * kScreenW + x] = (uint8_t)(((x / 80) + (y / 50) * 2) & 7);
+    logPrint("[d3d] selfTestPattern: wrote 4x4 8-color grid to framebuffer\n");
+}
+
 // ---- deterministic frame recorder (validation) ------------------------------
 // When VOODKA_RECORD_DIR is set, every presented frame's raw 320x200x8
 // framebuffer + 768-byte palette is appended to {dir}/{frame}.raw (index
 // bytes, 768 bytes) for offline diffing against the original.
 static FILE* g_rec = nullptr;
+
+// ---- presentation readback diagnostic --------------------------------------
+// Copies the rendered swapchain back buffer back to CPU and saves it next to
+// the assembly framebuffer + palette so the full path can be validated.
+static FILE*  g_diagIn = nullptr;
+static FILE*  g_diagSrc = nullptr;
+static FILE*  g_diagPal = nullptr;
+static ID3D11Texture2D* g_diagStaging = nullptr;
+static int    g_diagCaptured = 0;
+static bool   g_diagInit = false;
+static int    g_diagCount = 0;
+
+void diagReadbackInit(const char* dir) {
+    g_diagInit = dir != nullptr;
+    if (!g_diagInit) return;
+    std::string base = std::string(dir);
+    g_diagIn   = fopen((base + "\\frame_gpu.raw").c_str(), "wb");
+    g_diagSrc  = fopen((base + "\\frame_src.raw").c_str(), "wb");
+    g_diagPal  = fopen((base + "\\frame_pal.raw").c_str(), "wb");
+    // staging texture matching the swapchain (R8G8B8A8)
+    auto td = [](UINT w, UINT h) {
+        D3D11_TEXTURE2D_DESC d{}; d.Width = w; d.Height = h;
+        d.MipLevels = 1; d.ArraySize = 1; d.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+        d.SampleDesc.Count = 1; d.Usage = D3D11_USAGE_STAGING;
+        d.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+        return d;
+    };
+    if (g_swap) {
+        DXGI_SWAP_CHAIN_DESC sd;
+        if (SUCCEEDED(g_swap->GetDesc(&sd)))
+            g_dev->CreateTexture2D(&td(sd.BufferDesc.Width, sd.BufferDesc.Height), nullptr, &g_diagStaging);
+    }
+    if (g_diagIn && g_diagSrc && g_diagPal) logPrint("[d3d] readback diagnostics on -> %s\n", dir);
+}
+void diagReadbackShutdown() {
+    if (g_diagIn) fclose(g_diagIn);
+    if (g_diagSrc) fclose(g_diagSrc);
+    if (g_diagPal) fclose(g_diagPal);
+    if (g_diagStaging) g_diagStaging->Release();
+    g_diagInit = false;
+}
+bool diagReadbackEnabled() { return g_diagInit; }
+
+static void diagCapture(const uint8_t* srcFrame) {
+    if (!g_diagInit || !g_diagStaging || g_diagCaptured >= 4) return;
+    g_diagCaptured++;
+    // dump source framebuffer + palette
+    fwrite(srcFrame, 1, kFramebufferBytes, g_diagSrc);
+    fwrite(g_pal, 1, kPaletteBytes, g_diagPal);
+    fflush(g_diagSrc); fflush(g_diagPal);
+    // read back the presented swapchain back buffer
+    ID3D11Texture2D* back = nullptr;
+    if (SUCCEEDED(g_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back))) {
+        g_ctx->CopyResource(g_diagStaging, back);
+        D3D11_MAPPED_SUBRESOURCE m{};
+        if (SUCCEEDED(g_ctx->Map(g_diagStaging, 0, D3D11_MAP_READ, 0, &m))) {
+            uint32_t w = 0, h = 0;
+            D3D11_TEXTURE2D_DESC d; g_diagStaging->GetDesc(&d);
+            w = d.Width; h = d.Height;
+            for (UINT y = 0; y < h; y++)
+                fwrite((uint8_t*)m.pData + (size_t)y * m.RowPitch, 1, w * 4, g_diagIn);
+            g_ctx->Unmap(g_diagStaging, 0);
+        }
+        back->Release();
+    }
+    fflush(g_diagIn);
+}
 
 void recInit(const char* dir) {
     if (!dir) return;
@@ -226,10 +329,13 @@ void presentFrame() {
     g_ctx->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
     g_ctx->VSSetShader(g_vs, nullptr, 0);
     g_ctx->PSSetShader(g_ps, nullptr, 0);
+    g_ctx->RSSetState(g_ras);
     g_ctx->PSSetShaderResources(0, 1, &g_indexSrv);
     g_ctx->PSSetShaderResources(1, 1, &g_palSrv);
     g_ctx->PSSetSamplers(0, 1, &g_samp);
     g_ctx->Draw(6, 0);
+
+    diagCapture(frame);          // read back GPU output before presenting
 
     g_swap->Present(1, 0);   // vsync lock
 }
