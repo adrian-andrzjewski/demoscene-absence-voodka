@@ -38,10 +38,12 @@ set(VOODKA_DAT "${CMAKE_SOURCE_DIR}/data/vodka.dat")
 add_executable(vodka_pack tools/vodka_pack/vodka_pack.cpp)
 add_executable(tabl2nasm  tools/vodka_pack/tabl2nasm.cpp)
 add_executable(frames2img  tools/validate/frames2img.cpp)
+add_executable(sin_tables tools/vodka_pack/sin_tables.cpp)
 if(MSVC)
     target_compile_options(vodka_pack PRIVATE /W4)
     target_compile_options(tabl2nasm  PRIVATE /W4)
     target_compile_options(frames2img PRIVATE /W4)
+    target_compile_options(sin_tables PRIVATE /W4)
 endif()
 
 add_custom_command(
@@ -51,6 +53,42 @@ add_custom_command(
     COMMENT "Packing vodka.dat from reference DANE/ (LINKER.PAS semantics)"
 )
 add_custom_target(voodka_data ALL DEPENDS "${VOODKA_DAT}")
+
+# ---- sine tables (generated; used by the engine + MROTATE) -----------------
+set(VOODKA_SIN "${CMAKE_SOURCE_DIR}/core/inc/sin_tables.asm")
+add_custom_command(
+    OUTPUT "${VOODKA_SIN}"
+    COMMAND sin_tables
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/core/inc"
+    DEPENDS sin_tables
+    COMMENT "Generating sine tables (sin + sinus)"
+    VERBATIM
+)
+add_custom_target(voodka_sin ALL DEPENDS "${VOODKA_SIN}")
+
+# ---- engine cross-check test ------------------------------------------------
+# engine_selftest: C++ reference vs the ported NASM engine (engine.asm --
+# through a small MS-x64 shim that adapts the original's register-global
+# calling convention). Validates sqrt / rotate_shape / n_calc / radix sort.
+add_library(engine_core_objects STATIC
+    core/engine/engine.asm
+    core/engine/engine_selftest.asm
+    core/inc/sin_tables.asm
+)
+target_include_directories(engine_core_objects PRIVATE
+    "${CMAKE_SOURCE_DIR}/core/eos_replace"
+    "${CMAKE_SOURCE_DIR}/core/inc"
+    "${CMAKE_SOURCE_DIR}/core/engine"
+)
+add_dependencies(engine_core_objects voodka_sin)
+target_include_directories(engine_core_objects PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/core/inc")
+
+add_executable(engine_selftest tools/validate/engine_selftest.cpp)
+target_compile_definitions(engine_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(engine_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(engine_selftest PRIVATE engine_core_objects)
+add_test(NAME engine.crosscheck COMMAND engine_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()

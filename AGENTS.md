@@ -26,6 +26,12 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
 - **Build:** run `port/build.ps1 -Config Release -Test` (auto-locates
   VS2022/2026, applies vcvars, runs CMake with vendored NASM). Output goes to
   `port/bin/Release/VOODKA.exe`.
+  **Gotcha:** if you reconfigure with `cmake -B`, pass
+  `-DCMAKE_ASM_NASM_COMPILER=D:/Project/voodka2/modules/nasm/nasm.exe`. The
+  CMake cache can otherwise resolve a system NASM (e.g. 3.01) whose codegen
+  breaks `[rel X]` references into high-VA `.bss` (silent heap/stack corruption
+  in the engine selftest — sort/n_calc fail or crash). Always verify
+  `CMakeCache.txt` shows the vendored exe.
 - **Run:** `VOODKA.exe [--record <dir>]` draws the demo in a 960x600 window
   (320x200x256 logic upscaled via D3D11 palette texture). `--record` dumps
   per-frame 320x200-index + 768-palette to `<dir>/frames.raw`; convert with
