@@ -61,7 +61,7 @@ add_subdirectory("${CMAKE_SOURCE_DIR}/../modules/libxmp"
                  "${CMAKE_BINARY_DIR}/libxmp")
 
 # ---- platform layer + assembly core (phases >0) -----------------------------
-# add_subdirectory(platform)
+add_subdirectory(platform)
 # add_subdirectory(core)
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")
