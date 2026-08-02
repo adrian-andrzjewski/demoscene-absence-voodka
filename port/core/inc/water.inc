@@ -61,6 +61,9 @@ calculateWater:
         mov     edi, [rel _bufor2]
         mov     esi, [rel _bufor1]
 .ches2:
+        ; add the arena base so these are real pointers, then offset in
+        add     rdi, qword [rel Code32_addr]
+        add     rsi, qword [rel Code32_addr]
         add     rsi, 161*2
         add     rdi, 161*2
 
@@ -136,43 +139,66 @@ drawWater:
 .draw:
         add     rsi, qword [rel Code32_addr]
 
-        ; ecx = (-99 << 16) | 160 ; WaterY = 0  (0xFF9D0000 + 160)
-        mov     ecx, 0xFF9D0000 + 160
+        ; ---- rasterize 160x100 water field -> 320x200 screen (2x2 upscale).
+        ; Each page cell outputs a 2x2 block at (row*2, col*2). The original
+        ; fused the counter into ecx=(-99<<16)|160 and advanced edi by 2 per
+        ; column plus 320 per row (640/row = 2 screen rows); we do the same
+        ; but with explicit row/col counters and a screen-bounds guard.
         mov     word [rel water_y], 0
-.outer:
+dw_outer:
         mov     cx, 160
         mov     word [rel water_x], 0
-.inner:
+dw_inner:
         ; ---- vdiff = [esi] - [esi+320] ; hdiff = [esi] - [esi+2] ----
+        ; IMPORTANT: ecx is the row/col loop counter. This entire block must
+        ; only use eax/ebx/edx/r8d/r9d/r10d/r11d/r12/r13 as scratch.
         movzx   eax, word [rsi]
         movzx   r10d, word [rsi + 320]
         movzx   r11d, word [rsi + 2]
-        mov     ecx, eax
-        sub     cx, r10w               ; cx = vdiff (16-bit, wraps)
         mov     edx, eax
+        sub     ax, r10w               ; ax = vdiff (16-bit, wraps)
         sub     dx, r11w               ; dx = hdiff (16-bit, wraps)
 
         ; ---- innerWater = (128 - vdiff) & 0xff ----
-        mov     eax, 128
-        sub     ax, cx                 ; 128 - vdiff
-        and     eax, 0xffff
-        mov     [rel inner_water], al
+        mov     ebx, 128
+        sub     bx, ax                 ; 128 - vdiff
+        and     ebx, 0xFFFF
+        mov     [rel inner_water], bl
 
-        ; ---- bx = vdiff>>3 + water_y ; dx = hdiff>>3 + water_x ----
-        mov     bx, cx
-        sar     bx, 3
-        add     bx, word [rel water_y]
-        sar     dx, 3
-        add     dx, word [rel water_x]
+        ; ---- row = (vdiff>>3)+water_y ; col = (hdiff>>3)+water_x ----
+        movsx   r8d, ax
+        sar     r8d, 3
+        movzx   r9d, word [rel water_y]
+        add     r8d, r9d
+        movsx   r9d, dx
+        sar     r9d, 3
+        movzx   r10d, word [rel water_x]
+        add     r9d, r10d
 
-        ; ---- ax = MUL160[bx] + dx ; pixel = picture[ax] ----
-        movzx   ecx, bx
+        ; ---- clamp row [0,99], col [0,159] ----
+        ; (original read OOB in flat DOS memory; Windows guard pages fault)
+        test    r8d, r8d
+        jns     ww_row_nn
+        xor     r8d, r8d
+ww_row_nn:
+        cmp     r8d, 99
+        jbe     ww_row_ok
+        mov     r8d, 99
+ww_row_ok:
+        test    r9d, r9d
+        jns     ww_col_nn
+        xor     r9d, r9d
+ww_col_nn:
+        cmp     r9d, 159
+        jbe     ww_col_ok
+        mov     r9d, 159
+ww_col_ok:
         lea     r12, [rel MUL160]
-        movzx   eax, word [r12 + rcx*2]
-        add     ax, dx
+        movzx   eax, word [r12 + r8*2]
+        add     eax, r9d
+        movzx   eax, byte [r13 + rax]
 
         ; multiply by innerWater -> ah stored (2x2 upsample)
-        movzx   eax, byte [r13 + rax]
         movzx   ebx, byte [rel inner_water]
         imul    ax, bx                ; ax = picture * innerWater
 
@@ -186,12 +212,12 @@ drawWater:
         add     rsi, 2
         inc     word [rel water_x]
         dec     cx
-        jnz     .inner
+        jnz     dw_inner
 
         add     rdi, 320
         inc     word [rel water_y]
-        add     ecx, 0x00010000
-        js      .outer
+        cmp     word [rel water_y], 100
+        jb      dw_outer
 
         add     rsp, 0x28
         pop     r15

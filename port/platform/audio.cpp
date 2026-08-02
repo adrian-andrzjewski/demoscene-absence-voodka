@@ -28,18 +28,14 @@ HANDLE      g_thread = nullptr;
 HANDLE      g_stop = nullptr;
 volatile long g_playing = 0;
 volatile long g_order = 0, g_row = 0;
+volatile long g_posBase = 0;          // rows accumulated across module loops
+volatile long g_prevOrder = -1;        // for loop-wrap detection
 CRITICAL_SECTION g_xmpCs = {};   // serializes ALL libxmp access (not thread-safe)
 
 IAudioClient*       g_ac = nullptr;
 IAudioRenderClient* g_arc = nullptr;
 UINT32              g_bufFrames = 0;
 UINT32              g_chunkFrames = 0;
-}
-
-uint32_t getModPos() {
-    // calibration: ModPos = (order<<6)|row  (64 rows per ProTracker pattern)
-    long o = _InterlockedOr(&g_order, 0), r = _InterlockedOr(&g_row, 0);
-    return (uint32_t)((o << 6) | r);
 }
 
 uint32_t getModLength() {
@@ -126,8 +122,23 @@ void audioPump() {
     EnterCriticalSection(&g_xmpCs);
     xmp_get_frame_info(g_xmp, &fi);
     LeaveCriticalSection(&g_xmpCs);
+    // cumulative song position: when the order list wraps back to a lower
+    // order, add one full loop of rows so ModPos stays monotonic.
+    long prev = _InterlockedOr(&g_prevOrder, 0);
+    if (prev >= 0 && fi.pos < prev) {
+        long modlen = (long)getModLength();
+        _InterlockedExchange(&g_posBase, g_posBase + modlen * 64);
+    }
+    _InterlockedExchange(&g_prevOrder, fi.pos);
     InterlockedExchange(&g_order, fi.pos);
     InterlockedExchange(&g_row, fi.row);
+}
+
+uint32_t getModPos() {
+    // monotonic song position in rows: base + order*64 + row
+    long base = _InterlockedOr(&g_posBase, 0);
+    long o = _InterlockedOr(&g_order, 0), r = _InterlockedOr(&g_row, 0);
+    return (uint32_t)(base + (o << 6) | r);
 }
 
 int audioInit(const char* modPath, int) {

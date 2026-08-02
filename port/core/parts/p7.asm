@@ -157,8 +157,12 @@ part7:
 
         AllocateMemory  320*100, _bufor3
         AllocateMemory  160*100, _obrazek
-        AllocateMemoryFree 32000, _bufor1
-        AllocateMemoryFree 32000, _bufor2
+        ; page buffers: pad by two extra rows worth (640 bytes) so drawWater's
+        ; boundary reads ([esi+320], [esi+2]) at the last row stay in-bounds.
+        ; The original tolerated these over-reads in flat DOS memory; Windows
+        ; guard pages fault instead.
+        AllocateMemoryFree 32000 + 640, _bufor1
+        AllocateMemoryFree 32000 + 640, _bufor2
 
         WaitVbl
 
