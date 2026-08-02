@@ -58,9 +58,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (P6 `BUMPXXX`/`BUMPYYY`, water `WaterX/Y`/`innerWater`, `DESTINY`) — it's
   read-only under DEP. These are ported as explicit memory state with identical
   arithmetic (see `p6.asm`, `water.inc`).
-- **Status:** platform layer, EOS-replacement ABI, and P6 (bump map) run
-  end-to-end at 69.9 fps with music. P7 (water) is ported but not yet reached.
-  P1-P5, P8, engine/txtr/objects pipelines, and ModPos calibration remain.
+- **Status:** platform layer, EOS-replacement ABI, and parts P6 (2D bump map)
+  and P7 (7-phase water, 160x100->320x200 upscale) run end-to-end at
+  69.9 fps with audio and per-frame recording. P1-P5, P8, the engine
+  (ENGINE.ASM/TXTR.ASM), VR/objects pipeline, and precise ModPos
+  calibration remain.
 
 ## Original DOS build (reference only)
 
