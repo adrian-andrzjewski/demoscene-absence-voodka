@@ -8,13 +8,13 @@ set(VOODKA_PLATFORM_SOURCES
     timer.cpp
     d3d11_present.cpp
     audio.cpp
-    demo_preview.cpp   # temporary; replaced by NASM core (Phases 3-4)
+    bridge.cpp
 )
 
 add_executable(VOODKA WIN32 ${VOODKA_PLATFORM_SOURCES})
 
 target_include_directories(VOODKA PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
-target_link_libraries(VOODKA PRIVATE xmp_static)
+target_link_libraries(VOODKA PRIVATE xmp_static voodka_core)
 
 if(MSVC)
     target_compile_options(VOODKA PRIVATE /W4)
