@@ -16,14 +16,58 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (`abc_voda/`, `VOODKA.EXE`). Don't modify.
 - `music/amnezja2.mod` — the ProTracker module the demo plays (referenced as
   `amnezja2.mod` runtime filename in `CODE/DEMO.AS^`).
+- `port/` — **native Windows x64 port** (Nasm assembly core + C++ platform
+  layer). The original `demoscene-absence-voodka-master/` stays byte-identical;
+  the port reads its data from there and rebuilds `vodka.dat`.
+- `modules/` — vendored NASM 2.16.03 (`nasm.exe`) and libxmp 4.6.2 (MOD player).
 
-## Build (DOS only, Borland toolchain)
+## Windows port (port/) — how to build & debug
+
+- **Build:** run `port/build.ps1 -Config Release -Test` (auto-locates
+  VS2022/2026, applies vcvars, runs CMake with vendored NASM). Output goes to
+  `port/bin/Release/VOODKA.exe`.
+- **Run:** `VOODKA.exe [--record <dir>]` draws the demo in a 960x600 window
+  (320x200x256 logic upscaled via D3D11 palette texture). `--record` dumps
+  per-frame 320x200-index + 768-palette to `<dir>/frames.raw`; convert with
+  `port/bin/Release/frames2img.exe`.
+- **Architecture:** `port/core/*.asm` is the demo (faithful NASM x64 port of
+  TASM parts); `port/platform/*.cpp` is the EOS replacement. The bridge
+  (`bridge.cpp`) exposes the only C symbols NASM may call (`vk_*`).
+- **Memory model:** the whole demo universe is one arena (64MB). The demo
+  stores 32-bit `Code32_addr`-relative arena offsets in dwords; add the qword
+  `Code32_addr` base before dereferencing. The two VGA overlays are fixed:
+  `kBackbufferOffset` (0x10000, pt draws here) and `kFramebufferOffset`
+  (0x20000, presented). See `port/platform/platform_abi.h`.
+- **ABI rule (critical):** every NASM->C++ call must have `RSP%16==0` at the
+  `call` instruction. Prologue accounting: entry RSP%16==8; after `push rbp` it
+  is 0; each extra push moves it by 8. A function pushing 7 regs after rbp
+  needs `sub rsp,0x28`; one pushing 4 needs `sub rsp,0x20`; an *inlined* block
+  that pushes rbp+sub must reach 0 relative to the enclosing body. Getting this
+  wrong crashes inside MSVCRT/NVIDIA D3D with `/GS` cookie or stack faults —
+  the #1 gotcha in this port.
+- **EOS services** (Allocate_Memory, Allocate_Selector, wait_vbl, Get_Info,
+  Load/Play/Stop_module, use_int_08/09) go through `eos_dispatch.asm` with
+  service ids defined in `eos.inc` (original `EOS.INC` is not in the repo, so
+  the port defines its own ids). `wait_vbl` = QPC-paced ~70Hz retrace emulation
+  (`timer.cpp`); `GetModPos` = libxmp pattern position (order<<6|row, to be
+  calibrated against the original's ModPos in Phase 8).
+- **Selectors:** user-mode x64 forbids arbitrary fs/gs bases. `sel_base_table`
+  in `bridge.cpp` maps alloc_selector handles -> base pointers; texture mappers
+  read the base up front instead of `fs:[...]`.
+- **Self-modifying code:** the original patches instruction immediates
+  (P6 `BUMPXXX`/`BUMPYYY`, water `WaterX/Y`/`innerWater`, `DESTINY`) — it's
+  read-only under DEP. These are ported as explicit memory state with identical
+  arithmetic (see `p6.asm`, `water.inc`).
+- **Status:** platform layer, EOS-replacement ABI, and P6 (bump map) run
+  end-to-end at 69.9 fps with music. P7 (water) is ported but not yet reached.
+  P1-P5, P8, engine/txtr/objects pipelines, and ModPos calibration remain.
+
+## Original DOS build (reference only)
 
 Requires TASM/TASMX + TLINK, and the **EOS kernel headers are external and NOT
 in this repo**. Source includes absolute machine paths like
 `D:\TASM\EOS\EOS.INC`, `c:\TASM\EOS\EOS.INC`, `\TASM\EOS\EOS.INC`
 (inconsistent across files) — you must have EOS.INC reachable at each path.
-
 Flow:
 1. Assemble each part `P1..P8` to `.OBJ` (e.g. `CODE/P2/P2.BAT` runs
    `tasmx /kh32768 p2.as^`; `P5/M.BAT`, `P6/M.BAT`, `COMS/M.BAT` exist; others
