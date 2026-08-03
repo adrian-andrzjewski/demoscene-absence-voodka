@@ -285,6 +285,27 @@ target_include_directories(p2world_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platfor
 target_link_libraries(p2world_selftest PRIVATE p2world_core_objects)
 add_test(NAME p2world.crosscheck COMMAND p2world_selftest)
 
+# p2draw_selftest: P2 object rasterizer (p2draw.asm DrawObject /
+# DrawZielonyLudek, the per-object face walk + cull + texel math). Drives
+# vk_draw_object_trace over synthetic TEXTURE/PHONG objects and cross-checks
+# every record {drawn,x1..y3,p1..p3} against a C++ reference.
+add_library(p2draw_core_objects STATIC
+    core/engine/p2draw.asm
+    core/engine/p2draw_selftest.asm
+    core/engine/txtr.asm
+    core/engine/v2d.asm
+    core/engine/persp.asm
+)
+target_include_directories(p2draw_core_objects PRIVATE
+    "${CMAKE_SOURCE_DIR}/core/eos_replace"
+    "${CMAKE_SOURCE_DIR}/core/inc"
+)
+add_executable(p2draw_selftest tools/validate/p2draw_selftest.cpp)
+target_compile_definitions(p2draw_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(p2draw_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(p2draw_selftest PRIVATE p2draw_core_objects)
+add_test(NAME p2draw.crosscheck COMMAND p2draw_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
