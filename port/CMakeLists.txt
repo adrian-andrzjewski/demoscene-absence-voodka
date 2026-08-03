@@ -204,6 +204,23 @@ target_include_directories(loader_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform
 target_link_libraries(loader_selftest PRIVATE loader_core_objects)
 add_test(NAME loader.crosscheck COMMAND loader_selftest)
 
+# vrot_selftest: rotation/transform glue (vr-PLE2 Transform + RotateObj ->
+# vrot.asm) reusing units 1 (mrotate) + 2 (camera matrix). Transform verified
+# byte-exact vs a matrix-multiply reference; RotateObj vs unit-1 directly.
+add_library(vrot_core_objects STATIC
+    core/engine/vrot.asm
+    core/engine/mrotate.asm
+    core/engine/cammat.asm
+    core/inc/sin_tables.asm
+)
+add_dependencies(vrot_core_objects voodka_sin)
+target_include_directories(vrot_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_executable(vrot_selftest tools/validate/vrot_selftest.cpp)
+target_compile_definitions(vrot_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(vrot_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(vrot_selftest PRIVATE vrot_core_objects)
+add_test(NAME vrot.crosscheck COMMAND vrot_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
