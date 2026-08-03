@@ -158,6 +158,17 @@ target_include_directories(cammat_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform
 target_link_libraries(cammat_selftest PRIVATE cammat_core_objects)
 add_test(NAME cammat.crosscheck COMMAND cammat_selftest)
 
+# persp_selftest: C++ reference vs the ported 3D->2D perspective projection
+# (PERSP.PM -> persp.asm). Byte-for-byte over random vertices.
+add_library(persp_core_objects STATIC
+    core/engine/persp.asm
+)
+add_executable(persp_selftest tools/validate/persp_selftest.cpp)
+target_compile_definitions(persp_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(persp_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(persp_selftest PRIVATE persp_core_objects)
+add_test(NAME persp.crosscheck COMMAND persp_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
