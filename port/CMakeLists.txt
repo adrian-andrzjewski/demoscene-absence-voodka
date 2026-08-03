@@ -143,6 +143,21 @@ target_include_directories(mrotate_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platfor
 target_link_libraries(mrotate_selftest PRIVATE mrotate_core_objects)
 add_test(NAME mrotate.crosscheck COMMAND mrotate_selftest)
 
+# cammat_selftest: C++ reference vs the ported camera-matrix builder
+# (VIRTUAL.INC MakeCameraMatrix -> cammat.asm). Byte-for-byte over random eye
+# angles; unused (zeroed) matrix entries verified too.
+add_library(cammat_core_objects STATIC
+    core/engine/cammat.asm
+    core/inc/sin_tables.asm
+)
+add_dependencies(cammat_core_objects voodka_sin)
+target_include_directories(cammat_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_executable(cammat_selftest tools/validate/cammat_selftest.cpp)
+target_compile_definitions(cammat_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(cammat_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(cammat_selftest PRIVATE cammat_core_objects)
+add_test(NAME cammat.crosscheck COMMAND cammat_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
