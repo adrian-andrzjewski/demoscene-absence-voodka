@@ -268,6 +268,23 @@ target_include_directories(p2path_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform
 target_link_libraries(p2path_selftest PRIVATE p2path_core_objects)
 add_test(NAME p2path.crosscheck COMMAND p2path_selftest)
 
+# p2world_selftest: P2 World domain (INC/WORLD data + camera globals).
+# Cross-checks the World data byte-exact and drives records through unit-8
+# CalculateVisiblating against a reference (integration).
+add_library(p2world_core_objects STATIC
+    core/engine/p2world.asm
+    core/engine/vvis.asm
+    core/engine/cammat.asm
+    core/inc/sin_tables.asm
+)
+add_dependencies(p2world_core_objects voodka_sin)
+target_include_directories(p2world_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/data" "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_executable(p2world_selftest tools/validate/p2world_selftest.cpp)
+target_compile_definitions(p2world_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(p2world_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(p2world_selftest PRIVATE p2world_core_objects)
+add_test(NAME p2world.crosscheck COMMAND p2world_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
