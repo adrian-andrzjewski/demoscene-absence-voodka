@@ -11,11 +11,11 @@ Usage: python audit_addr32.py <obj...>
 """
 import struct, sys, os
 
-IMAGE_REL_AMD64_ADDR32 = 0x0001
-REL_NAMES = {1:"ADDR32",3:"ADDR32NB",4:"REL32",5:"REL32_1",6:"REL32_2",
-             7:"REL32_3",8:"REL32_4",9:"REL32_5",10:"ADDR64",14:"REL32_6",
-             15:"REL32_7",16:"REL32_8",17:"REL32_9",18:"REL32_10",
-             20:"SECTION",21:"SECREL",24:"ADDR32_10"}
+# IMAGE_REL_AMD64 types (note: ADDR32 = 2, ADDR64 = 1, REL32 = 4)
+IMAGE_REL_AMD64_ADDR32 = 0x0002
+REL_NAMES = {0:"ABS",1:"ADDR64",2:"ADDR32",3:"ADDR32NB",4:"REL32",5:"REL32_1",
+             6:"REL32_2",7:"REL32_3",8:"REL32_4",9:"REL32_5",10:"SECTION",
+             11:"SECREL",12:"SECREL7",13:"TOKEN",14:"SREL32",15:"PAIR"}
 
 def parse(path):
     d = open(path,'rb').read()
