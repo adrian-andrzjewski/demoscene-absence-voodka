@@ -221,6 +221,22 @@ target_include_directories(vrot_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
 target_link_libraries(vrot_selftest PRIVATE vrot_core_objects)
 add_test(NAME vrot.crosscheck COMMAND vrot_selftest)
 
+# vvis_selftest: visibility (CalculateVisiblating) + painter sort (VirSort)
+# -> vvis.asm, reusing unit 2 (camera matrix/globals). Visibility exact;
+# sort checked for valid permutation + ascending zet.
+add_library(vvis_core_objects STATIC
+    core/engine/vvis.asm
+    core/engine/cammat.asm
+    core/inc/sin_tables.asm
+)
+add_dependencies(vvis_core_objects voodka_sin)
+target_include_directories(vvis_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_executable(vvis_selftest tools/validate/vvis_selftest.cpp)
+target_compile_definitions(vvis_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(vvis_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(vvis_selftest PRIVATE vvis_core_objects)
+add_test(NAME vvis.crosscheck COMMAND vvis_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
