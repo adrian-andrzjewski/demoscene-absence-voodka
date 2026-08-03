@@ -192,6 +192,18 @@ target_include_directories(normals_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platfor
 target_link_libraries(normals_selftest PRIVATE normals_core_objects)
 add_test(NAME normals.crosscheck COMMAND normals_selftest)
 
+# loader_selftest: object-file parser/build (OBJECTS.PM Load_Object ->
+# loader.asm) + unit-5 normals for PHONG. Links loader + normals.
+add_library(loader_core_objects STATIC
+    core/engine/loader.asm
+    core/engine/normals.asm
+)
+add_executable(loader_selftest tools/validate/loader_selftest.cpp)
+target_compile_definitions(loader_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(loader_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(loader_selftest PRIVATE loader_core_objects)
+add_test(NAME loader.crosscheck COMMAND loader_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
