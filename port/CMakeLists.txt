@@ -306,6 +306,37 @@ target_include_directories(p2draw_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform
 target_link_libraries(p2draw_selftest PRIVATE p2draw_core_objects)
 add_test(NAME p2draw.crosscheck COMMAND p2draw_selftest)
 
+# p2loop_selftest: P2 per-frame render loop (p2loop.asm vk_p2_render_frame =
+# CalculateVisiblating -> VirSort -> WorldKol walk -> prepare/draw dispatch).
+# Drives the loop in TRACE mode over synthetic World records + synthetic
+# object/type tables and cross-checks the emitted {drawn,idx,obj#} stream.
+# (Real-render path links the full prepare/draw dependency set even though the
+# CTest exercises only the trace branch.)
+add_library(p2loop_core_objects STATIC
+    core/engine/p2loop.asm
+    core/engine/vvis.asm
+    core/engine/cammat.asm
+    core/inc/sin_tables.asm
+    core/engine/mrotate.asm
+    core/engine/vrot.asm
+    core/engine/vprep.asm
+    core/engine/p2draw.asm
+    core/engine/p2draw_selftest.asm
+    core/engine/txtr.asm
+    core/engine/v2d.asm
+    core/engine/persp.asm
+)
+add_dependencies(p2loop_core_objects voodka_sin)
+target_include_directories(p2loop_core_objects PRIVATE
+    "${CMAKE_SOURCE_DIR}/core/eos_replace"
+    "${CMAKE_SOURCE_DIR}/core/inc"
+)
+add_executable(p2loop_selftest tools/validate/p2loop_selftest.cpp)
+target_compile_definitions(p2loop_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(p2loop_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(p2loop_selftest PRIVATE p2loop_core_objects)
+add_test(NAME p2loop.crosscheck COMMAND p2loop_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
