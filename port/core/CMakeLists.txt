@@ -23,6 +23,7 @@ set(VOODKA_CORE_ASM
     engine/p2loop.asm
     parts/p1.asm
     parts/p2.asm
+    parts/p3.asm
     parts/p6.asm
     parts/p7.asm
     parts/p8.asm
