@@ -10,6 +10,7 @@
 // pointer from sel_base_table and do base+index addressing.
 
 #include "platform_abi.h"
+#include "pal_range.h"
 #include <cstdint>
 #include <cstdio>
 #include <cstdarg>
@@ -64,6 +65,15 @@ void vk_set_palette(const uint8_t* rgb) {
 }
 void vk_get_palette(uint8_t* out) {
     vk::currentPalette(out);
+}
+// set only a range of palette entries, preserving the rest (the `set_pal`
+// macro backs onto this). src carries the full entry stream; start/count are
+// 0-based palette indices.
+void vk_set_palette_range(const uint8_t* src, uint32_t start, uint32_t count) {
+    uint8_t cur[768];
+    vk::currentPalette(cur);
+    applyPaletteRange(cur, src, start, count);
+    vk_set_palette(cur);
 }
 void vk_present_frame(void) { vk::presentFrame(); }
 void* vk_backbuffer_ptr(void) { return vk::arena() + vk::kBackbufferOffset; }

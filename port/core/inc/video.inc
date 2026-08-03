@@ -119,4 +119,20 @@ SetPal:
 VSynch:
         ret
 
+; v_sync - port of the external-EOS `v_sync` macro: wait for a frame boundary.
+; Original polled the VGA retrace; here it forwards to EOS wait_vbl (QPC-paced
+; ~70Hz). Must be used from a body with RSP%16==0; frames its own stack so the
+; eos_dispatch call is 16-aligned.
+%macro v_sync 0
+        push    rbp
+        mov     rbp, rsp
+        sub     rsp, 0x28
+        extern eos_dispatch
+        mov     eax, EOS_WAIT_VBL
+        call    eos_dispatch
+        add     rsp, 0x28
+        mov     rsp, rbp
+        pop     rbp
+%endmacro
+
 %endif ; VIDEO_INC

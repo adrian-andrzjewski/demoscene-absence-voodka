@@ -14,6 +14,7 @@
 
 extern vk_get_palette
 extern vk_set_palette
+extern vk_set_palette_range
 
 section .bss
 ; per-part palette working buffer (each part includes pal.inc once; local)
@@ -102,5 +103,23 @@ pal_fadein10:
         pop     rbx
         pop     rbp
         ret
+
+; set_pal <src>, <start>, <count> - set only palette entries [start,start+count)
+; from source label <src> (3 bytes/entry), preserving every other entry. Port
+; of the external-EOS `set_pal` macro. Must be used from a body with RSP%16==0
+; (standard for the other inline macros); it frames its own stack region so the
+; two C calls are 16-aligned.
+%macro set_pal 3
+        push    rbp
+        mov     rbp, rsp
+        sub     rsp, 0x28        ; entry%16==0 + rbp(8)=8 +0x28(40)=48 -> 0
+        lea     rcx, [rel %1]
+        mov     edx, %2
+        mov     r8d, %3
+        call    vk_set_palette_range
+        add     rsp, 0x28
+        mov     rsp, rbp
+        pop     rbp
+%endmacro
 
 %endif ; PAL_INC

@@ -108,6 +108,13 @@ target_include_directories(txtr_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
 target_link_libraries(txtr_selftest PRIVATE txtr_core_objects)
 add_test(NAME txtr.crosscheck COMMAND txtr_selftest)
 
+# palette_range: CTest validating applyPaletteRange, the logic behind the
+# bridge vk_set_palette_range / the `set_pal` macro (palette-range upload).
+add_executable(palette_selftest tools/validate/palette_selftest.cpp)
+target_compile_definitions(palette_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(palette_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+add_test(NAME palette.crosscheck COMMAND palette_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
