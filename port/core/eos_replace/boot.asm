@@ -43,6 +43,7 @@ section .text
 extern vk_make_toonel
 
 extern part1
+extern part2
 extern part6
 extern part7
 extern part8
@@ -98,6 +99,8 @@ DemoStart32:
         je      .full_sequence
         cmp     eax, 1
         je      .single_p1
+        cmp     eax, 2
+        je      .single_p2
         cmp     eax, 6
         je      .single_p6
         cmp     eax, 7
@@ -110,6 +113,9 @@ DemoStart32:
 .single_p1:
         call    part1
         jmp     .done
+.single_p2:
+        call    part2
+        jmp     .done
 .single_p6:
         call    part6
         jmp     .done
@@ -121,8 +127,9 @@ DemoStart32:
         jmp     .done
 
 .full_sequence:
-        ; current implemented slice: P1 then P6 then P7
+        ; current implemented slice: P1 then P2 then P6 then P7
         call    part1
+        call    part2
         call    part6
         call    part7
 

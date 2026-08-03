@@ -229,9 +229,11 @@ pz_walk:
         mov     [pz_rec], rdi
         jmp     .next
 .dotm:
-        mov     cx, word [r13 + 72]     ; texsel
-        movzx   ecx, cx
-        mov     [fs_sel], ecx
+        ; NOTE: fs_sel was already set by the caller (vk_p2_render_frame sets it
+        ; from the world record's type -> textury[type]). The original
+        ; DrawObject does not set fs here; the render loop does, per object.
+        ; We must NOT override it with the object's own +72 tex-sel, or the
+        ; texture selector chosen by the world type would be lost.
         call    tm_face
         jmp     .next
 .notdrawn:

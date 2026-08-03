@@ -8,7 +8,21 @@ set(VOODKA_CORE_ASM
     inc/sin_tables.asm
     engine/engine.asm
     engine/txtr.asm
+    engine/persp.asm
+    engine/v2d.asm
+    engine/mrotate.asm
+    engine/vrot.asm
+    engine/cammat.asm
+    engine/vvis.asm
+    engine/normals.asm
+    engine/loader.asm
+    engine/vprep.asm
+    engine/p2path.asm
+    engine/p2world.asm
+    engine/p2draw.asm
+    engine/p2loop.asm
     parts/p1.asm
+    parts/p2.asm
     parts/p6.asm
     parts/p7.asm
     parts/p8.asm
@@ -22,6 +36,7 @@ target_include_directories(voodka_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/parts"
     "${CMAKE_CURRENT_SOURCE_DIR}/engine"
+    "${CMAKE_CURRENT_SOURCE_DIR}/data"
 )
 
 # sine tables are generated at configure->build time before assembling
