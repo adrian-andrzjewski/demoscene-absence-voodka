@@ -255,6 +255,19 @@ target_include_directories(vprep_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform"
 target_link_libraries(vprep_selftest PRIVATE vprep_core_objects)
 add_test(NAME vprep.crosscheck COMMAND vprep_selftest)
 
+# p2path_selftest: P2 camera-path data (TRASA!/WIDOKI) + selection logic. Parses
+# the reference text tables and cross-checks the NASM data byte-exact + the
+# vk_p2_camera selection over many ModPos / trasa_ruch samples.
+add_library(p2path_core_objects STATIC
+    core/engine/p2path.asm
+)
+target_include_directories(p2path_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/data")
+add_executable(p2path_selftest tools/validate/p2path_selftest.cpp)
+target_compile_definitions(p2path_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(p2path_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(p2path_selftest PRIVATE p2path_core_objects)
+add_test(NAME p2path.crosscheck COMMAND p2path_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
