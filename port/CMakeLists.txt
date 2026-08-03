@@ -169,6 +169,17 @@ target_include_directories(persp_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform"
 target_link_libraries(persp_selftest PRIVATE persp_core_objects)
 add_test(NAME persp.crosscheck COMMAND persp_selftest)
 
+# v2d_selftest: C++ reference vs the 2D primitives (VISIBLE.PM isVisible,
+# PIXEL2D.PM Pixel2d -> v2d.asm). Byte-for-byte over random triangles/points.
+add_library(v2d_core_objects STATIC
+    core/engine/v2d.asm
+)
+add_executable(v2d_selftest tools/validate/v2d_selftest.cpp)
+target_compile_definitions(v2d_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(v2d_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(v2d_selftest PRIVATE v2d_core_objects)
+add_test(NAME v2d.crosscheck COMMAND v2d_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
