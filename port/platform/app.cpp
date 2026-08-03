@@ -12,6 +12,20 @@
 #include <cstdio>
 #include <cstring>
 #include <cstdlib>
+
+// Very small crash logger: print exception address + register state then let
+// the OS terminate. Gives the exact faulting RIP without a debugger attached.
+static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep) {
+    EXCEPTION_RECORD* er = ep->ExceptionRecord;
+    CONTEXT* cx = ep->ContextRecord;
+    vk::logPrint("[CRASH] code=0x%08x at %p\n", er->ExceptionCode, er->ExceptionAddress);
+    vk::logPrint("[CRASH] rax=%p rbx=%p rcx=%p rdx=%p\n",
+                 (void*)cx->Rax, (void*)cx->Rbx, (void*)cx->Rcx, (void*)cx->Rdx);
+    vk::logPrint("[CRASH] rsi=%p rdi=%p rbp=%p rsp=%p rip=%p\n",
+                 (void*)cx->Rsi, (void*)cx->Rdi, (void*)cx->Rbp, (void*)cx->Rsp, (void*)cx->Rip);
+    vk::logFlush();
+    return EXCEPTION_CONTINUE_SEARCH;
+}
 #include <string>
 
 // bridge symbols (extern "C"): select which part the assembly core runs
@@ -186,6 +200,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         rcode = 0;
     } else {
         vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
+        SetUnhandledExceptionFilter(&CrashFilter);
         rcode = DemoStart32(ab, 64ull * 1024 * 1024);
     }
 

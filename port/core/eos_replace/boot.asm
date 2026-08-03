@@ -37,6 +37,7 @@ extern ModPos
 extern part1
 extern part6
 extern part7
+extern part8
 
 global DemoStart32
 DemoStart32:
@@ -83,6 +84,8 @@ DemoStart32:
         je      .single_p6
         cmp     eax, 7
         je      .single_p7
+        cmp     eax, 8
+        je      .single_p8
         ; unknown single part: default to the full slice
         jmp     .full_sequence
 
@@ -94,6 +97,9 @@ DemoStart32:
         jmp     .done
 .single_p7:
         call    part7
+        jmp     .done
+.single_p8:
+        call    part8
         jmp     .done
 
 .full_sequence:

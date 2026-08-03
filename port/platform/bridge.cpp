@@ -96,4 +96,10 @@ void vk_log_printf(const char* fmt, ...) {
     vk::logPrint("%s", buf);
 }
 
+// copy the platform key map (128 PC scancodes, 1=pressed) into dst
+void vk_key_map_copy(uint8_t* dst) {
+    const uint8_t* src = vk::rawKeyMap();
+    for (int i = 0; i < 128; i++) dst[i] = src[i] ? 1 : 0;
+}
+
 } // extern "C"
