@@ -128,6 +128,21 @@ target_include_directories(toonel_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform
 target_link_libraries(toonel_selftest PRIVATE toonel_core_objects)
 add_test(NAME toonel.crosscheck COMMAND toonel_selftest)
 
+# mrotate_selftest: C++ reference vs the ported fixed-point 3D rotation
+# (MROTATE.PM -> mrotate.asm). Compares rotation matrices + rotated vertices
+# byte-for-byte over random angles/vertices.
+add_library(mrotate_core_objects STATIC
+    core/engine/mrotate.asm
+    core/inc/sin_tables.asm
+)
+add_dependencies(mrotate_core_objects voodka_sin)
+target_include_directories(mrotate_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_executable(mrotate_selftest tools/validate/mrotate_selftest.cpp)
+target_compile_definitions(mrotate_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(mrotate_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(mrotate_selftest PRIVATE mrotate_core_objects)
+add_test(NAME mrotate.crosscheck COMMAND mrotate_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
