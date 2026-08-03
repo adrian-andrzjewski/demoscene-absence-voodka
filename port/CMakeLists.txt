@@ -180,6 +180,18 @@ target_include_directories(v2d_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
 target_link_libraries(v2d_selftest PRIVATE v2d_core_objects)
 add_test(NAME v2d.crosscheck COMMAND v2d_selftest)
 
+# normals_selftest: C++ reference vs the Phong normal generator
+# (NORMALS.PM calcNormals -> normals.asm). Per-vertex normals within
+# FPU tolerance; per-vertex counts exact.
+add_library(normals_core_objects STATIC
+    core/engine/normals.asm
+)
+add_executable(normals_selftest tools/validate/normals_selftest.cpp)
+target_compile_definitions(normals_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(normals_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(normals_selftest PRIVATE normals_core_objects)
+add_test(NAME normals.crosscheck COMMAND normals_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
