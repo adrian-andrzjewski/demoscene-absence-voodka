@@ -3,6 +3,7 @@
 set(VOODKA_CORE_ASM
     eos_replace/eos_dispatch.asm
     eos_replace/boot.asm
+    eos_replace/toonel.asm
     inc/globals.asm
     inc/sin_tables.asm
     engine/engine.asm

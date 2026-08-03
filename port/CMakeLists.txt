@@ -115,6 +115,19 @@ target_compile_definitions(palette_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN
 target_include_directories(palette_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
 add_test(NAME palette.crosscheck COMMAND palette_selftest)
 
+# toonel_selftest: validates vk_make_toonel, the shared 128000-byte tunnel
+# table filler (used by boot's Start32 + the tunnel parts). Checks determinism
+# (two fills hash identically), non-triviality, and spot u/v coordinate cells.
+add_library(toonel_core_objects STATIC
+    core/eos_replace/toonel.asm
+)
+add_dependencies(toonel_core_objects voodka_sin)
+add_executable(toonel_selftest tools/validate/toonel_selftest.cpp)
+target_compile_definitions(toonel_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(toonel_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(toonel_selftest PRIVATE toonel_core_objects)
+add_test(NAME toonel.crosscheck COMMAND toonel_selftest)
+
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
 enable_testing()
