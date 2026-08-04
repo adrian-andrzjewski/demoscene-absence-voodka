@@ -89,10 +89,13 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (vk_p2_render_frame / vk_load_object / vk_prepare+VKdraw / textury) plus a
   P5-specific 128x128->256x256 water engine (`parts/water.p5.inc`), with its
   own World + TRASA camera data (`parts/p5_world.inc`, `parts/p5_trasa.inc`).
-  P8 is now wired into CMake + the full sequence (single_p8 works, 18/18 tests
-  pass) but --part 8 still AVs on frame 1: `rotate` writes past its module .bss
-  into the engine's `addr_tab` (face indices are valid, so the overrun is not
-  yet pinpointed). The standalone engine parts and precise ModPos calibration
+  P8 is now wired and runs crash-free (~70 fps with live animation): the
+  frame-1 sort crash was P8's `prepare`/`co_prepare` doubling con vertex indices
+  into byte-space, so `rotate`'s rcalc/check writes (reference `rcalc[idx*2]`)
+  overran module .bss into the engine's `addr_tab` - fixed by moving rcalc/check
+  to the arena and using the reference's byte*2 rcalc stride (the port had *4)
+  plus reading show()'s face vertex index from con (not rcalc). The standalone
+  engine parts and precise ModPos calibration
   remain.
 
 ## Original DOS build (reference only)

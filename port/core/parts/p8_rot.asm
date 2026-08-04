@@ -581,7 +581,7 @@ cmp     word [r14+rsi*2], 0
 inc     word [r14+rsi*2]
         mov     r14d, [rel rcalc_a8]
         add     r14, qword [rel Code32_addr]
-lea     rdi, [r14+rsi*4]
+lea     rdi, [r14+rsi*2]
         lea     r13, [rel shape]
         lea     r12d, [esi*2+esi]
         movsx   eax, word [r13+r12]

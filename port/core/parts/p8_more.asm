@@ -286,7 +286,7 @@ show:
         or      r9b, r9b
         jz      .no_plane
         ; ---- plane (sw object, map via pkt) ----
-        movzx   ebx, word [r15+rdi]
+        movzx   ebx, word [r13+rdi]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_1], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -294,7 +294,7 @@ show:
         sub     ebx, 40*2
         mov     eax, dword [rbp + rbx*2]
         mov     [rel p_1], eax
-        movzx   ebx, word [r15+rdi+2]
+        movzx   ebx, word [r13+rdi+2]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_2], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -302,7 +302,7 @@ show:
         sub     ebx, 40*2
         mov     eax, dword [rbp + rbx*2]
         mov     [rel p_2], eax
-        movzx   ebx, word [r15+rdi+4]
+        movzx   ebx, word [r13+rdi+4]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_3], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -318,7 +318,7 @@ show:
         mov     eax, [rel n_rot_a]
         add     rax, qword [rel Code32_addr]
         mov     rbp, rax
-        movzx   ebx, word [r15+rdi]
+        movzx   ebx, word [r13+rdi]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_1], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -332,7 +332,7 @@ show:
         add     ax, 108
         shl     ax, 8
         mov     [rel p_1+2], ax
-        movzx   ebx, word [r15+rdi+2]
+        movzx   ebx, word [r13+rdi+2]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_2], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -346,7 +346,7 @@ show:
         add     ax, 108
         shl     ax, 8
         mov     [rel p_2+2], ax
-        movzx   ebx, word [r15+rdi+4]
+        movzx   ebx, word [r13+rdi+4]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_3], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -363,7 +363,7 @@ show:
         jmp     .drawing
 .nshading:
         ; flat shading (con2 + pos)
-        movzx   ebx, word [r15+rdi]
+        movzx   ebx, word [r13+rdi]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_1], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -373,7 +373,7 @@ movzx   ebx, word [r10 + rdi]
         lea     r11, [rel pos]
 mov     eax, dword [r11 + rbx*2]
         mov     [rel p_1], eax
-        movzx   ebx, word [r15+rdi+2]
+        movzx   ebx, word [r13+rdi+2]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_2], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -383,7 +383,7 @@ movzx   ebx, word [r10 + rdi+2]
         lea     r11, [rel pos]
 mov     eax, dword [r11 + rbx*2]
         mov     [rel p_2], eax
-        movzx   ebx, word [r15+rdi+4]
+        movzx   ebx, word [r13+rdi+4]
         movsx   eax, word [r15 + rbx*2]
         mov     [rel x_3], eax
         movsx   eax, word [r15 + rbx*2 + 2]
@@ -955,3 +955,4 @@ sloneczko:
 
 section .bss
 sun_step: resd 1
+
