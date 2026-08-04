@@ -139,7 +139,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     // ---- entry-point seeking -----------------------------------------------
     // The demo may begin from a scene in the middle of the timeline; the music
     // must start at the matching song position. Units:
-    //   --modpos N  absolute ModPos (cumulative rows; the demo's timeline)
+    //   --modpos N  absolute ModPos ((order<<8)|row; the demo's timeline)
     //   --ms N      milliseconds from the start of the module
     //   --order N   order-list index (pattern start, row 0)
     //   --part N    scene/part index (maps to a ModPos, see table below)

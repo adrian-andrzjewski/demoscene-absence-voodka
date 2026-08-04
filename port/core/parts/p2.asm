@@ -63,6 +63,8 @@ bolek:      dd 1
 ileFadow:   dd 0
 znacznik:   dd 0
 lampa:      db 0
+; world palette (2WORLD.PAL, vodka 37) - arena offset, add Code32_addr to use.
+_pal:       dd 0
 spos:       dd 0
 sun:        dd 0
 sun_step:   dd 0
@@ -192,8 +194,32 @@ part2:
         mov     dword [rel trasa_ruch], 0
         mov     dword [rel ileFadow], 0
 
+        ; ---- world palette (2WORLD.PAL) for the stadium; P1 hands off with a
+        ; full-white palette (see p1.asm .virtual), so P2 fades into _pal below.
+        vodka   37, _pal
+
 ; ------------------------------------------------------------------- Main ---
 .main_loop:
+        ; ---- palette fade-in from P1's white end-state toward _pal (world).
+        ; Faithful port of P2.AS^ Main 130-143: a per-frame ileFadow ramp that
+        ; steps pal_fadein10 by (ileFadow>>1) toward _pal, dissolving white.
+        mov     eax, [rel ileFadow]
+        cmp     eax, 63
+        jg      .pal_nicosc
+        cmp     eax, 126
+        jle     .pal_here
+        mov     dword [rel ileFadow], 63
+        jmp     .pal_out
+.pal_here:
+        inc     dword [rel ileFadow]
+.pal_out:
+        movzx   ebx, byte [rel ileFadow]
+        sar     bl, 1
+        mov     edi, [rel _pal]
+        add     rdi, qword [rel Code32_addr]
+        call    pal_fadein10
+.pal_nicosc:
+
         call    GetModPos
         movzx   eax, word [rel ModPos]
 
@@ -215,6 +241,20 @@ part2:
         mov     [rel cam_eyeAY], eax
         mov     eax, [rel p2_cam_out+20]
         mov     [rel cam_eyeAZ], eax
+
+        ; ---- blysk_no: one white camera-flash + re-apply world palette at
+        ; ModPos > 0x500 (faithful port of P2.AS^ 202-212). ----
+        cmp     word [rel ModPos], 0x500
+        jle     .no_blysk
+        cmp     byte [rel lampa], 0
+        jne     .no_blysk
+        mov     byte [rel lampa], 1
+        lea     rsi, [rel white]
+        call    pal_set
+        mov     esi, [rel _pal]
+        add     rsi, qword [rel Code32_addr]
+        call    pal_set
+.no_blysk:
 
         ; ---- advance trasa_ruch by ramki (frame-rate-scaled) ----
         mov     eax, [rel ramki]
@@ -287,6 +327,15 @@ part2:
         mov     [rel ramki], eax
         Ekran
 
+        ; ---- currant: once the fade ramp has run, commit the full world
+        ; palette (faithful port of P2.AS^ currant 309-312). ----
+        cmp     dword [rel ileFadow], 63
+        jle     .currant_skip
+        mov     esi, [rel _pal]
+        add     rsi, qword [rel Code32_addr]
+        call    pal_set
+.currant_skip:
+
         ; ---- loop / exit to water stage ----
         call    GetModPos
         movzx   eax, word [rel ModPos]
@@ -307,8 +356,11 @@ part2:
         rep movsd
 
         WaitVbl
-        ; keep the world palette (not white) for the water stage
-        ; (original re-applied _pal; P2's ipkus palette is set inside pikus)
+        ; re-apply the world palette for the water stage (faithful port of
+        ; P2.AS^ wodda 331-334: wait_vbl then pal_set(_pal)).
+        mov     esi, [rel _pal]
+        add     rsi, qword [rel Code32_addr]
+        call    pal_set
 
         ; world[0] angle adders for Main2 water wobble
         lea     r12, [rel vk_p2_world]
@@ -419,9 +471,10 @@ part2:
         movzx   ebx, al
         lea     rdi, [rel white]
         call    pal_fadein10
-        ; re-apply the stage palette (white base + water palette handled
-        ; elsewhere; here re-apply a neutral white so fades stay visible):
-        lea     rsi, [rel white]
+        ; re-apply the stage world palette so the fade stays legible
+        ; (faithful port of P2.AS^ parker 434-443: pal_fadein10 then pal_set _pal)
+        mov     esi, [rel _pal]
+        add     rsi, qword [rel Code32_addr]
         call    pal_set
 .no_fade:
 
@@ -572,7 +625,7 @@ pikus:
         mov     ebx, [rbx + rax*4]
         mov     esi, [rel _bufor1]
         add     rsi, qword [rel Code32_addr]
-        add     esi, ebx
+        add     rsi, rbx                ; 64-bit add: ebx is an arena-relative delta
         mov     byte [rsi], 0xFF
         mov     byte [rsi+2], 0xFF
         mov     byte [rsi+4], 0xFF

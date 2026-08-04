@@ -86,7 +86,7 @@ int  vk_audio_stop()        { return vk::audioStop(); }
 void vk_audio_clear()       { }
 void vk_audio_set_pattern(int pos) { (void)pos; }
 
-// seeking: returns actual ModPos (rows) reached.
+// seeking: returns actual ModPos ((order<<8)|row) reached.
 uint32_t vk_audio_seek_rows(uint32_t rows) { return vk::audioSeekRows(rows); }
 uint32_t vk_audio_seek_ms(int ms)           { return vk::audioSeekMs(ms); }
 uint32_t vk_audio_seek_order(int order)     { return vk::audioSeekOrder(order); }

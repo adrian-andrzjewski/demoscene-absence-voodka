@@ -113,8 +113,35 @@ static void computeRowsPerLoop() {
 // ---------------------------------------------------------------------------
 // Seeking
 // ---------------------------------------------------------------------------
+// The demo timeline is the original EOS ModPos: (orderIndex << 8) | row.
+// That is, the order-list index lives in the high byte and the pattern row in
+// the low byte, so each order advances ModPos by 256 units (rows 0..63 land in
+// 0x00..0x3F, leaving 0x40..0xFF as "one-past-the-end" boundary markers used by
+// the part-window constants like 0x0B40). One full loop of the order list
+// therefore spans rowsPerLoop * 4 ModPos units (rowsPerLoop/64 orders * 256).
 
-// Break a ModPos row count into (loop, order, row). Returns true if resolvable.
+// ModPos units spanned by one full pass of the order list.
+static long modPosPerLoop() {
+    long rpl = _InterlockedOr(&g_rowsPerLoop, 0);
+    if (rpl <= 0) rpl = (long)getModLength() * 64;
+    return rpl * 4;
+}
+
+// Convert an absolute ModPos ((order<<8)|row, possibly across loops) into the
+// equivalent cumulative row count used internally by libxmp seeking.
+static uint32_t modPosToRows(uint32_t mp) {
+    long mpl = modPosPerLoop();
+    if (mpl <= 0) return mp;
+    long loop = (long)(mp / (uint32_t)mpl);
+    long rest = (long)(mp % (uint32_t)mpl);
+    long order = rest >> 8;
+    long rowOff = rest & 0xff;      // may exceed 63 for "past-the-end" markers
+    long rpl = _InterlockedOr(&g_rowsPerLoop, 0);
+    if (rpl <= 0) rpl = (long)getModLength() * 64;
+    return (uint32_t)((loop * rpl) + (order * 64) + rowOff);
+}
+
+// Break a cumulative row count into (loop, order, row). Returns true if resolvable.
 static bool splitRows(uint32_t rows, long* loopOut, long* orderOut, long* rowOut) {
     long rpl = _InterlockedOr(&g_rowsPerLoop, 0);
     if (rpl <= 0) rpl = (long)getModLength() * 64;
@@ -155,28 +182,32 @@ static bool splitRows(uint32_t rows, long* loopOut, long* orderOut, long* rowOut
     return ok;
 }
 
-uint32_t audioSeekRows(uint32_t rows) {
-    if (!g_xmp) return 0;
+static bool seekRowsInternal(uint32_t rows) {
     long loop, order, row;
-    if (!splitRows(rows, &loop, &order, &row)) return 0;
+    if (!splitRows(rows, &loop, &order, &row)) return false;
 
     EnterCriticalSection(&g_xmpCs);
     xmp_set_position(g_xmp, (int)order);
     xmp_set_row(g_xmp, (int)row);
     LeaveCriticalSection(&g_xmpCs);
 
-    InterlockedExchange(&g_posBase, loop * _InterlockedOr(&g_rowsPerLoop, 0));
+    InterlockedExchange(&g_posBase, loop * modPosPerLoop());
     InterlockedExchange(&g_prevOrder, order);
     InterlockedExchange(&g_order, order);
     InterlockedExchange(&g_row, row);
-    return rows;
+    return true;
+}
+
+uint32_t audioSeekRows(uint32_t mp) {
+    if (!g_xmp) return 0;
+    if (!seekRowsInternal(modPosToRows(mp))) return 0;
+    return getModPos();                 // reached ModPos (original encoding)
 }
 
 uint32_t audioSeekOrder(int order) {
     if (!g_xmp) return 0;
-    long rpl = _InterlockedOr(&g_rowsPerLoop, 0);
-    if (rpl <= 0) rpl = (long)getModLength() * 64;
-    return audioSeekRows((uint32_t)((long)order * 64));  // order start, row 0
+    if (!seekRowsInternal(modPosToRows((uint32_t)((long)order << 8)))) return 0;
+    return getModPos();                 // order start, row 0
 }
 
 uint32_t audioSeekMs(int ms) {
@@ -186,21 +217,19 @@ uint32_t audioSeekMs(int ms) {
     xmp_seek_time(g_xmp, ms);
     xmp_get_frame_info(g_xmp, &fi);
     LeaveCriticalSection(&g_xmpCs);
-    long rpl = _InterlockedOr(&g_rowsPerLoop, 0);
-    if (rpl <= 0) rpl = (long)getModLength() * 64;
-    if (rpl <= 0) return 0;
+    if (modPosPerLoop() <= 0) return 0;
     long loop = 0;
     if (fi.total_time > 0 && ms > fi.total_time) {
         loop = ms / fi.total_time;
     }
-    long base = loop * rpl;
+    long base = loop * modPosPerLoop();
     InterlockedExchange(&g_posBase, base);
     InterlockedExchange(&g_prevOrder, fi.pos);
     InterlockedExchange(&g_order, fi.pos);
     InterlockedExchange(&g_row, fi.row);
     g_playedBase = loop * (fi.total_time > 0 ? fi.total_time * 0.001 : 1.0);
     g_loops = loop;
-    return (uint32_t)(base + ((fi.pos << 6) | fi.row));
+    return (uint32_t)(base + ((fi.pos << 8) | fi.row));
 }
 
 // ---------------------------------------------------------------------------
@@ -345,12 +374,12 @@ void audioPump() {
     LeaveCriticalSection(&g_xmpCs);
 
     // cumulative song position: when the order list wraps back to a lower
-    // order, add one full loop of rows so ModPos stays monotonic.
+    // order, add one full loop of ModPos units so ModPos stays monotonic.
     long prev = _InterlockedOr(&g_prevOrder, 0);
     if (prev >= 0 && fi.pos < prev) {
-        long rpl = _InterlockedOr(&g_rowsPerLoop, 0);
-        if (rpl <= 0) rpl = (long)getModLength() * 64;
-        _InterlockedExchange(&g_posBase, _InterlockedOr(&g_posBase, 0) + rpl);
+        long mpl = modPosPerLoop();
+        if (mpl > 0)
+            _InterlockedExchange(&g_posBase, _InterlockedOr(&g_posBase, 0) + mpl);
         g_loops++;
         if (fi.total_time > 0) g_playedBase += fi.total_time * 0.001;
     }
@@ -363,7 +392,8 @@ void audioPump() {
 uint32_t getModPos() {
     long base = _InterlockedOr(&g_posBase, 0);
     long o = _InterlockedOr(&g_order, 0), r = _InterlockedOr(&g_row, 0);
-    uint32_t pos = (uint32_t)(base + ((o << 6) | r));
+    // original-encoding ModPos: (orderIndex << 8) | row, monotonic across loops
+    uint32_t pos = (uint32_t)(base + ((o << 8) | r));
     static long hb = 0;
     if ((hb++ & 0x1ff) == 0)
         logPrint("[audio] ModPos=%u (order=%ld row=%ld base=%ld)\n", pos, o, r, base);
@@ -564,7 +594,7 @@ int audioSelfCheck(int seconds) {
     QueryPerformanceCounter((LARGE_INTEGER*)&w0);
 
     double p0 = getPlayedSeconds();
-    long modpos0 = g_posBase + ((g_order << 6) | g_row);
+    long modpos0 = g_posBase + ((g_order << 8) | g_row);
     _InterlockedExchange(&g_servedFrames, 0);
     _InterlockedExchange(&g_underruns, 0);
     _InterlockedExchange(&g_fillErrors, 0);
@@ -588,7 +618,7 @@ int audioSelfCheck(int seconds) {
     long served = _InterlockedOr(&g_servedFrames, 0);
     long under = _InterlockedOr(&g_underruns, 0);
     long fillErr = _InterlockedOr(&g_fillErrors, 0);
-    long modpos1 = g_posBase + ((g_order << 6) | g_row);
+    long modpos1 = g_posBase + ((g_order << 8) | g_row);
     long rowsAdv = modpos1 - modpos0;
 
     // Audible tempo = PCM frames actually delivered to the device / rate, vs
@@ -605,7 +635,7 @@ int audioSelfCheck(int seconds) {
              wallSec, servedSec, tempo, driftMs);
     logPrint("[audio] decode clock (fi.time): %.2fs (tempo=%.3f)\n",
              playedSec, decodeTempo);
-    logPrint("[audio] ModPos advanced by %ld rows (monotonic across loops)\n", rowsAdv);
+    logPrint("[audio] ModPos advanced by %ld units (monotonic across loops)\n", rowsAdv);
     logPrint("[audio] frames served=%ld  underruns(dropouts)=%ld  fill errors=%ld\n",
              served, under, fillErr);
     logPrint("[audio] pumps=%d  stream=%s\n", frames,
