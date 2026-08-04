@@ -261,16 +261,26 @@ part1:
         jg      .znika2
         jmp     .znika1                 ; 0x10 < ModPos <= 0x20
 .i_nie_znika:
-        ; present backbuffer -> framebuffer (the old rep movsw to 0xA0000)
-        Ekran
-
+        ; Screen flash (ModPos >= 0x300): wash the frame toward white by
+        ; (ModPos & 63) BEFORE presenting so the flash actually reaches the
+        ; presented frame. In the original this fade + immediate rm_eye reset
+        ; was a DAC-time transient that the CRT showed as a flicker; with a
+        ; vsynced D3D present the old order made it invisible, so apply the
+        ; wash first, present, then restore the scene palette for the interior
+        ; drawing that follows.
         cmp     word [rel ModPos], 0x0300
-        jl      .yogi
+        jl      .flash_done
         mov     ax, [rel ModPos]
         and     ax, 63
         mov     bl, al
         lea     rdi, [rel white]
         call    pal_fadein10
+.flash_done:
+        ; present backbuffer -> framebuffer (the old rep movsw to 0xA0000)
+        Ekran
+
+        cmp     word [rel ModPos], 0x0300
+        jl      .yogi
         lea     rsi, [rel pal]
         call    pal_set
 .yogi:
@@ -305,12 +315,15 @@ part1:
         call    eos_dispatch
         mov     [rel ramki], eax
 
-        mov     eax, [rel ramki]
-        shl     ax, 1
-        add     word [r_z], ax
-        add     word [r_y], ax
-        shl     ax, 1
-        add     word [r_x], ax
+        ; Angular increments. The original added ramki*2 / ramki*4 per frame
+        ; (ramki = running 70Hz frame counter), which grows quadratically and
+        ; spins the head several full turns per frame once ramki climbs - too
+        ; fast to be readable. The user chose a slower, constant-rate rotation:
+        ; small per-frame steps give a gentle tumble that completes only a few
+        ; full turns across the whole part (angles are mod-1024 in the matrix).
+        add     word [r_z], 1
+        add     word [r_y], 2
+        add     word [r_x], 3
 
         call    GetModPos
         call    show
