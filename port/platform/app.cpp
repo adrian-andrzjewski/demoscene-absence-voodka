@@ -60,6 +60,13 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         PAINTSTRUCT ps; BeginPaint(h, &ps); EndPaint(h, &ps);
         return 0;
     }
+    case WM_ACTIVATE:
+        // Stay topmost for the whole lifetime: the window must always float
+        // over other apps during development/testing/debugging.
+        if (w != WA_INACTIVE)
+            SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0,
+                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+        break;
     case WM_DESTROY:
         PostQuitMessage(0);
         return 0;
@@ -70,6 +77,10 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
+
+    // Per-monitor DPI awareness: window geometry is expressed in physical
+    // pixels, so centering stays consistent across DPI-scaled desktops.
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     // optional: --record <dir>  (deterministic frame+palette capture)
     //       and  --diag <dir>   (GPU readback diagnostics)
@@ -108,18 +119,62 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         return 1;
     }
     RECT rc{0, 0, kWinW, kWinH};
-    AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, FALSE, 0);
-    HWND hwnd = CreateWindowW(kWinClass, L"VOODKA (Absence 1996x - Windows x64 port)",
-                              WS_OVERLAPPEDWINDOW,
-                              CW_USEDEFAULT, CW_USEDEFAULT,
-                              rc.right - rc.left, rc.bottom - rc.top,
-                              nullptr, nullptr, hInst, nullptr);
+    AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, FALSE, WS_EX_TOPMOST);
+    int winW = rc.right - rc.left;
+    int winH = rc.bottom - rc.top;
+
+    // Center the window on the primary (active/default) display's work area.
+    // Derived from the primary monitor every launch, so placement is identical
+    // regardless of monitor configuration/resolution (and never CW_USEDEFAULT's
+    // cascade). rcWork keeps the taskbar visible; fall back to the whole
+    // primary screen if GetMonitorInfo fails.
+    {
+        RECT wa{};
+        POINT origin{0, 0};
+        HMONITOR mon = MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY);
+        MONITORINFO mi{};
+        mi.cbSize = sizeof(mi);
+        if (mon && GetMonitorInfoW(mon, &mi)) {
+            wa = mi.rcWork;
+        } else {
+            wa.left = 0;
+            wa.top = 0;
+            wa.right = GetSystemMetrics(SM_CXSCREEN);
+            wa.bottom = GetSystemMetrics(SM_CYSCREEN);
+        }
+        int x = wa.left + (wa.right - wa.left - winW) / 2;
+        int y = wa.top + (wa.bottom - wa.top - winH) / 2;
+        if (x < wa.left) x = wa.left;
+        if (y < wa.top) y = wa.top;
+        vk::logPrint("[app] primary work area %dx%d at %d,%d; window %dx%d at %d,%d\n",
+                     wa.right - wa.left, wa.bottom - wa.top, wa.left, wa.top,
+                     winW, winH, x, y);
+        rc.left = x;
+        rc.top = y;
+        rc.right = x + winW;
+        rc.bottom = y + winH;
+    }
+
+    // WS_EX_TOPMOST makes the window topmost from the very first frame; the
+    // WM_ACTIVATE handler in WndProc then keeps it there for the whole process.
+    HWND hwnd = CreateWindowExW(WS_EX_TOPMOST, kWinClass,
+                                L"VOODKA (Absence 1996x - Windows x64 port)",
+                                WS_OVERLAPPEDWINDOW,
+                                rc.left, rc.top, winW, winH,
+                                nullptr, nullptr, hInst, nullptr);
     if (!hwnd) {
         vk::logPrint("[app] CreateWindowW failed\n");
         return 1;
     }
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
+    // Cement the z-order and hand the window input focus so it comes up on top
+    // and active even if another app was foreground at launch time.
+    SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    SetForegroundWindow(hwnd);
+    SetActiveWindow(hwnd);
+    SetFocus(hwnd);
     vk::progressInit(hwnd);
 
     // ---- init subsystems ---------------------------------------------------
