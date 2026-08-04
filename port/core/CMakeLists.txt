@@ -24,6 +24,7 @@ set(VOODKA_CORE_ASM
     parts/p1.asm
     parts/p2.asm
     parts/p3.asm
+    parts/p4.asm
     parts/p6.asm
     parts/p7.asm
     parts/p8.asm
