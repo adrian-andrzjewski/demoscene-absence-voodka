@@ -53,7 +53,7 @@ GetModPos:
         sub     rsp, 0x28
         mov     eax, EOS_GET_INFO
         call    eos_dispatch
-        movzx   eax, al
+        movzx   eax, ax
         mov     [rel ModPos], ax
         add     rsp, 0x28
         pop     rbx

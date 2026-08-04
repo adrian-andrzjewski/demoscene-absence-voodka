@@ -47,6 +47,23 @@ uint64_t getQpcUs() {
 uint64_t getFrameCounter() { return g_frameCounter; }
 
 void waitVbl() {
+    // ---- pause handling (Space) -------------------------------------------
+    // Pump input every frame (in case presentFrame isn't reached this frame) so
+    // the Space key-down in WndProc can toggle pause. If paused, park the demo
+    // thread here until Space resumes. g_frameCounter is NOT advanced while
+    // parked, so all ramki/ModPos-driven animation, effects and transitions
+    // freeze and resume at the exact same values -> audio/visual sync is kept.
+    updateInput();
+    if (isPaused()) {
+        for (;;) {
+            updateInput();
+            if (!isPaused()) break;
+            Sleep(5);
+        }
+        // resumed: reset the pacing phase so the next frame waits a full tick
+        QueryPerformanceCounter((LARGE_INTEGER*)&g_nextTickCount);
+    }
+
     // The disable-latency + Sleep(0) spin target is ~70.07 Hz.
     int64_t period = usToCount(g_nominalPeriodUs);
     for (;;) {
@@ -65,6 +82,8 @@ void waitVbl() {
     }
     g_nextTickCount += period;
     g_frameCounter++;
+    // keep the run-progress title/log in step with the rendered frame
+    progressUpdate();
 }
 
 }  // namespace vk

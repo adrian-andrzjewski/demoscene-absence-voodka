@@ -49,7 +49,7 @@ uint64_t vk_selector_base(uint16_t handle) {
     return 0;
 }
 
-void     vk_wait_vbl()      { vk::waitVbl(); }
+uint64_t vk_wait_vbl()       { vk::waitVbl(); return vk::getFrameCounter(); }
 uint32_t vk_get_modpos()    { vk::audioPump(); return vk::getModPos(); }
 uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
 

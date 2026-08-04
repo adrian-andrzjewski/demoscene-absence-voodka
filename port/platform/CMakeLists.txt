@@ -8,6 +8,8 @@ set(VOODKA_PLATFORM_SOURCES
     timer.cpp
     d3d11_present.cpp
     audio.cpp
+    progress.cpp
+    pause.cpp
     bridge.cpp
 )
 

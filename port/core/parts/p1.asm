@@ -317,18 +317,30 @@ part1:
 
         cmp     word [rel ModPos], 0x0200
         jl      .zenek
+        ; Build logo_tab byte offset = (ModPos & 0xff)*16 + (ModPos>>8 - 2)*1024.
+        ; The table is 160 entries * 16 bytes = 2560 bytes; clamp the offset to
+        ; 2544 so the 4-dword read (up to +12) always stays inside the table.
+        ; Without the clamp, ModPos >= ~0x2A0 made the offset exceed the table,
+        ; reading garbage and driving an out-of-bounds write in copy()'s blit.
         movzx   eax, word [rel ModPos]
-        and     ax, 0x00ff
-        shl     ax, 4
-        movzx   rcx, ax
+        and     eax, 0x00ff
+        shl     eax, 4
+        mov     ebx, eax                ; part A = low*16
+        movzx   eax, word [rel ModPos]
+        and     eax, 0xff00
+        shr     eax, 8                  ; high byte
+        sub     eax, 2
+        jns     .log_hi_ok
+        xor     eax, eax                ; clamp negative term to 0
+.log_hi_ok:
+        shl     eax, 10                 ; *1024
+        add     ebx, eax                ; total byte offset
+        cmp     ebx, 2544
+        jbe     .log_off_ok
+        mov     ebx, 2544               ; clamp to last full entry (safe +12)
+.log_off_ok:
         lea     rsi, [rel logo_tab]
-        add     rsi, rcx
-        movzx   ebx, word [rel ModPos]
-        and     bx, 0xff00
-        sub     bh, 2
-        shl     bx, 2
-        movzx   rcx, bx
-        add     rsi, rcx
+        add     rsi, rbx
         mov     eax, [rsi]
         mov     [rel l_addr], eax
         mov     eax, [rsi+4]

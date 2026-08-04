@@ -215,7 +215,10 @@ static void fillOutput(BYTE* dst, long frames) {
     const long shorts = frames * kChannels;
     const long bytes = shorts * sizeof(short);
     const long outBytes = (g_outFloat ? shorts * 4 : bytes);
-    if (!g_playing) { memset(dst, 0, (size_t)outBytes); return; }
+    // Paused: keep the device fed with silence but DO NOT advance libxmp, so
+    // the music (and ModPos) freeze at the exact current position/row. Resume
+    // then continues seamlessly from that note.
+    if (!g_playing || isPaused()) { memset(dst, 0, (size_t)outBytes); return; }
 
     EnterCriticalSection(&g_xmpCs);
     int rc;
@@ -307,10 +310,11 @@ void audioPump() {
     if (!g_xmp) return;
     if (!InterlockedCompareExchange(&g_playing, 1, 0)) return;
 
-    if (g_thread == nullptr) {
+    if (g_thread == nullptr && !isPaused()) {
         // Headless mode (VOODKA_NOAUDIO or no audio device): no WASAPI render
         // thread, so advance the module manually at ~playback rate so the
         // timeline (ModPos) keeps moving for scene testing/--audiocheck.
+        // (Skipped while paused so the timeline freezes like real audio.)
         static int64_t lastQpc = 0;
         static bool first = true;
         int64_t now = 0, freq = 0;
@@ -369,6 +373,8 @@ uint32_t getModPos() {
 static double getPlayedSeconds() {
     return g_playedNow;
 }
+
+double audioElapsedSec() { return getPlayedSeconds(); }
 
 // ---------------------------------------------------------------------------
 // Init / shutdown

@@ -72,6 +72,16 @@ uint64_t getFrameCounter();   // VGA-retrace emulated counter
 void     waitVbl();           // block until next presented retrace tick
 uint64_t getQpcUs();          // high-resolution microseconds since app start
 
+// ---- progress reporting ------------------------------------------------------
+// Centralized run-progress: updates the window title + structured log whenever
+// the active demo part/scene/effect changes (driven by the ModPos timeline).
+void progressInit(void* hwnd);   // set the HWND whose title reflects progress
+void progressUpdate();           // call once per frame (waitVbl); emits on change
+
+// ---- pause / resume (Space key) ----------------------------------------------
+bool isPaused();            // current pause state (1 = paused)
+void pauseToggle();         // toggle pause (WndProc Space key-down edge)
+
 // ---- input -----------------------------------------------------------------
 // PC scancode -> pressed (1)/released(0), mirrors EOS Key_Map.
 int  isKeyDown(int scancode);
@@ -90,6 +100,7 @@ int  audioPlay();
 int  audioStop();
 uint32_t getModPos();         // Get_Info: song-position scalar for sync
 uint32_t getModLength();      // total positions, for calibration
+double   audioElapsedSec();   // monotonic playback elapsed seconds (audio clock)
 void     audioPump();         // must be called periodically from main loop
 
 // ---- seeking ----------------------------------------------------------------

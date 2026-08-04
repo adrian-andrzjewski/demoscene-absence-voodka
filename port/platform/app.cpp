@@ -44,6 +44,8 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         UINT sc = (UINT)((l >> 16) & 0xFF);
         if (l & 0x01000000) sc |= 0x80;             // extended
         vk::keyDown((uint8_t)(sc & 0x7F));
+        if (sc == 0x39 && !(l & 0x40000000))  // Space scancode, ignore auto-repeat
+            vk::pauseToggle();
         vk::keyUp((uint8_t)(sc & 0x7F));
         // re-press semantics: report held while down via timer in EOS; for
         // the port we mirror held state each WM_KEYDOWN.
@@ -118,6 +120,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     }
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
+    vk::progressInit(hwnd);
 
     // ---- init subsystems ---------------------------------------------------
     if (!vk::platformInit()) {
