@@ -265,7 +265,8 @@ show:
         and     eax, 0x1ff
         mov     r14, [rbx + rax*8]        ; texture base (fs)
         mov     [rel fsq], r14
-        lea     r15, [rel rcalc]          ; rcalc module base
+        mov     r15d, [rel rcalc_a8]
+        add     r15, qword [rel Code32_addr]   ; rcalc arena base
         lea     rbp, [rel pkt]            ; pkt module base
         movzx   edi, word [rsi+2]         ; face index (byte offset into con)
 .als:

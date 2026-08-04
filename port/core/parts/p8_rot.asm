@@ -449,7 +449,8 @@ rotate:
         push    r13
         push    r14
         sub     rsp, 0x20
-        lea     rdi, [rel check]
+        mov     edi, [rel check_a8]
+        add     rdi, qword [rel Code32_addr]
         xor     ax, ax
         mov     ecx, p_len
         rep stosw
@@ -571,12 +572,15 @@ rotate:
         mov     eax, [rel con_a8]
         add     rax, qword [rel Code32_addr]
         movzx   esi, word [rax+rbx]
-        lea     r14, [rel check]
+        mov     r14d, [rel check_a8]
+        add     r14, qword [rel Code32_addr]
 cmp     word [r14+rsi*2], 0
         jne     .skip
-        lea     r14, [rel check]
+        mov     r14d, [rel check_a8]
+        add     r14, qword [rel Code32_addr]
 inc     word [r14+rsi*2]
-        lea     r14, [rel rcalc]
+        mov     r14d, [rel rcalc_a8]
+        add     r14, qword [rel Code32_addr]
 lea     rdi, [r14+rsi*4]
         lea     r13, [rel shape]
         lea     r12d, [esi*2+esi]

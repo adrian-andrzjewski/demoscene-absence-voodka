@@ -163,13 +163,15 @@ n_add_a:  resd 1
 n_vert_a: resd 1
 n_rot_a:  resd 1
 draw_a8:  resd 1      ; draw_tab (f_len dwords)
+rcalc_a8: resd 1      ; working rcalc in arena (rotate's doubled-index writes
+check_a8: resd 1      ;   overrun module .bss in the port; contains them safely)
 
 ; module .bss statics (part-code only)
 pts_src:  resw (224+256+256)*3
 pts_tab:  resw f_len*3
 rcalc:    resw p_len*2
-ile:      resd 1
 check:    resw p_len
+ile:      resd 1
 
 frames:    resd 1
 ruchy_ptr: resd 1
@@ -460,6 +462,16 @@ part8:
         mov     edx, f_len*4
         call    eos_dispatch
         mov     [rel draw_a8], edx
+        ; rcalc / check -> arena (rotate's doubled-index writes overrun these;
+        ; keep them in the arena so the overrun can't stomp the engine's .bss)
+        mov     eax, EOS_ALLOCATE_MEMORY
+        mov     edx, 4096
+        call    eos_dispatch
+        mov     [rel rcalc_a8], edx
+        mov     eax, EOS_ALLOCATE_MEMORY
+        mov     edx, 2048
+        call    eos_dispatch
+        mov     [rel check_a8], edx
 
 
         ; selectors
