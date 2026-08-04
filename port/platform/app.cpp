@@ -187,7 +187,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     // ---- self-test or run the demo core (assembly) --------------------------
     uint8_t* ab = vk::arena();
     int rcode = 0;
-    bool selftest = std::string(lpCmd ? lpCmd : "").find("--selftest") != std::string::npos;
+    std::string cmdline = lpCmd ? lpCmd : "";
+    bool selftest = cmdline.find("--selftest") != std::string::npos;
     if (selftest) {
         // present the built-in pattern a few times so the readback can be
         // compared 1:1; bypasses the demo entirely
@@ -198,6 +199,22 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
             Sleep(16);
         }
         rcode = 0;
+    } else if (cmdline.find("--audiocheck") != std::string::npos) {
+        // run the audio subsystem self-check; no demo rendering.
+        int secs = 20;
+        std::string flag = "--audiocheck";
+        auto p = cmdline.find(flag);
+        std::string rest = cmdline.substr(p + flag.size());
+        size_t st = rest.find_first_not_of(" \t\"=");
+        if (st != std::string::npos) {
+            std::string tok = rest.substr(st);
+            size_t sp = tok.find_first_of(" \t");
+            tok = tok.substr(0, sp == std::string::npos ? std::string::npos : sp);
+            long v = strtol(tok.c_str(), nullptr, 0);
+            if (v > 0) secs = (int)v;
+        }
+        vk::logPrint("[app] AUDIO CHECK: running %d s\n", secs);
+        rcode = vk::audioSelfCheck(secs);
     } else {
         vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
         SetUnhandledExceptionFilter(&CrashFilter);

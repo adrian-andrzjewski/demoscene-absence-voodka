@@ -105,6 +105,11 @@ uint32_t audioSeekRows(uint32_t rows);
 uint32_t audioSeekMs(int ms);
 uint32_t audioSeekOrder(int order);
 
+// ---- audio self-check (--audiocheck) ----------------------------------------
+// Exercise init/load/playback for `seconds`, verify tempo accuracy, audio-video
+// drift and dropouts, log a full report. Returns 0 (pass) / nonzero (fail).
+int  audioSelfCheck(int seconds);
+
 // ---- logging ---------------------------------------------------------------
 void logInit();                        // open debugger + voodka.log (once)
 void logPrint(const char* fmt, ...);      // printf-style to debugger+file
