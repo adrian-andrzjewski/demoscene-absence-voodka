@@ -1827,9 +1827,10 @@ show:
         xor     edx, edx
         div     ebx
         shl     eax, 3                   ; face*8
+        mov     r8, rax                  ; keep index (P4AR clobbers eax)
         P4AR con3_a, rbx
         ; selector handle -> texture base
-        mov     ecx, [rbx + rax]
+        mov     ecx, [rbx + r8]
         movzx   rdx, cx
         and     rdx, 0x1ff
         lea     r9, [rel sel_base_table]

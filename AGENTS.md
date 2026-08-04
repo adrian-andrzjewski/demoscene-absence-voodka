@@ -52,7 +52,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   counter (the original used memory-operand `shape[ebp*2+ebp]` + `loop`, never
   touching `ecx`). The count then looped a garbage face index (~millions) and
   `rsi` walked past the 64 MB arena. Use a spare register (`r8`) for such
-  scratch so `ecx` stays the counter.
+  scratch so `ecx` stays the counter. A second collision fixed `show()`: it
+  computed the con3 face index into `eax`, then `P4AR con3_a, rbx` — the macro
+  internally does `mov eax,[rel con3_a]`, clobbering the live `eax` index, so
+  the texture-selector handle read garbage (mapQ -> 0, crash in `face()`).
+  Save such live values in a register `P4AR` won't touch (`r8`).
 - **ABI rule (critical):** every NASM->C++ call must have `RSP%16==0` at the
   `call` instruction. Prologue accounting: entry RSP%16==8; after `push rbp` it
   is 0; each extra push moves it by 8. A function pushing 7 regs after rbp
@@ -75,7 +79,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   arithmetic (see `p6.asm`, `water.inc`).
 - **Status:** platform layer, EOS-replacement ABI, and parts P6 (2D bump map)
   and P7 (7-phase water, 160x100->320x200 upscale) run end-to-end at
-  69.9 fps with audio and per-frame recording. P1-P5, P8, the engine
+  69.9 fps with audio and per-frame recording. P1-P4 are ported and wired;
+  part P4 (`--part 4`) now runs its full render loop crash-free at ~69 fps
+  with live per-frame recording, after fixing two ported-register collisions
+  (see Memory model note): calc_pts `ecx` counter and show() con3-index
+  preserved across P4AR (which clobbers `eax`). P5, P8, the engine
   (ENGINE.ASM/TXTR.ASM), VR/objects pipeline, and precise ModPos
   calibration remain.
 
