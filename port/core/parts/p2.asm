@@ -27,6 +27,19 @@ DEFAULT REL
 %include "vodka.inc"
 %include "water.inc"
 
+; WaitVbl + compute ramki as the per-frame retrace delta (mirror of the
+; original EOS wait_vbl, which returned ticks since the last call ~= 1).
+; WITHOUT this, ramki was the absolute 70Hz counter (getFrameCounter), so
+; sloneczko/trasa/water advanced by ramki>>2 ~ hundreds per frame.
+%macro WaitVblDelta 0
+        mov     eax, EOS_WAIT_VBL
+        call    eos_dispatch            ; eax = absolute 70Hz frame counter
+        mov     ecx, eax
+        sub     ecx, [rel last_vbl]     ; delta since last vbl (~1)
+        mov     [rel ramki], ecx
+        mov     [rel last_vbl], eax
+%endmacro
+
 extern _screen
 extern _scr_Addr
 extern _file_addr
@@ -41,6 +54,8 @@ extern cam_cameraZ
 extern cam_eyeAX
 extern cam_eyeAY
 extern cam_eyeAZ
+extern fs_sel
+extern gs_sel
 
 ; p2 render loop + camera path
 extern vk_p2_render_frame
@@ -57,6 +72,7 @@ section .data align=16
 global part2
 
 ramki:      dd 0
+last_vbl:   dd 0
 trasa_ruch: dd 0
 plum:       dd 0
 bolek:      dd 1
@@ -77,6 +93,29 @@ textury:    times 10 dw 0
 
 ; working scr + count multiples
 _scrSel:    dw 0
+
+; obroty - world[0] (torus) scripted rotation for ModPos >= 0x600 (P2.AS^ 45-65).
+; idx = (ModPos & 0xf)*3; each triple is (dax,day,daz) added to world[0]'s angles.
+obroty:     dd 22,22,8
+            dd 22,22,8
+            dd -22,22,8
+            dd -22,22,8
+            dd -22,22,8
+            dd -22,22,8
+            dd -22,-22,8
+            dd -22,-22,8
+            dd -22,-22,8
+            dd -22,-22,8
+            dd -22,-22,-13
+            dd -22,-22,-13
+            dd -22,-22,-13
+            dd -22,-22,-13
+            dd -3,-14,12
+            dd -3,-14,12
+            dd -3,-14,12
+            dd -3,-14,12
+            dd -3,-14,12
+            dd -3,-14,12
 
 ; object file indices 12..15 (VODKA.TXT, 0-based) - the four stadium walls.
 ; texture index 0 (selector from textury[0]) as the original LoadObject 12,0.
@@ -110,6 +149,17 @@ part2:
         mov     ecx, 16000
         rep stosd
 
+        ; ---- screen selector (gs for tm_face): backbuffer base ----
+        ; tm_face writes pixels through sel_base_table[gs_sel]; without this
+        ; the 3D raster writes to a stale/null screen base and is invisible.
+        mov     eax, EOS_ALLOCATE_SELECTOR
+        mov     esi, [rel _scr_Addr]
+        add     rsi, qword [rel Code32_addr]
+        mov     edi, 320*200
+        call    eos_dispatch                 ; -> ax = handle
+        movzx   edx, ax
+        mov     [rel gs_sel], edx
+
         ; ---- allocate waterWorld (256*256) + its selector into textury[0] ----
         AllocateMemory 256*256, waterWorld
         mov     eax, EOS_ALLOCATE_SELECTOR
@@ -120,15 +170,17 @@ part2:
         movzx   edx, ax
         mov     word [rel textury+0], dx       ; t[0] = waterWorld (unused as texture)
 
-        ; ---- real wall textures (reference PART2): t[1]=obrazek(0),
-        ;      t[2..4]=t001(1), t[5]=env(3); world types 1,2,4,5 use these ----
+        ; ---- real wall textures (reference CODE/PART2): t[1]=obrazek(0),
+        ;      t[2]=t001(1), t[3]=t002(2), t[4]=t002(2), t[5]=env(3);
+        ;      world types 1,2,4,5 use these ----
         %macro texsel_from_vodka 2       ; %1=vka idx, %2=textury word slot
-        mov     esi, [rel _file_addr]
+        mov     rsi, [rel _file_addr]
         add     rsi, qword [rel Code32_addr]
-        mov     eax, [rsi + (%1)*8]     ; file offset
+        mov     r10, rsi                ; archive offset-table real ptr
+        mov     eax, [r10 + (%1)*8]     ; file offset (relative to the table)
         mov     r10, rax
-        add     r10, qword [rel Code32_addr]
-        mov     esi, r10d
+        add     r10, rsi                ; base = table_rt + file_off (has _file_addr!)
+        mov     rsi, r10                ; full 64-bit real ptr
         mov     edi, 256*256            ; generous limit (buffer within arena)
         mov     eax, EOS_ALLOCATE_SELECTOR
         call    eos_dispatch
@@ -137,8 +189,8 @@ part2:
         %endmacro
         texsel_from_vodka 0, textury+2
         texsel_from_vodka 1, textury+4
-        texsel_from_vodka 1, textury+6
-        texsel_from_vodka 1, textury+8
+        texsel_from_vodka 2, textury+6
+        texsel_from_vodka 2, textury+8
         texsel_from_vodka 3, textury+10
 
         ; ---- sun sprite (vodka 16 = klatki.dat) ----
@@ -194,6 +246,12 @@ part2:
         mov     dword [rel trasa_ruch], 0
         mov     dword [rel ileFadow], 0
 
+        ; ---- prime last_vbl to the current frame counter so the first
+        ; WaitVblDelta computes a real per-vbl delta (~1), not a giant one. ----
+        mov     eax, EOS_WAIT_VBL
+        call    eos_dispatch
+        mov     [rel last_vbl], eax
+
         ; ---- world palette (2WORLD.PAL) for the stadium; P1 hands off with a
         ; full-white palette (see p1.asm .virtual), so P2 fades into _pal below.
         vodka   37, _pal
@@ -242,41 +300,80 @@ part2:
         mov     eax, [rel p2_cam_out+20]
         mov     [rel cam_eyeAZ], eax
 
-        ; ---- blysk_no: one white camera-flash + re-apply world palette at
-        ; ModPos > 0x500 (faithful port of P2.AS^ 202-212). ----
+        ; ---- trasa-path camera advance + world rotation (P2.AS^ ruchamy) ----
+        ; Only the trasa path (ModPos <= 0x63F) advances trasa_ruch / rotates the
+        ; world; the scripted widoki phase does neither.
+        lea     r12, [rel vk_p2_world]      ; world base (register-indirect avoids
+                                            ; ADDR32 reloc to the external .data)
+        cmp     word [rel ModPos], 0x63f
+        jg      .no_ruch
+
+        ; --- ModPos <= 0x500: slow advance, no world rotation ---
         cmp     word [rel ModPos], 0x500
-        jle     .no_blysk
+        jle     .slow_adv
+
+        ; --- ModPos > 0x500: one white camera-flash + re-apply world palette ----
         cmp     byte [rel lampa], 0
-        jne     .no_blysk
+        jne     .blysk_ok
         mov     byte [rel lampa], 1
         lea     rsi, [rel white]
         call    pal_set
         mov     esi, [rel _pal]
         add     rsi, qword [rel Code32_addr]
         call    pal_set
-.no_blysk:
+.blysk_ok:
+        ; trasa_ruch += ramki (full rate)
+        mov     eax, [rel ramki]
+        add     [rel trasa_ruch], eax
 
-        ; ---- advance trasa_ruch by ramki (frame-rate-scaled) ----
+        ; --- ModPos >= 0x600: world[0] (torus) obroty-table spin ---
+        cmp     word [rel ModPos], 0x600
+        jge     .obroty
+
+        ; --- 0x500 < ModPos < 0x600: world[0].ay/az fast spin + katys ----
+        mov     eax, [rel ramki]
+        shl     eax, 1
+        add     dword [r12 + 6*4], eax   ; world[0].ay += ramki*2
+        shl     eax, 1
+        add     dword [r12 + 7*4], eax   ; world[0].az += ramki*4
+        jmp     .do_katys
+
+.obroty:
+        lea     r13, [rel obroty]              ; obroty base (indexed access needs
+                                               ; a 64-bit index reg - rel/32-bit can't)
+        movzx   eax, word [rel ModPos]
+        and     eax, 0xf
+        imul    eax, eax, 3                    ; (ModPos&0xf)*3  (dword count)
+        movsxd  rcx, eax
+        shl     rcx, 2                         ; byte offset
+        mov     ebx, [r13 + rcx]
+        add     dword [r12 + 20], ebx
+        mov     ebx, [r13 + rcx + 4]
+        add     dword [r12 + 24], ebx
+        mov     ebx, [r13 + rcx + 8]
+        add     dword [r12 + 28], ebx
+        jmp     .no_katys
+
+.slow_adv:
+        ; ModPos <= 0x500: trasa_ruch += (ramki>4 ? ramki>>2 : 1)
         mov     eax, [rel ramki]
         cmp     eax, 4
-        jg      .adv
+        jg      .ksdk
         mov     eax, 1
-.adv:
-        mov     ebx, eax
-        shr     ebx, 2
-        test    ebx, ebx
-        jnz     .adv_apply
-        mov     ebx, 1
-.adv_apply:
-        add     [rel trasa_ruch], ebx
+        jmp     .slow_apply
+.ksdk:
+        sar     eax, 2
+.slow_apply:
+        add     [rel trasa_ruch], eax
+        jmp     .no_katys
 
+.do_katys:
         ; ---- world angle adders: world[i].angle += world[i].adder ----
-        lea     r12, [rel vk_p2_world]      ; direct data label address
         mov     r13d, [rel vk_p2_worldsobjects]   ; value
         xor     ecx, ecx
 .katys:
         cmp     ecx, r13d
-        jae     .katys_done
+        jae     .no_katys
         mov     eax, [r12 + 32]
         add     [r12 + 20], eax
         mov     eax, [r12 + 36]
@@ -286,7 +383,8 @@ part2:
         add     r12, 48
         inc     ecx
         jmp     .katys
-.katys_done:
+.no_katys:
+.no_ruch:
 
         Screen0
 
@@ -308,14 +406,15 @@ part2:
         lea     rax, [rel textury]
         mov     [rel p2_tex_tmp], rax
         ; vk_p2_render_frame(base, world, count, zet, kol, objects, textury, trace=0)
+        ; 5th..8th args at [rsp+0x20..0x38] (callee reads they at +0x20/+0x28/+0x30/+0x38).
         sub     rsp, 0x20
         mov     rax, [rel p2_kol_tmp]
         mov     [rsp+0x20], rax
         mov     rax, [rel p2_obj_tmp]
-        mov     [rsp+0x30], rax
+        mov     [rsp+0x28], rax
         mov     rax, [rel p2_tex_tmp]
-        mov     [rsp+0x38], rax
-        mov     qword [rsp+0x40], 0
+        mov     [rsp+0x30], rax
+        mov     qword [rsp+0x38], 0
         call    vk_p2_render_frame
         add     rsp, 0x20
 
@@ -323,8 +422,7 @@ part2:
         call    sloneczko
 
         ; ---- present ----
-        WaitVbl
-        mov     [rel ramki], eax
+        WaitVblDelta
         Ekran
 
         ; ---- currant: once the fade ramp has run, commit the full world
@@ -436,10 +534,10 @@ part2:
         mov     rax, [rel p2_kol_tmp]
         mov     [rsp+0x20], rax
         mov     rax, [rel p2_obj_tmp]
-        mov     [rsp+0x30], rax
+        mov     [rsp+0x28], rax
         mov     rax, [rel p2_tex_tmp]
-        mov     [rsp+0x38], rax
-        mov     qword [rsp+0x40], 0
+        mov     [rsp+0x30], rax
+        mov     qword [rsp+0x38], 0
         mov     rcx, [rel Code32_addr]
         lea     rdx, [rel vk_p2_world]
         mov     r8d, [rel vk_p2_worldsobjects]
@@ -456,11 +554,10 @@ part2:
         jmp     .sun
 .dwar:
         mov     dword [rel bolek], -1
-.sun:
+        .sun:
         call    sloneczko
 
-        WaitVbl
-        mov     [rel ramki], eax
+        WaitVblDelta
 
         ; ---- fade toward white near the end (0xB20..0xB3F) ----
         movzx   eax, word [rel ModPos]
@@ -564,22 +661,6 @@ sloneczko:
 .doit:
         imul    ebx
         add     [rel sun_step], eax
-        ; re-clamp so the sprite offset never leaves the 36-frame table
-        mov     eax, [rel sun_step]
-        cmp     eax, 35
-        jg      .wrap_hi
-        cmp     eax, 0
-        jge     .wrap_done
-.wrap_hi:
-        xor     edx, edx
-        mov     ecx, 36
-        idiv    ecx
-        test    edx, edx
-        jns     .wrap_pos
-        add     edx, 36
-.wrap_pos:
-        mov     [rel sun_step], edx
-.wrap_done:
 
         add     rsp, 0x20
         pop     r14
@@ -653,8 +734,7 @@ pikus:
         call    calculateWater
         inc     dword [rel nPage]
 
-        WaitVbl
-        mov     [rel ramki], eax
+        WaitVblDelta
         Ekran
 
         call    GetModPos
