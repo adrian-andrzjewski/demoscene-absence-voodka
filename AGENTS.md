@@ -89,7 +89,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (vk_p2_render_frame / vk_load_object / vk_prepare+VKdraw / textury) plus a
   P5-specific 128x128->256x256 water engine (`parts/water.p5.inc`), with its
   own World + TRASA camera data (`parts/p5_world.inc`, `parts/p5_trasa.inc`).
-  P8, the standalone engine parts, and precise ModPos calibration remain.
+  P8 is now wired into CMake + the full sequence (single_p8 works, 18/18 tests
+  pass) but --part 8 still AVs on frame 1: `rotate` writes past its module .bss
+  into the engine's `addr_tab` (face indices are valid, so the overrun is not
+  yet pinpointed). The standalone engine parts and precise ModPos calibration
+  remain.
 
 ## Original DOS build (reference only)
 
