@@ -46,6 +46,7 @@ extern part1
 extern part2
 extern part3
 extern part4
+extern part5
 extern part6
 extern part7
 extern part8
@@ -107,6 +108,8 @@ DemoStart32:
         je      .single_p3
         cmp     eax, 4
         je      .single_p4
+        cmp     eax, 5
+        je      .single_p5
         cmp     eax, 6
         je      .single_p6
         cmp     eax, 7
@@ -128,6 +131,9 @@ DemoStart32:
 .single_p4:
         call    part4
         jmp     .done
+.single_p5:
+        call    part5
+        jmp     .done
 .single_p6:
         call    part6
         jmp     .done
@@ -139,11 +145,12 @@ DemoStart32:
         jmp     .done
 
 .full_sequence:
-        ; current implemented slice: P1 then P2 then P3 then P4 then P6 then P7
+        ; current implemented slice: P1 then P2 then P3 then P4 then P5 then P6 then P7
         call    part1
         call    part2
         call    part3
         call    part4
+        call    part5
         call    part6
         call    part7
 

@@ -83,9 +83,13 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   part P4 (`--part 4`) now runs its full render loop crash-free at ~69 fps
   with live per-frame recording, after fixing two ported-register collisions
   (see Memory model note): calc_pts `ecx` counter and show() con3-index
-  preserved across P4AR (which clobbers `eax`). P5, P8, the engine
-  (ENGINE.ASM/TXTR.ASM), VR/objects pipeline, and precise ModPos
-  calibration remain.
+  preserved across P4AR (which clobbers `eax`). Part P5 (`--part 5`, the
+  morphing-torus-over-water VR scene) is now ported and wired into boot.asm
+  (+ core CMake) and runs crash-free: it reuses the P2 VR layer
+  (vk_p2_render_frame / vk_load_object / vk_prepare+VKdraw / textury) plus a
+  P5-specific 128x128->256x256 water engine (`parts/water.p5.inc`), with its
+  own World + TRASA camera data (`parts/p5_world.inc`, `parts/p5_trasa.inc`).
+  P8, the standalone engine parts, and precise ModPos calibration remain.
 
 ## Original DOS build (reference only)
 
