@@ -44,6 +44,15 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   `Code32_addr` base before dereferencing. The two VGA overlays are fixed:
   `kBackbufferOffset` (0x10000, pt draws here) and `kFramebufferOffset`
   (0x20000, presented). See `port/platform/platform_abi.h`.
+  **There is NO module `.data`/`.bss` "capacity" limit** (combined module data
+  is only ~40 KB; rip-relative `[rel X]` reaches any image offset). An early
+  P4 "arena migration" was done under the belief the module data was full —
+  that was a misdiagnosis. The real P4 setup crash was a register collision in
+  `calc_pts`: the port's `lea rcx,[rbp*2+rbp]` overwrote the `ecx` loop
+  counter (the original used memory-operand `shape[ebp*2+ebp]` + `loop`, never
+  touching `ecx`). The count then looped a garbage face index (~millions) and
+  `rsi` walked past the 64 MB arena. Use a spare register (`r8`) for such
+  scratch so `ecx` stays the counter.
 - **ABI rule (critical):** every NASM->C++ call must have `RSP%16==0` at the
   `call` instruction. Prologue accounting: entry RSP%16==8; after `push rbp` it
   is 0; each extra push moves it by 8. A function pushing 7 regs after rbp

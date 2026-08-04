@@ -1078,38 +1078,38 @@ calc_pts:
         mov     rdi, r12              ; shape base
 .calc_pts_loop:
         movzx   ebp, word [rsi]
-        lea     rcx, [rbp*2+rbp]
-        mov     ax, [rdi+rcx]
+        lea     r8, [rbp*2+rbp]
+        mov     ax, [rdi+r8]
         movzx   ebp, word [rsi+2]
-        lea     rcx, [rbp*2+rbp]
-        add     ax, [rdi+rcx]
+        lea     r8, [rbp*2+rbp]
+        add     ax, [rdi+r8]
         movzx   ebp, word [rsi+4]
-        lea     rcx, [rbp*2+rbp]
-        add     ax, [rdi+rcx]
+        lea     r8, [rbp*2+rbp]
+        add     ax, [rdi+r8]
         cwd
         idiv    bx
         mov     [r13], ax
         movzx   ebp, word [rsi]
-        lea     rcx, [rbp*2+rbp]
-        mov     ax, [rdi+rcx+2]
+        lea     r8, [rbp*2+rbp]
+        mov     ax, [rdi+r8+2]
         movzx   ebp, word [rsi+2]
-        lea     rcx, [rbp*2+rbp]
-        add     ax, [rdi+rcx+2]
+        lea     r8, [rbp*2+rbp]
+        add     ax, [rdi+r8+2]
         movzx   ebp, word [rsi+4]
-        lea     rcx, [rbp*2+rbp]
-        add     ax, [rdi+rcx+2]
+        lea     r8, [rbp*2+rbp]
+        add     ax, [rdi+r8+2]
         cwd
         idiv    bx
         mov     [r13+2], ax
         movzx   ebp, word [rsi]
-        lea     rcx, [rbp*2+rbp]
-        mov     ax, [rdi+rcx+4]
+        lea     r8, [rbp*2+rbp]
+        mov     ax, [rdi+r8+4]
         movzx   ebp, word [rsi+2]
-        lea     rcx, [rbp*2+rbp]
-        add     ax, [rdi+rcx+4]
+        lea     r8, [rbp*2+rbp]
+        add     ax, [rdi+r8+4]
         movzx   ebp, word [rsi+4]
-        lea     rcx, [rbp*2+rbp]
-        add     ax, [rdi+rcx+4]
+        lea     r8, [rbp*2+rbp]
+        add     ax, [rdi+r8+4]
         cwd
         idiv    bx
         mov     [r13+4], ax
