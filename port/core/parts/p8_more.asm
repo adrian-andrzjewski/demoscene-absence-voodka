@@ -918,7 +918,7 @@ sloneczko:
         add     rsi, qword [rel Code32_addr]
         mov     edi, [rel scr_addr]
         add     rdi, qword [rel Code32_addr]
-        add     edi, (-2*320)+254
+        add     rdi, (-2*320)+254
         mov     ecx, 64
 .sp1:
         mov     ebp, 64
@@ -931,7 +931,7 @@ sloneczko:
         inc     rdi
         dec     ebp
         jnz     .sp2
-        add     edi, 320-64
+        add     rdi, 320-64
         dec     ecx
         jnz     .sp1
         mov     eax, [rel frames]

@@ -145,7 +145,7 @@ DemoStart32:
         jmp     .done
 
 .full_sequence:
-        ; current implemented slice: P1 then P2 then P3 then P4 then P5 then P6 then P7
+        ; current implemented slice: P1 then P2 then P3 then P4 then P5 then P6 then P7 then P8
         call    part1
         call    part2
         call    part3
@@ -153,6 +153,7 @@ DemoStart32:
         call    part5
         call    part6
         call    part7
+        call    part8
 
 .done:
         xor     eax, eax

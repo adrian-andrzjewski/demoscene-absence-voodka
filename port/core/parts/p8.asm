@@ -50,6 +50,7 @@ extern r_x, r_y, r_z
 extern nrot_addr
 extern n_calc
 extern rotate_normals
+extern prep_sort
 extern sort
 
 p_len   EQU 40+33+114+128+128+40
@@ -487,7 +488,7 @@ part8:
         ; engine sort uses sort_addr (arena draw_tab) + faces
         mov     eax, [rel draw_a8]
         mov     [rel sort_addr], eax
-
+        call    prep_sort
         call    make_pos
         call    prepare
 
@@ -696,10 +697,10 @@ section .text
 
         mov     esi, [rel last_pic]
         add     rsi, qword [rel Code32_addr]
-        add     esi, 320*100
+        add     rsi, 320*100
         mov     edi, [rel framebuffer_off]
         add     rdi, qword [rel Code32_addr]
-        add     edi, 320*100
+        add     rdi, 320*100
         mov     ecx, (320*60)/4
         rep movsd
 
@@ -720,10 +721,10 @@ section .text
 
         mov     esi, [rel last_pic]
         add     rsi, qword [rel Code32_addr]
-        add     esi, 320*160
+        add     rsi, 320*160
         mov     edi, [rel framebuffer_off]
         add     rdi, qword [rel Code32_addr]
-        add     edi, 320*160
+        add     rdi, 320*160
         mov     ecx, (320*39)/4
         rep movsd
 
@@ -812,3 +813,4 @@ section .text
 
 %include "p8_rot.asm"
 %include "p8_more.asm"
+

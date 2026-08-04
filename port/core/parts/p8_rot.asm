@@ -239,10 +239,10 @@ make_phong:
         call    sub_rot
         mov     esi, [rel n_src_a]
         add     rsi, qword [rel Code32_addr]
-        add     esi, 114*6
+        add     rsi, 114*6
         mov     edi, [rel n_vert_a]
         add     rdi, qword [rel Code32_addr]
-        add     edi, 114*6
+        add     rdi, 114*6
         mov     dword [rel shf], 0
         mov     ecx, 128
         call    sub_rot
@@ -264,10 +264,10 @@ make_phong:
         call    sub_rot
         mov     esi, [rel n_src_a]
         add     rsi, qword [rel Code32_addr]
-        add     esi, (114+128)*6
+        add     rsi, (114+128)*6
         mov     edi, [rel n_vert_a]
         add     rdi, qword [rel Code32_addr]
-        add     edi, (114+128)*6
+        add     rdi, (114+128)*6
         mov     dword [rel shf], 0
         mov     ecx, 128
         call    sub_rot
