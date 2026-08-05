@@ -82,19 +82,19 @@ calculateWaterP5:
 .outer:
         mov     r13, 126                  ; inner (y Count)
 .inner:
-        movzx   eax, word [rdi + 128*2]
-        movzx   edx, word [rdi - 128*2]
-        add     eax, edx
-        movzx   edx, word [rdi + 1*2]
-        add     eax, edx
-        movzx   edx, word [rdi - 1*2]
-        add     eax, edx
-        sar     eax, 1
-        movzx   edx, word [rsi]
-        sub     eax, edx
-        mov     edx, eax
-        sar     edx, 6                    ; DESTINY = 6
-        sub     eax, edx
+        ; 16-bit signed ripple arithmetic, faithful to the original TASM:
+        ; the field values are signed int16 oscillating around zero; movzx/
+        ; 32-bit ops would zero-extend negatives and corrupt the sim. Use
+        ; ax/dx exactly as P5's water.pm does (DESTINY = 6).
+        mov     ax, [rdi + 128*2]
+        add     ax, [rdi - 128*2]
+        add     ax, [rdi + 1*2]
+        add     ax, [rdi - 1*2]
+        sar     ax, 1
+        sub     ax, [rsi]
+        mov     dx, ax
+        sar     dx, 6                     ; DESTINY = 6
+        sub     ax, dx
         mov     [rsi], ax
         add     rsi, 2
         add     rdi, 2

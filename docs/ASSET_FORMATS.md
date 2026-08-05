@@ -376,7 +376,11 @@ picture and never installed `absence.pal`). Deliberate deviations, all
 documented in-code: row/col clamps instead of the original's out-of-grid DOS
 reads (only undefined edge cells differ); P5's final offset keeps the 16-bit
 wrap exactly; the P7 port loops the correct 99 rows (a 100th row wrote 2
-bytes past the 64,000-byte frame — fixed).
+bytes past the 64,000-byte frame — fixed). The propagation sum itself keeps
+the original's 16-bit signed `ax/dx` arithmetic: an earlier port used 32-bit
+`movzx` loads that zero-extended negative ripple values into large positives,
+corrupting the average/diff/damping into full-field noise — fixed 2026-08-05
+in both `inc/water.inc` and `parts/water.p5.inc` (P2 already used `ax`/`dx`).
 
 ### 5.5 Sine tables
 
