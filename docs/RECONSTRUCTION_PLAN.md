@@ -1,8 +1,9 @@
 # Reconstruction plan & decision log
 
-Status snapshot: 2026-08-04. This document records the audit, the decisions
-taken, and the remaining work. Per-topic depth lives in `ASSETS.md`,
-`PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
+Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). This
+document records the audit, the decisions taken, and the remaining work.
+Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
+`BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 
 ## 1. Audit conclusions (what the repository contains)
 
@@ -72,16 +73,26 @@ taken, and the remaining work. Per-topic depth lives in `ASSETS.md`,
   loader (`--check` for CTest, Escape to quit).
 - [x] **Phase 6 - final polish**: dist recipe in BUILDING.md, docs synced,
   full playthrough + 25-test suite green.
+- [x] **Phase 7 - asset-format audit (2026-08-05)**: every runtime format
+  reverse-engineered and documented (`docs/ASSET_FORMATS.md`), original vs
+  port compared at each decode stage, presentation color/scaling pipeline
+  analyzed. Fixed 10 port bugs found along the way (P3 make_pal 8-bit clamp,
+  P2 water faithful re-port + absence.pal, P5 sun load + RIP drops, P4/P8
+  outro presents, water 99-row loop, palette 6->8 rounding, part-5 boundary,
+  P6 word-cmp) - all frame-record-verified; 25/25 tests + full playthrough
+  exit 0.
 
 ## 4. Open questions / known approximations
 
 - **ModPos calibration** (Phase 3): `kPartStartModPos` is derived from the
-  parts' own exit thresholds; exact order/row at each scene transition in
-  the *original* (DIAMOND player) may differ by a row - to be measured.
+  parts' own exit thresholds; exact order/row at each scene transition in the
+  *original* (DIAMOND player) may differ by a row - to be measured.
 - **14-channel module**: unusual (FastTracker 14CH per libxmp). DIAMOND was
   a custom player; any playback nuance differences go to
-  `KNOWN_DIFFERENCES.md`.
-- **`t002.dat` (40,896 B) and the odd-sized `.INC` blobs**: exact dimensions
-  are inferred from consumers, not from headers - flagged in `ASSETS.md`.
+  `KNOWN_DIFFERENCES.md`. The file's 233,984-byte trailing region (61%) is
+  inert for both players (ASSET_FORMATS.md 6.1).
+- **Odd-sized `.INC` blobs**: resolved by the Phase 7 audit - dimensions
+  derived from consumer code for every blob (ASSET_FORMATS.md 3.3);
+  `t002.dat` carries no header (256-wide, ~128 content rows, zero tail).
 - **P5 `vodka 45` (1-byte `voodka.dat`)**: loaded but effectively unused;
   behavior preserved as-is.

@@ -30,7 +30,7 @@ development happens in `port/` + `docs/`.
 
 ```powershell
 cd port
-.\build.ps1 -Config Release -Test   # build + run the 18-test suite
+.\build.ps1 -Config Release -Test   # build + run the 25-test suite
 .\bin\Release\VOODKA.exe            # watch the demo (960x600 window, ~70 fps)
 .\bin\Release\VOODKA.exe --part 5   # jump straight to a part
 ```
@@ -43,6 +43,9 @@ Details: **[docs/BUILDING.md](docs/BUILDING.md)**
   findings, decisions, phase status, open questions
 - [docs/ASSETS.md](docs/ASSETS.md) - vodka.dat format, the 76-asset index
   map, recovery procedures
+- [docs/ASSET_FORMATS.md](docs/ASSET_FORMATS.md) - every asset format
+  reverse-engineered: container, palettes, bitmaps, sprites, V3D/V3M, paths,
+  water/bump data, the MOD, and the DOS->D3D11 color/scaling pipeline
 - [docs/PORTING_NOTES.md](docs/PORTING_NOTES.md) - architecture, ABI rules,
   memory model, case studies
 - [docs/BUILDING.md](docs/BUILDING.md) - build/run/test reference

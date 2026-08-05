@@ -2,6 +2,9 @@
 
 How the 1996 TASM/DOS demo became a native Windows x64 program without
 losing behavioral fidelity. Read this before touching `port/core`.
+For the asset formats themselves (container, palettes, bitmaps, V3D/V3M,
+paths, water/bump data, MOD, presentation conversion) see
+`docs/ASSET_FORMATS.md`.
 
 ## Big picture
 
@@ -93,7 +96,9 @@ The original patches instruction immediates, which is read-only under DEP.
 These are ported as memory variables with identical arithmetic:
 
 - P6 bump map: `BUMPXXX`/`BUMPYYY` -> `bump_x`/`bump_y` (`parts/p6.asm`)
-- P7 water: `WaterX`/`WaterY`, `innerWater` patch sites (`core/inc/water.inc`)
+- P7 water: `WaterX`/`WaterY`, `innerWater` patch sites (`core/inc/water.inc`);
+  same treatment for the P2 water (`parts/water.p2.inc`, DESTINY=6) and the
+  P5 water (`parts/water.p5.inc`, DESTINY=6, 16-bit index wrap)
 - P8: `DESTINY` immediate
 - `cammat.asm`: VIRTUAL.INC SMC sites -> bss vars
 
@@ -140,8 +145,21 @@ for scratch; never reuse a register the original left live.**
   and the 768-byte palette to a 256x1 texture; a point-sampled fullscreen
   quad maps indices through the palette - pixel-identical to VGA DAC
   behavior, 3x integer upscale into a 960x600 window.
+- 6-bit DAC -> 8-bit conversion happens only at palette-texture upload:
+  **`round(v*255/63)` = `(v*255+31)/63`** (the linear mapping the DAC's
+  analog output implements; identical formula in `frames2img`, so recordings
+  match the screen pixel-for-pixel). All demo palette math stays in 6-bit
+  space (`setPalette` masks `& 63`).
+- **Present rule (audit 2026-08-05):** anything that was directly visible in
+  DOS - framebuffer writes *or* palette/DAC changes - needs an explicit
+  `vk_present_frame` to reach the window. The P4/P8 outros (VGA-memory
+  writes + pal_set fades with no `Ekran`) were invisible until presents were
+  added; when porting a new sequence, find every `rep movsd`/`pal_set` aimed
+  at the visible screen and ensure a present follows.
 - Palette writes (`set_pal` macro / `pal_set`) go through
   `applyPaletteRange` (`pal_range.h`), shared with `palette.crosscheck`.
+- Aspect/gamma rationale (square pixels, no gamma encode): see
+  `docs/ASSET_FORMATS.md` section 7.
 
 ## Audio path
 

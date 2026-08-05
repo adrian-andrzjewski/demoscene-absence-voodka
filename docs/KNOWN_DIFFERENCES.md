@@ -59,6 +59,66 @@ covered by the test suite:
    CODE/PART2 maps t[1]=t001, t[2..4]=t002, t[5]=env.
 10. Presentation vs 60 Hz vsync (see above).
 
+## Fixed divergences - asset-format audit (2026-08-05)
+
+A full asset-format reverse-engineering pass (docs/ASSET_FORMATS.md) compared
+every loader/decoder against the original sources and found these port bugs,
+all fixed and verified by frame recording (`--record` + palette/pixel diff):
+
+11. **P3 `make_pal` clamp semantics.** The port used a 32-bit `add eax,ebx`,
+    so the `jns` negative-clamp tested bit 31 instead of bit 7: wrapped bytes
+    128..255 passed through and `&63` mapped them to bright values where the
+    original clamps to black (dark ramp levels 6..14). Fixed to the original
+    8-bit `add al,bl`; recorded ramp now matches the original semantics for
+    all 720 bytes (tn.pal region exact too).
+12. **P2 water stage was a different effect.** The port reused the P7-style
+    water engine (160x100 field, 2x2 upscale) sampling `obrazek.dat`, cleared
+    the screen to black, and never installed `absence.pal` - ~1.5 s of
+    all-white frames. Now a faithful port of `P2/WATER/WATER.PM`
+    (`parts/water.p2.inc`): 320x200 int16 field, 318x80 sim, 320x80 1:1 strip
+    at screen rows 61..140 sampling `absence.dat` over the `water.abc`
+    backdrop, `absence.pal` installed via SetPal, drops from the correct
+    `P2/WATER/TAB` table (`p2_watertab.asm`; the shared `P2/TABLICA3` copy is
+    unreferenced by the original P2 build). Verified: palette == absence.pal
+    (768/768), live strip, correct backdrop.
+13. **P4 tull-picture outro was never presented.** The picture blit and the
+    64-step `pic_lo` fade + `brum` flashes ran, but no `vk_present_frame`
+    occurred between the last 3D frame (~0x1200) and P5's first frame
+    (~0x1400). Presents added (v_sync-paced fade steps, flash loop, wait
+    loop); verified: white -> tull picture fade-in visible, palette converges
+    to tull.pal exactly.
+14. **P8 end screen was never presented.** Same class: the 3-slice last.dat
+    reveal + `lopa`/`hopla` fades only touched the DAC/VGA memory in the
+    original. Presents added (fades v_sync-paced, matching the original's
+    pal_set retrace pacing); verified: slices -> fade-in -> 274-VBL hold ->
+    fade to all-black -> exit 0.
+15. **P5 sun sprite was never loaded.** `vodka 72,sun` (P5.AS^:156) had no
+    port equivalent; the sprite sampled the archive header. Added
+    (`p5_sun`); verified animating 19-frame 2world.inc sprite on screen.
+16. **P5 water had no drops.** The original's `RIP` include injects a drop
+    into `_bufor1` every `calculateWater` call (crawling `P5/TABLICA3`);
+    the port had none, so the water surface was static. Added to
+    `water.p5.inc`, including the original's duplicated `[esi+256]` poke bug
+    and odd byte offsets; table converted as `p5_tablica3.asm` (covered by
+    tablica3.crosscheck).
+17. **P7/P2-shared water drew 100 rows instead of 99** (`inc/water.inc`),
+    writing 2 bytes past the 64,000-byte frame each frame. Fixed to the
+    original's 99.
+18. **Palette 6->8-bit conversion truncated** (`(v*255)/63`), losing <=1 LSB
+    on ~half the values and disagreeing with frames2img's rounding. Now
+    `round(v*255/63)` exactly (`(v*255+31)/63`) in both - the linear mapping
+    the VGA DAC's analog output implements.
+19. **`--part 5` seeked 2 orders early** (`kPartStartModPos[4]` was 0x1200 =
+    P4's outro start; P4 exits at >= 0x1400). Fixed to 0x1400; progress.cpp
+    gained the missing "P4 tull outro" scene row.
+20. **P6 exit compared a dword at the word var `ModPos`** (worked only
+    because the adjacent `framebuffer_off` low word is 0). Now a word
+    compare.
+
+Also corrected in docs/comments: the .V3D UV block is per-vertex (nov*8),
+not per-face (loader.asm/v3d_crosscheck.cpp comments); `EOS_GET_INFO`
+comment said `bl` but the dispatcher returns `eax`.
+
 ## Remaining known differences
 
 - **P2 env-mapped object shade**: the stadium's env-mapped centerpiece
@@ -69,16 +129,41 @@ covered by the test suite:
   original's silver-blue at some phases (palette-range nuance under
   observation). The sw/metal palettes themselves were verified byte-exact
   against the OBJ-recovered data.
+- **P2 world palette (tree vs release)**: the tree's `P2.AS^` installs an
+  inline palette `jjdj`; the port installs `2WORLD.PAL` (vodka 37) - they
+  differ in 719/768 bytes, but `jjdj` is absent from the release EXE while
+  the release's embedded vodka.dat matches the port byte-for-byte. The tree
+  source is a different revision than the shipped build; the port matches
+  the release (ASSET_FORMATS.md section 2.5).
+- **Sine table variant**: `INC/SIN` is `round(32766*sin(2pi*i/1023))` (a
+  1023-interval table, hex-verified); the port generates a true 1024-step
+  `round(32767*sin(2pi*i/1024))`. Max deviation 201 Q15 units (~0.6%); the
+  word-format `sinus.inc` is missing from the repo entirely, so a
+  reconstruction was required regardless (the port's 2048-word two-period
+  table also safely covers the engine's cos over-reads up to word 1279).
+- **Out-of-grid water samples**: the P2/P7 water draw clamps the sample
+  row/col where the original's 16-bit index wrapped into adjacent DOS memory
+  (undefined bytes). Only extreme-gradient edge cells differ; the P5 final
+  offset keeps the exact 16-bit wrap (arena-safe).
 - **Transient first-frame deltas:** after a part stall the EOS delta is
   large for one frame; the original shows a momentary animation jump (and in
   P8's case read harmless garbage in DOS). The port wraps the sprite index
   instead — visually cleaner, same steady state.
 - **Windowed 960x600 D3D11 vs fullscreen mode 13h**; integer 3x upscale,
-  point-sampled, 6-bit palette DAC behavior reproduced. Possible one-line
-  tearing under Present(0), as on real VGA.
+  point-sampled, 6-bit palette DAC behavior reproduced (round(v*255/63),
+  no gamma encode - sRGB displays approximate the CRT's native gamma;
+  ASSET_FORMATS.md section 7). Square pixels vs the CRT's 1.2:1 tall-pixel
+  stretch (same choice as DOSBox's default). Possible one-line tearing under
+  Present(0), as on real VGA.
 - **Audio:** libxmp 4.6.2 vs the custom DIAMOND player (14-channel
   FastTracker module). Playback-rate difference noted above; mixing/filter
   nuances are those of libxmp's FT2-accurate mixer vs DIAMOND's SB16 output.
+  The module file carries 233,984 trailing bytes (61%) past the well-formed
+  module end - inert for both players (ASSET_FORMATS.md section 6.1).
+- **Sub-frame palette transients**: same-retrace white flashes (P2 lampa,
+  P7 phase changes, P8 brum) were DAC updates inside one frame in the
+  original; in the port the last state before a present wins. Effectively
+  invisible in both.
 - **Input:** Esc skips parts in the original; the port maps PC scancodes
   identically. Space = pause (port addition).
 
@@ -90,4 +175,9 @@ covered by the test suite:
   MROTATE matrices, camera matrix, projection, normals, object loader, VR
   visibility/sort/prepare, the P2 camera path and world data, and the toonel
   table: byte-exact vs C++ references re-deriving the original arithmetic
-  (17 CTests).
+  (25 CTests, incl. all five water drop tables and the V3D/V3M decode).
+- Asset-level runtime checks (2026-08-05, frame-recorded): P3 palette ramp
+  matches the original's 8-bit make_pal semantics for all 720 bytes; the P2
+  water installs absence.pal exactly (768/768); the P4 outro converges to
+  tull.pal exactly; the P8 end screen equals last.dat/last.pal and fades to
+  all-black.

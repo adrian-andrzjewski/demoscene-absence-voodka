@@ -307,9 +307,14 @@ void presentFrame() {
     if (SUCCEEDED(g_ctx->Map(g_palTex, 0, D3D11_MAP_WRITE_DISCARD, 0, &m))) {
         uint8_t* pd = (uint8_t*)m.pData;
         for (int i = 0; i < 256; i++) {
-            int rr = (g_pal[i * 3 + 0] * 255) / 63;
-            int gg = (g_pal[i * 3 + 1] * 255) / 63;
-            int bb = (g_pal[i * 3 + 2] * 255) / 63;
+            // The VGA DAC drives the analog outputs linearly with v/63 of full
+            // scale, so the faithful 8-bit mapping is round(v*255/63), exactly
+            // (v*255+31)/63 in integer math (truncating v*255/63 would lose up
+            // to 1 LSB on ~half the values). Same formula as frames2img, so
+            // recordings and on-screen output agree pixel-for-pixel.
+            int rr = (g_pal[i * 3 + 0] * 255 + 31) / 63;
+            int gg = (g_pal[i * 3 + 1] * 255 + 31) / 63;
+            int bb = (g_pal[i * 3 + 2] * 255 + 31) / 63;
             pd[i * 4 + 0] = (uint8_t)(rr > 255 ? 255 : rr);
             pd[i * 4 + 1] = (uint8_t)(gg > 255 ? 255 : gg);
             pd[i * 4 + 2] = (uint8_t)(bb > 255 ? 255 : bb);

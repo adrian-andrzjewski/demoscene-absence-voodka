@@ -184,6 +184,8 @@ part5:
         vodkasel 40, fn, textury+4
         vodkasel 38, fn, textury+6
         vodka   37, _pal
+        vodka   72, p5_sun              ; 2world.inc: 19-frame 64x64 sun sprite
+                                        ; (P5.AS^:156 `vodka 72,sun`)
 
         ; ---- load objects 31..34 into lo_objects ----
         mov     dword [rel lo_bump], 0x02000000

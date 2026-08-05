@@ -514,6 +514,14 @@ part4:
         mov     ecx, 16000
         rep movsd
 
+        ; the original wrote straight to VGA memory and updated the DAC, so the
+        ; whole outro was visible live; present explicitly here or nothing of
+        ; it ever reaches the window.
+        sub     rsp, 0x20
+        extern  vk_present_frame
+        call    vk_present_frame
+        add     rsp, 0x20
+
 .pic_lo:
         v_sync
         lea     rsi, [rel p4_white]
@@ -531,6 +539,9 @@ part4:
         loop    .co
         lea     rsi, [rel p4_white]
         call    pal_set
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
         dec     dword [rel ile_fade]
         jnz     .pic_lo
 
@@ -540,11 +551,16 @@ part4:
         rep stosb
 
 .wa:
+        v_sync
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
         call    GetModPos
         cmp     word [rel ModPos], 0x1338
         jl      .wa
 
 .brum:
+        v_sync
         call    GetModPos
         movzx   eax, word [rel ModPos]
         and     eax, 0x3f
@@ -562,6 +578,9 @@ part4:
         add     rsi, qword [rel Code32_addr]
         call    pal_set
 .no_flash:
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
         cmp     word [rel ModPos], 0x1400
         jl      .brum
 

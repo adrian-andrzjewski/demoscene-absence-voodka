@@ -71,8 +71,9 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   Load/Play/Stop_module, use_int_08/09) go through `eos_dispatch.asm` with
   service ids defined in `eos.inc` (original `EOS.INC` is not in the repo, so
   the port defines its own ids). `wait_vbl` = QPC-paced ~70Hz retrace emulation
-  (`timer.cpp`); `GetModPos` = libxmp pattern position (order<<6|row, to be
-  calibrated against the original's ModPos in Phase 8).
+  (`timer.cpp`); `GetModPos` = libxmp pattern position as **(order<<8)|row**
+  (proven from DEMO.AS^'s `mov al,bl` merge + P1's `0ff00h` order mask;
+  validated against DOSBox scene timing).
 - **Selectors:** user-mode x64 forbids arbitrary fs/gs bases. `sel_base_table`
   in `bridge.cpp` maps alloc_selector handles -> base pointers; texture mappers
   read the base up front instead of `fs:[...]`.
@@ -97,9 +98,18 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   into byte-space, so `rotate`'s rcalc/check writes (reference `rcalc[idx*2]`)
   overran module .bss into the engine's `addr_tab` - fixed by moving rcalc/check
   to the arena and using the reference's byte*2 rcalc stride (the port had *4)
-  plus reading show()'s face vertex index from con (not rcalc). The standalone
-  engine parts and precise ModPos calibration
-  remain.
+  plus reading show()'s face vertex index from con (not rcalc).
+- **Asset-format audit (2026-08-05)** reverse-engineered every runtime format
+  (docs/ASSET_FORMATS.md) and fixed another 10 port bugs: P3 `make_pal` 8-bit
+  clamp semantics, P2 water rewritten faithful to `P2/WATER/WATER.PM` (was a
+  P7-engine reuse: wrong picture, no absence.pal, white screen) as
+  `parts/water.p2.inc` + `p2_watertab.asm`, P5 `vodka 72` sun load, P5 RIP
+  drop injection (`p5_tablica3.asm`, duplicate-+256 bug preserved), P4/P8
+  outros now actually presented (DAC/VGA writes need explicit
+  `vk_present_frame`), water.inc 99-row loop (was 100 = 2-byte OOB write),
+  palette 6->8-bit rounding, `--part 5` boundary 0x1200->0x1400, P6 word-cmp.
+  Full playthrough exit 0; P3 ramp/P2 water palette/P4/P8 outros
+  frame-record-verified.
 - **Full playthrough runs clean end-to-end (exit 0, ~66-70 fps)** after the
   2026-08-04 validation pass fixed: P2 `_file_addr` qword load (64-bit read
   of a dword var scooped P1's `len`=81), P5 mirror/water 32-bit-vs-16-bit
@@ -120,15 +130,18 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   loader (`--check` = load+exit for CI; Escape/window-close to quit).
 - **Docs:** `docs/` holds the reconstruction documentation -
   `RECONSTRUCTION_PLAN.md` (audit/decisions/phase status), `ASSETS.md`
-  (vodka.dat format + 76-asset index map + recovery), `PORTING_NOTES.md`
+  (vodka.dat format + 76-asset index map + recovery), `ASSET_FORMATS.md`
+  (per-format reverse-engineering bible: structures, encodings, consumption,
+  port parity, presentation color/scaling pipeline), `PORTING_NOTES.md`
   (architecture/ABI/memory model/case studies), `BUILDING.md` (build/run/
   test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
   them in sync with the work.
-- **Tests:** 23 CTests (`port/build.ps1 -Config Release -Test`), sources in
+- **Tests:** 25 CTests (`port/build.ps1 -Config Release -Test`), sources in
   `port/tools/validate/` (the old empty `port/tests/` was removed): 17
   NASM-vs-C++ cross-checks + `vodka.golden_hash` + `v3d.crosscheck` (real
   .V3D/.V3M decode via the ported loader) + `tablica3.crosscheck` (generated
-  NASM tables vs original TASM text) + `pal.integrity` + `pal.repro`
+  NASM tables vs original TASM text, all five water/drop tables) +
+  `pal.integrity` + `pal.repro`
   (OBJ-extraction reproducibility) + `build.addr32` (COFF reloc hygiene);
   the Python ones are skipped if no interpreter is found.
 

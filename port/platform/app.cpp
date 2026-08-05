@@ -252,7 +252,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
             0x0400,  // part 2
             0x0B40,  // part 3
             0x0D40,  // part 4
-            0x1200,  // part 5
+            0x1400,  // part 5 (P4's tull-picture outro runs 0x1200..0x1400;
+                     //  P4.ASM only returns at ModPos >= 0x1400)
             0x1B40,  // part 6
             0x1C40,  // part 7
             0x2040,  // part 8

@@ -25,11 +25,17 @@ p5_water_x:  resw 1
 p5_water_y:  resw 1
 p5_inner:    resb 1
 p5_page:     resd 1
+p5_licznikwat: resd 1               ; RIP drop cursor (P5/RIP licznikWat)
 
 section .text
 
 ; ----------------------------------------------------- calculateWaterP5 ----
 ; 128x128 16-bit page ripple. edi = write page, esi = read page (page parity).
+; The original opens with `INCLUDE rip` (P5/RIP): a drop injection into
+; _bufor1 on EVERY call, crawling the P5/TABLICA3 drop path. Faithfully
+; reproduced here, including the original's duplicated `[esi+256]` poke (the
+; fourth poke was presumably meant to be +257) and the odd byte offsets
+; (+1 = high byte of word 0, +256 = low byte of word 128).
 calculateWaterP5:
         push    rbp
         mov     rbp, rsp
@@ -40,6 +46,20 @@ calculateWaterP5:
         push    r13
         push    r14
         sub     rsp, 0x28
+
+        ; ---- rip (drop injection, always into _bufor1) ----
+        mov     eax, [rel p5_licznikwat]
+        and     eax, 127
+        lea     rbx, [rel tablica3]
+        mov     ebx, [rbx + rax*4]
+        mov     esi, [rel _bufor1]
+        add     rsi, qword [rel Code32_addr]
+        add     rsi, rbx
+        mov     byte [rsi], 0xff
+        mov     byte [rsi+1], 0xff
+        mov     byte [rsi+256], 0xff
+        mov     byte [rsi+256], 0xff    ; duplicate offset, as the original
+        inc     dword [rel p5_licznikwat]
 
         mov     eax, [rel p5_page]
         and     eax, 1
@@ -208,5 +228,8 @@ drawWaterP5:
         pop     rbx
         pop     rbp
         ret
+
+section .data align=16
+%include "p5_tablica3.asm"   ; P5/TABLICA3: RIP drop path (label tablica3), 128-wide buffer offsets
 
 %endif ; WATER_P5_INC

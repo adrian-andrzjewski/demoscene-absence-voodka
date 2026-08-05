@@ -25,7 +25,7 @@ DEFAULT REL
 %include "video.inc"
 %include "pal.inc"
 %include "vodka.inc"
-%include "water.inc"
+%include "water.p2.inc"
 
 ; WaitVbl + store ramki. EOS wait_vbl returns the per-frame retrace DELTA
 ; (~1); the port's eos_dispatch does the same (bridge vk_wait_vbl computes
@@ -674,9 +674,10 @@ sloneczko:
         ret
 
 ; ------------------------------------------------------------------ pikus ---
-; Water picture: renders the reflective floor stage (from P2/WATER).
-; Loads the water picture/palette and runs the drop+Water raster loop until
-; ModPos > 0x73f.
+; Water picture (faithful port of CODE/P2/WATER/WATER): the stadium's
+; reflective floor. Installs absence.pal, then per frame pokes a 3x2-word drop
+; into _bufor1 (drop path from P2/WATER/TAB), re-copies the water.abc backdrop
+; to _screen and runs the 320x80 strip water (water.p2.inc) until ModPos > 0x73f.
 pikus:
         push    rbp
         mov     rbp, rsp
@@ -689,25 +690,27 @@ pikus:
         push    r15
         sub     rsp, 0x28
 
+        vodka   19, _waterPIC           ; water.abc  (320x200 backdrop)
+        vodka   17, _obrazek2           ; absence.dat (refraction source pic)
+        vodka   18, _paleta             ; absence.pal
+
+        mov     esi, [rel _paleta]
+        add     rsi, qword [rel Code32_addr]
+        call    SetPal
+
         AllocateMemoryFree 320*200*2, _bufor1
         AllocateMemoryFree 320*200*2, _bufor2
 
-        ; ---- water picture ----
-        ; shared water.inc drawWater samples `_obrazek` as a 160x100 picture;
-        ; obrazek.dat (vodka 0) is the grayscale water picture.
-        extern _obrazek
-        vodka   0, _obrazek
-
-        ; render until 0x73f
+        ; render until ModPos > 0x73f (original label: Keye)
 .pikus_loop:
-        ; a few water drops around the current drop position
+        ; a 3x2-word drop around the current drop position (always _bufor1)
         mov     eax, [rel licznik]
         and     eax, 127
-        lea     rbx, [rel tablica3]
+        lea     rbx, [rel watertab]
         mov     ebx, [rbx + rax*4]
         mov     esi, [rel _bufor1]
         add     rsi, qword [rel Code32_addr]
-        add     rsi, rbx                ; 64-bit add: ebx is an arena-relative delta
+        add     rsi, rbx
         mov     byte [rsi], 0xFF
         mov     byte [rsi+2], 0xFF
         mov     byte [rsi+4], 0xFF
@@ -717,22 +720,24 @@ pikus:
 
         mov     eax, [rel ramki]
         cmp     eax, 2
-        jge     .drop_amt
+        jge     .nic
         inc     dword [rel licznik]
-        jmp     .drop_done
-.drop_amt:
+        jmp     .ouss
+.nic:
         shr     eax, 1
         add     [rel licznik], eax
-.drop_done:
+.ouss:
 
+        ; backdrop: water.abc -> _screen (full 64000-byte frame)
+        mov     esi, [rel _waterPIC]
+        add     rsi, qword [rel Code32_addr]
         mov     edi, [rel _screen]
         add     rdi, qword [rel Code32_addr]
-        xor     eax, eax
-        mov     ecx, 8000
-        rep stosq                        ; clear screen (bg = water pic base)
+        mov     ecx, 16000
+        rep movsd
 
-        call    drawWater
-        call    calculateWater
+        call    drawWaterP2
+        call    calculateWaterP2
         inc     dword [rel nPage]
 
         WaitVblDelta
@@ -765,11 +770,11 @@ p2_kol_tmp: dq 0
 p2_obj_tmp: dq 0
 p2_tex_tmp: dq 0
 _obidx:   dd 0
-; _bufor1/_bufor2/nPage are provided by p7.asm (shared water.inc consumers)
+; pikus (water stage) asset offsets - arena offsets, add Code32_addr to use
+_obrazek2: dd 0                     ; vodka 17 = absence.dat (refraction pic)
+_waterPIC: dd 0                     ; vodka 19 = water.abc  (backdrop)
+_paleta:   dd 0                     ; vodka 18 = absence.pal
+; _bufor1/_bufor2/nPage are provided by p7.asm (shared water page globals)
 licznik:  dd 0
 
-extern _bufor1
-extern _bufor2
-extern nPage
-
-%include "p2_tablica3.asm"   ; module-local tablica3 (single-dd, like p7)
+%include "p2_watertab.asm"   ; P2/WATER/TAB: the drop-path table (label watertab)

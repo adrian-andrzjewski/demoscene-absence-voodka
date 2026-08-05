@@ -7,6 +7,10 @@ The port regenerates it byte-identically with `port/tools/vodka_pack`
 (verified by the `vodka.golden_hash` CTest against the archive embedded in
 the release `VOODKA.EXE`).
 
+**For the full per-format reverse-engineering (structures, encodings,
+consumption semantics, port parity) see `ASSET_FORMATS.md`.** This file is
+the index map + recovery notes.
+
 ## Archive format (`vodka.dat`)
 
 ```
@@ -35,9 +39,9 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 
 | # | File | Size | Format / content | Consumer |
 |--:|---|--:|---|---|
-| 0 | `obrazek.dat` | 16,384 | 128x128 8-bit texture | `DEMO.AS^`/PART2 -> `textury[0]` (P2 stadium) |
-| 1 | `t001.dat` | 32,768 | texture (128x256) *(inferred)* | PART2 -> `textury` (P2) |
-| 2 | `t002.dat` | 40,896 | texture, odd size (with header?) *(inferred)* | PART2 -> `textury` (P2) |
+| 0 | `obrazek.dat` | 16,384 | 128x128 8-bit pic | P2 (`PART2` -> `_obrazek`); **dead load** in the shipped P2 (never drawn) |
+| 1 | `t001.dat` | 32,768 | texture **256x128** (mapper stride is 256) | PART2 -> `textury[1]` (P2) |
+| 2 | `t002.dat` | 40,896 | texture 256-wide, content rows 0..127; **no header** (unpadded export, zero tail) | PART2 -> `textury[2..4]` (P2) |
 | 3 | `env.dat` | 65,536 | 256x256 environment map | PART2 -> `textury` (P2) |
 | 4 | `_rm.inc` | 51,200 | texture blob (binary despite .inc) | P1 (`map` - head texture) |
 | 5 | `_logo1.inc` | 5,880 | logo graphic | P1 (`logo1`) |
@@ -63,7 +67,7 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 | 25 | `v_txr1.inc` | 51,200 | texture blob | P4 (`map2`) |
 | 26 | `proc.inc` | 51,200 | texture blob | P4 (`map3`) |
 | 27 | `metal.inc` | 51,200 | texture blob | P4 (`map4`), P8 (`map2`) |
-| 28 | `logo_a.dat` | 48,000 | logo graphic (240x200) *(inferred)* | P4 (`logo`) |
+| 28 | `logo_a.dat` | 48,000 | **15-frame 64x50 sprite anim** (15x3200) | P4 (`show_logo`) |
 | 29 | `tull.inc` | 64,000 | 320x200 screen | P4 (`pic_data`) |
 | 30 | `tull.pal` | 768 | palette | P4 (`pic_pal`) |
 | 31 | `2wall.v3d` | 140 | VR object | P5 world |
@@ -81,18 +85,18 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 | 43 | `w3.DAT` | 64,000 | 320x200 screen | P5 (`_adr1`) |
 | 44 | `w4.DAT` | 64,000 | 320x200 screen | P5 (`_voodka2`) |
 | 45 | `voodka.dat` | 1 | **1-byte placeholder** (name collision with the archive itself) | P5 (`_voodka`) |
-| 46 | `h1.dat` | 14,976 | small bitmap (128x117) *(inferred)* | P5 (`_voodka2`) |
-| 47 | `h2.dat` | 14,976 | small bitmap | P5 (`_adr1`) |
-| 48 | `h3.dat` | 14,976 | small bitmap | P5 (`_voodka2`) |
-| 49 | `h4.dat` | 14,976 | small bitmap | P5 (`_adr1`) |
-| 50 | `death.dat` | 64,000 | 320x200 screen | P6 (`_pic`, bump-map backdrop) |
-| 51 | `death.pal` | 768 | palette | P6 (`_pal`) |
-| 52 | `mapa.dat` | 16,384 | 128x128 bump height map | P6 (`_bump`) |
-| 53 | `jaszczur.dat` | 64,000 | 320x200 screen ("lizard") | P6 (`_jaszczur`) |
-| 54 | `pulse.dat` | 16,000 | 160x100 water phase pic | P7 phase 6 (`_pulse`) |
-| 55 | `pls.dat` | 32,000 | 160x100x2 water phase data | P7 phase 6 (`_pulseW`) |
+| 46 | `h1.dat` | 14,976 | small bitmap **156x96** (per the dead `voodka2:` blitter) | P5 (`_voodka2`); loaded, never drawn |
+| 47 | `h2.dat` | 14,976 | small bitmap | P5 (`_adr1`); never drawn |
+| 48 | `h3.dat` | 14,976 | small bitmap | P5 (`_voodka2`); never drawn |
+| 49 | `h4.dat` | 14,976 | small bitmap | P5 (`_adr1`); never drawn |
+| 50 | `death.dat` | 64,000 | 320x200 bump **height field** | P6 (`_pic`, bump-map gradients) |
+| 51 | `death.pal` | 768 | palette (two 128-entry banks) | P6 (`_pal`) |
+| 52 | `mapa.dat` | 16,384 | 128x128 bump **lighting LUT** (values 0..119) | P6 (`_bump`) |
+| 53 | `jaszczur.dat` | 64,000 | 320x200 overlay mask ("lizard"; nonzero => +128) | P6 (`_jaszczur`) |
+| 54 | `pulse.dat` | 16,000 | 160x100 water phase pic | P7 phase **7** (`_pulse`) |
+| 55 | `pls.dat` | 32,000 | 160x100 int16 water initial state | P7 phase **7** (`_pulseW`) |
 | 56 | `camorra.dat` | 16,000 | water phase pic | P7 phase 1 |
-| 57 | `cma.dat` | 32,000 | water phase data | P7 phase 1 |
+| 57 | `cma.dat` | 32,000 | 160x100 int16 water initial state | P7 phase 1 |
 | 58 | `poison.dat` | 16,000 | water phase pic | P7 phase 2 |
 | 59 | `psn.dat` | 32,000 | water phase data | P7 phase 2 |
 | 60 | `substanc.dat` | 16,000 | water phase pic | P7 phase 3 |
@@ -101,14 +105,14 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 | 63 | `tcm.dat` | 32,000 | water phase data | P7 phase 4 |
 | 64 | `hypnotiz.dat` | 16,000 | water phase pic | P7 phase 5 |
 | 65 | `hpz.dat` | 32,000 | water phase data | P7 phase 5 |
-| 66 | `motion.dat` | 16,000 | water phase pic | P7 phase 7 |
-| 67 | `mtn.dat` | 32,000 | water phase data | P7 phase 7 |
+| 66 | `motion.dat` | 16,000 | water phase pic | P7 phase **6** |
+| 67 | `mtn.dat` | 32,000 | water phase data | P7 phase **6** |
 | 68 | `woda.dat` | 16,000 | final water pic | P7 (`_obrazek2`) |
 | 69 | `woda.pal` | 768 | palette | P7 (`_paleta`) |
 | 70 | `last.pal` | 768 | palette | P8 (`last_pal`) |
 | 71 | `last.dat` | 63,680 | 320x199 screen (one line short) | P8 (`last_pic`) |
-| 72 | `2world.inc` | 77,824 | texture blob | P5 (`sun` sprite) |
-| 73 | `log.inc` | 77,824 | texture blob | P8 (`sun` sprite) |
+| 72 | `2world.inc` | 77,824 | **19-frame 64x64 sprite anim** (19x4096) | P5 (`sun` sprite) |
+| 73 | `log.inc` | 77,824 | 19-frame 64x64 sprite anim | P8 (`sun` sprite) |
 | 74 | `trasa.dat` | 106,704 | binary camera path (2,964 nodes x 9 dwords) | P4 (`ruchy`) |
 | 75 | `tr2.dat` | 90,288 | binary camera path (2,508 nodes x 9 dwords) | P8 (`ruchy`) |
 
@@ -126,23 +130,27 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 
 - **`.PAL`** - 768 bytes = 256 x (r,g,b), 6-bit VGA DAC values (0..63).
 - **`.DAT` raw bitmaps** - headerless 8-bit indexed pixels. Common sizes:
-  64,000 = 320x200; 32,000 = 160x200 or 160x100x2; 16,000 = 160x100;
-  65,536 = 256x256; 16,384 = 128x128; 147,456 = 36 frames of 64x64;
-  63,680 = 320x199 (`last.dat`); 14,976 = h1-h4 small pics.
+  64,000 = 320x200; 32,000 = 160x100 **int16 words** (water initial states);
+  16,000 = 160x100; 65,536 = 256x256; 16,384 = 128x128; 147,456 = 36 frames
+  of 64x64; 77,824 = 19 frames of 64x64; 63,680 = 320x199 (`last.dat`);
+  14,976 = h1-h4 small pics (156x96 per the only consumer code).
 - **`.INC` (in DANE)** - binary texture/screen blobs despite the extension
-  (51,200 / 44,032 / 77,824 / 38,912 bytes etc.; dimensions known only from
-  consumer code).
+  (256-stride mapper textures: 51,200 = 256x200, 44,032 = 256x172,
+  38,912 = 256x152; 77,824 = 19x64x64 sprite stacks). See ASSET_FORMATS.md
+  §3.3 for the full derivation table.
 - **`.V3D` / `.V3M`** - VR-engine object files. Per `CODE/WORLD/VC.EXT` they
   are literally renamed `.COM` images built from `WORLD.ASM`-style sources
   (`tasm`, `tlink /x/3/t`, `ren !.com !.v3d`). Header dwords carry
-  object/face counts; parsed by `OBJECTS.PM Load_Object`
-  (port: `engine/loader.asm vk_load_object`, covered by `loader.crosscheck`).
-  `.V3M` is a morph-target variant for the P5 torus.
+  type/vertex/face counts + spin adders, then novx12 vertices, nofx12 faces,
+  and a **per-vertex** UV block (novx8; hex-proven via WALL.V3D) - parsed by
+  `OBJECTS.PM Load_Object`
+  (port: `engine/loader.asm vk_load_object`, covered by `v3d.crosscheck`).
+  `.V3M` is the same blob minus the 36-byte header (P5 morph target).
 - **`trasa.dat` / `tr2.dat`** - binary camera-path node arrays consumed by P4
   and P8 (9 dwords per node). Their text sources live in `CODE/COMS/`
   (`TRASA.DAT`/`TR2.DAT` as `dd` rows, compiled by `MALE.ASM`).
-- **`do_water`, `mapa.dat`** - 128x128 8-bit grids (water template / bump
-  heights).
+- **`do_water`, `mapa.dat`** - 128x128 8-bit grids (P5 water source pic /
+  P6 bump lighting LUT).
 
 ## Compile-time assets (NOT in vodka.dat)
 
@@ -151,7 +159,8 @@ These were `INCLUDE`d / `incbin`'d into the part .OBJs at assembly time:
 | Asset | Used by | Status / recovery |
 |---|---|---|
 | `rm_eye.pal` (768 B) | P1 | missing from repo; recovered from `P1.OBJ` |
-| `jup.pal`, `tn.pal` (16 colors each) | P3 | missing; recovered from `P3.OBJ` LEDATA |
+| `jup.pal` | P3 | missing; recovered from `P3.OBJ` LEDATA |
+| `tn.pal` (16 colors) | P3 | ASCII `CODE/P3/TN.PAL` survives in-tree (60 values = 16 colors + 4 black; only 48 read) and matches the `P3.OBJ` recovery byte-for-byte |
 | `sw.pal`, `v_txr1.pal`, `proc.pal`, `metal.pal` | P4 | missing; recovered from `P4.OBJ` LEDATA |
 | `sw.pal`, `metal.pal` | P8 | missing; recovered from `P8.OBJ` (cross-checked vs P4) |
 | `macro.inc` | P1/P3/P4/P8 | missing; semantics reconstructed in the port |
@@ -172,9 +181,14 @@ in `port/data/pal/`.
   by P1/P3/P4/P8 (`shape3`, `constr3`, `log_s/log_c`, `vws/vwc`, `ob/sw`).
   Six orphaned includes (`TOR_C/TOR_S/SHAPE/CONSTR/CND/SHD.INC`) are referenced
   by no current source.
-- `CODE/P2/TABLICA3`, `P6/TABLICA3`, `P7/TABLICA3` - precomputed water
-  displacement tables (`P6/TABLICA.PAS` is the 480 B generator); converted to
-  NASM by `port/tools/vodka_pack/tabl2nasm.cpp`.
+- `CODE/P2/TABLICA3`, `P6/TABLICA3`, `P7/TABLICA3`, `P5/TABLICA3`,
+  `P2/WATER/TAB` - precomputed drop-path/light-path tables
+  (`P6/TABLICA.PAS` is the 480 B generator for P6's Lissajous light path);
+  converted to NASM by `port/tools/vodka_pack/tabl2nasm.cpp`. Note: P2's
+  production water uses `P2/WATER/TAB` (`WATER.PM:106`), not the
+  same-named `P2/TABLICA3` (a byte-identical stray copy of P7's table);
+  P6's table is the bump-light path, not water. All five are covered by
+  `tablica3.crosscheck`.
 - `CODE/P2/TRASA.!`, `P5/TRASA.!`, `COMS/TRASA.DAT` - camera paths as text
   `dd` rows; ported to `core/data/p2trasa.inc` / `parts/p5_trasa.inc`.
 - `music/amnezja2.mod` - the music: **14-channel** module ("<>Amnezja<>" by

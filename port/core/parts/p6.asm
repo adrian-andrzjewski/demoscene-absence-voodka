@@ -119,8 +119,8 @@ part6:
         Ekran
 
         call    GetModPos
-        cmp     dword [rel ModPos], 0x1c3f
-        jle     .keye
+        cmp     word [rel ModPos], 0x1c3f   ; word var (a dword cmp reads the
+        jle     .keye                       ; low half of framebuffer_off too)
 
         add     rsp, 0x28
         pop     r15

@@ -9,7 +9,10 @@
 ;
 ; File layout (offsets base-relative): +0 type(0=PIX/1=TEX/2=PHONG), +4 nov,
 ;   +8 nof, +12/16/20 addAX/Y/Z, +36 vertexes(nov*3 dd), faces(nof*3 dd),
-;   textures(nof*3 dd, TEX only).
+;   then the per-vertex UV block (nov*2 dd; the draw path indexes it by vertex
+;   index with 8-byte stride - OBJECTS.PM:189-194; WALL.V3D's exact size
+;   140 = 36 + 4*12 + 2*12 + 4*8 proves per-vertex, not per-face). Present in
+;   every file (exporter leftover, garbage in PHONG), read only for TEX.
 ;
 ; Struct (21 dwords, base-relative) matches OBJECTS.PM:
 ;   +0 type +4 nov +8 nof .. +24/28/32 adders +36 vertexes +40 faces +44 tex

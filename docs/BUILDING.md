@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (18 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (25 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 

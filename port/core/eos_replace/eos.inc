@@ -40,7 +40,7 @@
 %define EOS_ALLOCATE_SELECTOR   0x04  ; rsi=real ptr, edi=limit -> bx=handle
 %define EOS_DEALLOCATE_SELECTOR 0x05  ; bx=handle
 %define EOS_WAIT_VBL            0x06  ; -> eax = frame counter
-%define EOS_GET_INFO            0x07  ; -> bl  = song position (ModPos)
+%define EOS_GET_INFO            0x07  ; -> eax = song position (ModPos, (order<<8)|row)
 %define EOS_LOAD_INTERNAL_FILE  0x08  ; edx = name ptr -> eax = arena offset
 %define EOS_QUERY_SOUNDCARD     0x09  ; -> eax = 1 (present)
 %define EOS_LOAD_MODULE         0x0A  ; al=1, edx=name ptr

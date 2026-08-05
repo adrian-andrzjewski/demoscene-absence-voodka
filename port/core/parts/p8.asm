@@ -679,6 +679,8 @@ section .data
 section .text
 
 ; ---- outtro -----------------------------------------------------------------
+; The original wrote these slices/fades straight to VGA memory + DAC; the port
+; must present explicitly or none of the end sequence is ever shown.
         lea     rsi, [rel white]
         call    pal_set
 
@@ -699,7 +701,16 @@ section .text
         add     rsi, qword [rel Code32_addr]
         call    pal_set
 
+        sub     rsp, 0x20
+        extern  vk_present_frame
+        call    vk_present_frame
+        add     rsp, 0x20
+
 .wa1:
+        v_sync
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
         call    GetModPos
         cmp     word [rel ModPos], 2705h
         jl      .wa1
@@ -723,7 +734,15 @@ section .text
         add     rsi, qword [rel Code32_addr]
         call    pal_set
 
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
+
 .wa2:
+        v_sync
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
         call    GetModPos
         cmp     word [rel ModPos], 2708h
         jl      .wa2
@@ -739,6 +758,10 @@ section .text
         add     rdi, 320*160
         mov     ecx, (320*39)/4
         rep movsd
+
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
 
         mov     dword [rel ile_fade], 64
 
@@ -766,6 +789,13 @@ section .text
         lea     rsi, [rel white]
         call    pal_set
 
+        ; the original paced this fade by pal_set's retrace wait; reproduce the
+        ; ~70Hz cadence and show every step.
+        v_sync
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
+
         dec     dword [rel ile_fade]
         cmp     dword [rel ile_fade], -4
         jge     .lopa
@@ -777,6 +807,9 @@ section .text
 .wait:
         mov     eax, EOS_WAIT_VBL
         call    eos_dispatch
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
         inc     dword [rel ile_fade]
         cmp     dword [rel ile_fade], 274
         jl      .wait
@@ -800,6 +833,11 @@ section .text
 
         lea     rsi, [rel white]
         call    pal_set
+
+        v_sync
+        sub     rsp, 0x20
+        call    vk_present_frame
+        add     rsp, 0x20
 
         inc     dword [rel ile_fade]
         cmp     dword [rel ile_fade], 64

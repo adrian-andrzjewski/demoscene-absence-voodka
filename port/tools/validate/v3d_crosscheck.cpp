@@ -2,9 +2,11 @@
 // CODE/LINKER/DANE with the actual ported loader (loader.asm vk_load_object).
 //
 // Format (OBJECTS.PM Load_Object): +0 type(1=TEX,2=PHONG), +4 nov, +8 nof,
-// +12..+32 adders, +36 vertexes(nov*3 dd), faces(nof*3 dd), textures(nof*3 dd,
-// TEX only). Files may carry trailing data the loader ignores (the .COM-image
-// heritage); .V3M is the same blob minus the 36-byte header (P5 morph target).
+// +12..+32 adders, +36 vertexes(nov*3 dd), faces(nof*3 dd), then a PER-VERTEX
+// UV block (nov*2 dd = nov*8 bytes; drawn via [uv + vidx*8], OBJECTS.PM:189-194;
+// hex-proven by WALL.V3D: 140 = 36 + 4*12 + 2*12 + 4*8). The block is present
+// in PHONG files too (filled with exporter leftovers) but only read for TEX.
+// .V3M is the same blob minus the 36-byte header (P5 morph target).
 //
 // Checks: header sanity + minimum size, then the ASM load: struct fields,
 // data offsets, and the in-place x16 vertex scale.

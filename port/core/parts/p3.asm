@@ -508,8 +508,13 @@ make_pal:
         xor     r12, r12
         mov     ecx, 16*3
 .f_lo2:
+        ; 8-bit add exactly like the original (P3.ASM make_pal): the byte wraps
+        ; mod 256 and `jns` tests bit 7, so any sum that lands negative as a
+        ; signed BYTE clamps to 0. (A 32-bit add here made bit 31 the sign and
+        ; let wrapped bytes 128..255 through - bright where the original is
+        ; black.)
         movzx   eax, byte [rsi + r12]
-        add     eax, ebx
+        add     al, bl
         jns     .pa1
         xor     al, al
 .pa1:

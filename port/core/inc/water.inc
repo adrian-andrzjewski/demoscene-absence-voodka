@@ -216,8 +216,9 @@ ww_col_ok:
 
         add     rdi, 320
         inc     word [rel water_y]
-        cmp     word [rel water_y], 100
-        jb      dw_outer
+        cmp     word [rel water_y], 99    ; original: ecx=-99 shl 16 -> 99 rows
+        jb      dw_outer                  ; (screen rows 1..198; 100 would write
+                                          ;  2 bytes past the 64000-byte frame)
 
         add     rsp, 0x28
         pop     r15
