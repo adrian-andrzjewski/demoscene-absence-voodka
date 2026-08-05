@@ -139,6 +139,9 @@ _count:  dd ile
 step:    dd 0
 
 skrin:   dq 0
+rollbuf: dq 0    ; base of the ile-screen rolling ring (scr_tab[i] = rollbuf+i*64000);
+                 ; kept SEPARATE from skrin (the composite screen), like the original
+                 ; P3.ASM (anonymous ring alloc vs `skrin` screen at P3.ASM:205-208).
 sun:     dq 0
 sun_step: dd 0
 ramki:   dd 0
@@ -401,11 +404,11 @@ prepare_twist:
         vodka   20, map
         vodka   21, lgmap
 
-        AllocateMemory 320*200*ile, skrin
+        AllocateMemory 320*200*ile, rollbuf
         lea     r12, [rel scr_tab]
         xor     edi, edi
         mov     ecx, ile
-        mov     edx, [rel skrin]
+        mov     edx, [rel rollbuf]
 .alloc_scr:
         mov     [r12 + rdi], edx
         add     edx, 320*200
@@ -414,7 +417,7 @@ prepare_twist:
         jnz     .alloc_scr
 
         ; zero roll block
-        mov     edi, [rel skrin]
+        mov     edi, [rel rollbuf]
         add     rdi, qword [rel Code32_addr]
         xor     eax, eax
         mov     ecx, 16000*ile
@@ -655,10 +658,13 @@ tooneling:
         movzx   ebx, word [rdx + 64000 + rsi*2 - 2]
         mov     r13d, ebx
         add     r13d, r14d
+        and     r13d, 0xffff        ; 16-bit wrap like the original's bx (64KB tex)
         mov     r15d, ecx
         add     r15d, r14d
+        and     r15d, 0xffff        ; 16-bit wrap like the original's cx
         movzx   eax, byte [r12 + r13]
         movzx   ebx, byte [r12 + r15]
+        mov     ah, bl              ; ax = (u-texel<<8) | v-texel, like [edi],ax
         mov     [rdi], ax
         add     rdi, 2
         dec     esi
@@ -712,43 +718,52 @@ copy:
         mov     dword [rel _skip1], 0
         mov     [rel _skip2], eax
 .cp1:
-        ; dst = skrin + p_y*320 + p_x
+        ; rows: ecx = 200 - p_y when p_y >= 0, else 200 (P3.ASM:535-547)
+        mov     ecx, 200
+        mov     eax, [rel p_y]
+        cmp     eax, 0
+        jl      .p2
+        sub     ecx, eax
+.p2:
+        ; dst = skrin + p_y*320 + p_x (running pointer, advances per row)
         mov     r15, [rel Code32_addr]
         mov     rdi, [rel skrin]
         add     rdi, r15
         mov     eax, [rel p_y]
         imul    eax, 320
         add     eax, [rel p_x]
+        movsxd  rax, eax
         add     rdi, rax
-        ; edi now = dst row base for row 0 (updated per row)
         mov     ebx, [rel step]
         and     ebx, 0x3ff
         mov     ebp, ile-4
         lea     r12, [rel scr_tab]
         lea     r11, [rel sinus]
-        xor     r13, r13            ; row counter
+        xor     r13, r13            ; running src row offset (row*320)
+        mov     r8d, [rel p_y]      ; running p_y (inc per row, like the original)
 .c_lop:
-        cmp     r13, 200
-        jae     .ret
-        ; src screen = scr_tab[ ((-sinus[ebx]*ebp)>>16) + ile/2 ]
+        test    ecx, ecx
+        jle     .ret
+        cmp     r8d, 0
+        jge     .gosp
+        add     rdi, 320            ; p_y < 0: skip dst row, no draw (P3.ASM:571-574)
+        jmp     .cosp
+.gosp:
+        ; src = scr_tab[ ((-sinus[ebx]*ebp)>>16) + ile/2 ] + row*320 + _skip1
         movsx   eax, word [r11 + rbx*2]
         neg     eax
         imul    ebp
         sar     eax, 16
         add     eax, ile/2
-        mov     eax, [r12 + rax*4]
-        add     eax, [rel skrin]
-        movsxd  rcx, eax              ; + _skip1 (sign-extend dword)
-        mov     eax, [rel _skip1]
-        movsxd  r9, eax
-        lea     rsi, [rcx + r9]
-        add     rsi, r15           ; src real
-        ; dst = rdi current row
-        mov     r14, rdi
-        mov     eax, [rel _skip1]
-        movsxd  r9, eax
-        add     r14, r9
-        mov     ecx, [rel _size]
+        mov     eax, [r12 + rax*4]  ; scr_tab[sel] (arena offset, already absolute)
+        add     rax, r13
+        mov     edx, [rel _skip1]
+        movsxd  rdx, edx
+        add     rax, rdx
+        lea     rsi, [rax + r15]    ; src real
+        mov     r14, rdi            ; dst cursor = rdi + _skip1
+        add     r14, rdx
+        mov     edx, [rel _size]
         ; copy row, skipping zeros
 .cprow:
         mov     al, byte [rsi]
@@ -758,17 +773,20 @@ copy:
 .zu:
         inc     rsi
         inc     r14
-        dec     ecx
+        dec     edx
         jnz     .cprow
-        ; dst advance
-        mov     eax, [rel _skip2]
-        movsxd  r9, eax
-        add     rdi, r9
-        add     rdi, 320
-        ; step advance
+        ; dst advance: _skip1 + _size + _skip2 (= 320) (P3.ASM:584-594)
+        mov     eax, [rel _skip1]
+        add     eax, [rel _size]
+        add     eax, [rel _skip2]
+        movsxd  rax, eax
+        add     rdi, rax
+.cosp:
         add     ebx, step_1
         and     ebx, 0x3ff
-        inc     r13
+        add     r13, 320
+        inc     r8d
+        dec     ecx
         jmp     .c_lop
 .ret:
         add     rsp, 0x28
@@ -783,13 +801,14 @@ copy:
         ret
 
 ; ---------------------------------------------------------------- clear -----
+; clears the ring's head screen (scr_tab[0]) for the next 3D draw (P3.ASM:606)
 clear:
         push    rbp
         mov     rbp, rsp
         push    rdi
         push    rcx
         sub     rsp, 0x20
-        mov     rdi, [rel skrin]
+        mov     edi, [rel scr_tab]
         add     rdi, qword [rel Code32_addr]
         xor     eax, eax
         mov     ecx, 16000
@@ -874,8 +893,9 @@ p_calc:
         add     rdi, qword [rel Code32_addr]
         mov     ecx, p_num
 .p_lop:
-        mov     bx, word [rsi+4]
+        movsx   ebx, word [rsi+4]       ; z
         sub     bx, 6200
+        movsx   ebx, bx                 ; signed 16-bit divisor for idiv ebx
         movsx   eax, word [rsi]
         imul    eax, zoom+32
         cdq
@@ -917,8 +937,10 @@ show:
         sub     rsp, 0x28
 
         ; resolve selector bases
+        ; draw target = the rolling ring's head screen (scr_tab[0]); the
+        ; original patches scr_tab into face's store (P3.ASM:1007/1122).
         mov     r15, [rel Code32_addr]
-        mov     eax, [rel _screen]
+        mov     eax, [rel scr_tab]
         lea     rdi, [rax + r15]
         mov     [rel esq], rdi
         lea     rbx, [rel sel_base_table]

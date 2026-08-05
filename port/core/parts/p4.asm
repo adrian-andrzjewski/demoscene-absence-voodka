@@ -762,26 +762,11 @@ p4_engine_set:
         push    r13
         sub     rsp, 0x28
 
-        mov     eax, EOS_ALLOCATE_MEMORY
-        mov     edx, n_src3*3*2
-        call    eos_dispatch
-        mov     [rel src3_a], edx
-        mov     rdi, rdx
-        add     rdi, qword [rel Code32_addr]
-        lea     rsi, [rel src3]
-        mov     ecx, (n_src3*3*2)>>2
-        rep movsd
-
-        mov     eax, EOS_ALLOCATE_MEMORY
-        mov     edx, n_c3*3*2
-        call    eos_dispatch
-        mov     [rel c3_a], edx
-        mov     rdi, rdx
-        add     rdi, qword [rel Code32_addr]
-        lea     rsi, [rel c3]
-        mov     ecx, (n_c3*3*2)>>2
-        rep movsd
-
+        ; n_calc must run on the POST-prepare data (P4.ASM:343-352 calls
+        ; prepare first): src3_a already holds src3 HALVED by `prepare`, and
+        ; con_a holds c3 with its indices DOUBLED (co_prepare's +311*2 offset
+        ; is applied only afterwards). The engine's addressing (shape read at
+        ; byte v*3, inc write at byte v) relies on doubled con values.
         mov     eax, EOS_ALLOCATE_MEMORY
         mov     edx, n_src3*3*2
         call    eos_dispatch
@@ -793,7 +778,9 @@ p4_engine_set:
 
         mov     eax, [rel src3_a]
         mov     [rel shape_addr], eax
-        mov     eax, [rel c3_a]
+        mov     eax, [rel con_a]
+        add     eax, (n_con1+n_c1+n_c2)*6
+        mov     [rel c3_a], eax
         mov     [rel con_addr], eax
         mov     eax, [rel n_vert_a]
         mov     [rel n_addr], eax
@@ -912,6 +899,12 @@ make_pos:
         push    rsi
         push    rdi
         sub     rsp, 0x20
+        ; identity object matrix before projecting src1 (P4.ASM:551-553);
+        ; without this ob1..9 are still 0 at init and every pkt collapses to
+        ; (96,60).
+        mov     word [rel r_x], 0
+        call    prep_rot1
+        mov     word [rel r_x], 328
         P4AR src1_a, rsi
         P4AR pkt_a, rdi
         mov     ecx, n_src1
@@ -1643,10 +1636,10 @@ rotate:
         mov     ecx, 3
 .lo:
         movzx   esi, word [r15+rbx]
-        cmp     word [r12+rsi*2], 0
+        cmp     word [r12+rsi], 0        ; check = word array, indexed by con (P4.ASM:1167)
         jne     .skip
-        inc     word [r12+rsi*2]
-        lea     rdi, [r13 + rsi*2]
+        inc     word [r12+rsi]
+        lea     rdi, [r13 + rsi*2]       ; rcalc = dword array (4B/vertex)
         lea     rsi, [rsi*2 + rsi]
         add     rsi, r14
         movsx   eax, word [rsi]
@@ -1810,8 +1803,12 @@ show:
 
         cmp     dword [rel ile], 0
         je      .ret
+        ; TEMP DIAG: reset per-frame counters, snapshot ile
+        mov     eax, [rel ile]
+        mov     [rel diag_ile0], eax
+        mov     dword [rel diag_seen], 0
+        mov     dword [rel diag_drawn], 0
 
-        ; screen base (scr_sel) -> esq
         lea     rbx, [rel sel_base_table]
         movzx   eax, word [rel scr_sel]
         and     eax, 0x1ff
@@ -1840,6 +1837,10 @@ show:
         lea     r11, [rel con2]
         P4AR pkt_a, r10
         movzx   edi, word [rsi+2]        ; face byte offset
+        cmp     edi, 440*6               ; TEMP DIAG: count hero faces in list
+        jb      .diag_seen_done
+        inc     dword [rel diag_seen]
+.diag_seen_done:
 
         mov     eax, edi
         mov     ebx, 6
@@ -1984,6 +1985,11 @@ show:
         sub     bx, cx
         js      .hide
 .draw:
+        ; TEMP DIAG: count drawn hero faces
+        cmp     edi, 440*6
+        jb      .diag_skip
+        inc     dword [rel diag_drawn]
+.diag_skip:
         call    face
 .hide:
         pop     rsi
@@ -1991,6 +1997,49 @@ show:
         dec     dword [rel ile]
         jnz     .lop
 .ret:
+        ; TEMP DIAG: every 60 frames, log ile/hero-seen/hero-drawn
+        inc     dword [rel diag_frames]
+        cmp     dword [rel diag_frames], 60
+        jb      .diag_out
+        mov     dword [rel diag_frames], 0
+        lea     rcx, [rel diag_fmt]
+        mov     edx, [rel diag_ile0]
+        mov     r8d, [rel diag_seen]
+        mov     r9d, [rel diag_drawn]
+        sub     rsp, 0x20
+        extern  vk_log_printf
+        call    vk_log_printf
+        add     rsp, 0x20
+.diag_out:
+        ; TEMP DIAG part 2: dump rcalc of sample verts + key of face 440
+        cmp     dword [rel diag_frames], 0
+        jne     .diag_out2
+        mov     esi, [rel rcalc_a]
+        add     rsi, qword [rel Code32_addr]
+        movzx   eax, word [rsi + 222*4]     ; chip vert 222 x
+        movzx   edx, word [rsi + 222*4 + 2] ; y
+        mov     [rel diag_k1], eax
+        mov     [rel diag_k2], edx
+        movzx   eax, word [rsi + 311*4]     ; cube vert 311 x
+        movzx   edx, word [rsi + 311*4 + 2] ; y
+        mov     [rel diag_k3], eax
+        mov     [rel diag_k4], edx
+        lea     rcx, [rel diag_fmt2]
+        mov     edx, [rel diag_k1]
+        mov     r8d, [rel diag_k2]
+        mov     r9d, [rel diag_k3]
+        sub     rsp, 0x20
+        call    vk_log_printf
+        add     rsp, 0x20
+        mov     esi, [rel draw_tab_a]
+        add     rsi, qword [rel Code32_addr]
+        lea     rcx, [rel diag_fmt3]
+        movzx   edx, word [rsi]             ; nearest key (drawn last)
+        movzx   r8d, word [rsi+2]           ; its face
+        sub     rsp, 0x20
+        call    vk_log_printf
+        add     rsp, 0x20
+.diag_out2:
         add     rsp, 0x28
         pop     r15
         pop     r14
@@ -2168,7 +2217,8 @@ face:
         inc     bx
 .okay:
         jg      .norm
-        neg     ebx
+        neg     bx                      ; 16-bit negate like the original (P4.ASM:1642);
+                                        ; neg ebx would turn (x_2-pom)<0 into ~4e9
         call    p4_slope
         jmp     .draw_1
 .norm:
@@ -2393,3 +2443,21 @@ show_logo:
         pop     rbx
         pop     rbp
         ret
+
+section .data
+; TEMP DIAG counters + fmt (remove after P4 hero-depth diagnosis)
+diag_frames: dd 0
+diag_ile0:   dd 0
+diag_seen:   dd 0
+diag_drawn:  dd 0
+diag_fmt:    db 'P4 diag: ile=%d heroSeen=%d heroDrawn=%d', 10, 0
+section .text
+
+section .data
+diag_k1: dd 0
+diag_k2: dd 0
+diag_k3: dd 0
+diag_k4: dd 0
+diag_fmt2: db 'P4 rcalc: v222=(%d,%d) v311=(%d,...)', 10, 0
+diag_fmt3: db 'P4 draw_tab[0]: key=%d face=%d', 10, 0
+section .text

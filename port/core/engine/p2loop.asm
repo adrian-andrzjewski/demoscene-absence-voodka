@@ -129,7 +129,7 @@ vk_p2_render_frame:
         jmp     .visback
 .visdone:
 
-        ; ---- VirSort -> WorldKol (record indices far->near) ----
+        ; ---- VirSort -> WorldKol (record indices far->near, descending zet) ----
         mov     rcx, [pl_zet]
         mov     edx, [pl_count]
         mov     r8, [pl_kol]

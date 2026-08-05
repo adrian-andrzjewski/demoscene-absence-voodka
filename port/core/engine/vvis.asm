@@ -6,15 +6,23 @@
 ;     -> zetOut; visOut = zet >= 1. Camera pos + matrix from unit 2 globals.
 ;
 ;   vk_virsort(const int32_t* zet, int count, int32_t* orderOut) [rcx, edx, r8]
-;     Stable painter's sort of the low 16 bits of zet, ascending (far->near);
-;     orderOut = object indices in draw order. (Worlds are small, <=255 objects,
-;     so a simple stable insertion sort is used; semantics match VirSort's.)
+;     Stable painter's sort of the low 16 bits of zet, DESCENDING (far->near):
+;     the VR camera looks down +z (zet>=1 visible, larger zet = farther), so
+;     orderOut[0] = farthest record and the WorldKol walk draws it first.
+;     Matches the original VirSort's radix bucket gather 15->0
+;     (INC/VIRSORT.PM, P5/VIRSORT.PM). The key first passes through
+;     virsort_shift (global dword set by the part: 0=P2, 4=P5):
+;     key = (uint16)((int16)low16(zet) >> shift)  -- P5/VIRSORT.PM's sar bx,4.
 
 BITS 64
 DEFAULT REL
 
 section .bss align=64
 vvis_order: resd 4096
+
+section .data align=4
+global virsort_shift
+virsort_shift: dd 0             ; sort-key shift: 0 = P2 (INC/VIRSORT.PM), 4 = P5
 
 section .text
 extern cam_cameraX
@@ -88,6 +96,7 @@ vk_virsort:
         mov     r12, rcx            ; zet
         lea     r13, [rel vvis_order]
         mov     r14d, edx           ; n
+        mov     r9b, [rel virsort_shift] ; key shift (0=P2, 4=P5)
         ; order[i] = i
         xor     ecx, ecx
 .init:
@@ -95,13 +104,17 @@ vk_virsort:
         inc     ecx
         cmp     ecx, edx
         jne     .init
-        ; stable insertion sort by low16(zet)
+        ; stable insertion sort by key=(uint16)((int16)low16(zet)>>shift),
+        ; DESCENDING (far->near, like VirSort's 15->0 bucket gather)
         mov     r15, 1              ; i (64-bit)
 .outer:
         cmp     r15, r14
         jae     .done
         mov     ebx, [r13 + r15*4]      ; key = order[i]
         mov     edx, [r12 + rbx*4]
+        movsx   edx, dx
+        mov     cl, r9b
+        sar     edx, cl
         and     edx, 0xFFFF             ; key zet
         mov     rsi, r15
         dec     rsi                     ; j = i-1  (signed 64-bit)
@@ -110,9 +123,13 @@ vk_virsort:
         jl      .place                  ; j<0 -> insert at front
         mov     eax, [r13 + rsi*4]      ; order[j]
         mov     eax, [r12 + rax*4]
+        movsx   eax, ax
+        mov     cl, r9b
+        sar     eax, cl
         and     eax, 0xFFFF
         cmp     eax, edx
-        jle     .place                  ; order[j] <= key: stop (stable)
+        jae     .place                  ; order[j] >= key (unsigned): stop (stable,
+                                        ; descending => farthest first)
         mov     eax, [r13 + rsi*4]
         mov     [r13 + rsi*4 + 4], eax  ; order[j+1] = order[j]
         dec     rsi

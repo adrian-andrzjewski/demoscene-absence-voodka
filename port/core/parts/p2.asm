@@ -159,6 +159,10 @@ part2:
         extern prep_sort
         call    prep_sort
 
+        ; VirSort key shift: P2's INC/VIRSORT.PM uses low16(zet) unshifted
+        extern virsort_shift
+        mov     dword [rel virsort_shift], 0
+
         ; ---- allocate waterWorld (256*256) + its selector into textury[0] ----
         AllocateMemory 256*256, waterWorld
         mov     eax, EOS_ALLOCATE_SELECTOR

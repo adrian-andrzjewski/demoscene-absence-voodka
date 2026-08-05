@@ -165,6 +165,10 @@ part5:
         extern prep_sort
         call    prep_sort
 
+        ; VirSort key shift: P5's VIRSORT.PM applies sar bx,4 to low16(zet)
+        extern virsort_shift
+        mov     dword [rel virsort_shift], 4
+
         ; ---- waterWorld + texture selectors ----
         AllocateMemory 256*256, _waterWorld
         mov     eax, EOS_ALLOCATE_SELECTOR

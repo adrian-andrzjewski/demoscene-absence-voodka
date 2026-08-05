@@ -11,7 +11,7 @@
 //
 // The visibility z and the painter sort are computed identically to
 // vk_calc_visibility/vk_virsort (camera-space z via cam_matrix, stable low16
-// insertion sort far->near).
+// key sort DESCENDING far->near, like VirSort's 15->0 bucket gather).
 //
 // Returns 0 on success, non-zero on any mismatch.
 
@@ -28,6 +28,7 @@ extern "C" void vk_p2_render_frame(uint8_t* base, const int32_t* world, int coun
                                    int32_t* worldZet, int32_t* worldKol,
                                    const uint32_t* objects, const uint16_t* textury,
                                    int32_t* trace);
+extern "C" int32_t virsort_shift;
 
 static int failures = 0;
 static void ck(const char* w, int32_t got, int32_t want){
@@ -90,11 +91,13 @@ static void run_case(){
         }
         // write visible gate back into world records (matches loop)
         for (int i=0;i<n;i++) world[i*12+0]=visr[i];
-        // stable insertion sort of indices by low16(z), ascending (far->near)
+        // stable insertion sort of indices by low16 key, DESCENDING (far->near);
+        // key=(uint16)((int16)low16(z)>>virsort_shift), matching VirSort
         std::vector<int> order(n); for(int i=0;i<n;i++) order[i]=i;
         for (int i=1;i<n;i++){
-            int key=order[i]; int32_t kz=zr[key]&0xffff; int j=i-1;
-            while(j>=0 && (zr[order[j]]&0xffff)>kz){ order[j+1]=order[j]; j--; }
+            int key=order[i];
+            uint16_t kz=(uint16_t)((int16_t)(zr[key]&0xffff)>>virsort_shift); int j=i-1;
+            while(j>=0 && (uint16_t)((int16_t)(zr[order[j]]&0xffff)>>virsort_shift) < kz){ order[j+1]=order[j]; j--; }
             order[j+1]=key;
         }
         // ---- expected trace stream ----
@@ -117,6 +120,7 @@ static void run_case(){
 }
 
 int main(){
+    virsort_shift = 0;   // P2 mode (P5 would be 4)
     // also exercise the zero-count / all-invisible edge: n=1 behind camera
     {
         srand(7);

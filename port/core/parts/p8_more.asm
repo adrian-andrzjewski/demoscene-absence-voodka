@@ -277,13 +277,12 @@ show:
         div     ebx
         shl     eax, 3
         lea     rbx, [rel con3]
-        movzx   edx, word [rbx+rax+4]
+        movzx   edx, word [rbx+rax+4]      ; dx = {byte5=plane flag, byte4=color lo}
         mov     [rel col], dx
         movzx   ecx, byte [rbx+rax+6]
-        mov     r9, rcx                   ; vis
-        movzx   edx, byte [rbx+rax+7]
-        mov     r10, rdx                  ; phong
-        or      r9b, r9b
+        mov     r9, rcx                    ; vis (cull gate, P8.ASM:1406)
+        movzx   r10d, byte [rbx+rax+7]     ; phong (P8.ASM:1407)
+        or      dh, dh                     ; plane flag = con3 byte[5] (P8.ASM:1411)
         jz      .no_plane
         ; ---- plane (sw object, map via pkt) ----
         movzx   ebx, word [r13+rdi]

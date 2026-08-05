@@ -574,14 +574,14 @@ rotate:
         movzx   esi, word [rax+rbx]
         mov     r14d, [rel check_a8]
         add     r14, qword [rel Code32_addr]
-cmp     word [r14+rsi*2], 0
+cmp     word [r14+rsi], 0          ; check = word array, indexed by con (P8.ASM:1256)
         jne     .skip
         mov     r14d, [rel check_a8]
         add     r14, qword [rel Code32_addr]
-inc     word [r14+rsi*2]
+inc     word [r14+rsi]
         mov     r14d, [rel rcalc_a8]
         add     r14, qword [rel Code32_addr]
-lea     rdi, [r14+rsi*2]
+lea     rdi, [r14+rsi*2]           ; rcalc = dword array (4B/vertex)
         lea     r13, [rel shape]
         lea     r12d, [esi*2+esi]
         movsx   eax, word [r13+r12]
