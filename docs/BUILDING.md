@@ -50,7 +50,7 @@ from elsewhere). To distribute, zip those three files (add `VIRTUAL.exe` +
 ## Running
 
 ```
-VOODKA.exe                     full demo, all 8 parts (~70 fps, 960x600 window)
+VOODKA.exe                     full demo, all 8 parts (~70 fps, 1280x800 window)
 VOODKA.exe --part N            start at part N (1..8), music seeked to match
 VOODKA.exe --modpos N          start at ModPos N  ((order<<8)|row)
 VOODKA.exe --order N           start at order N

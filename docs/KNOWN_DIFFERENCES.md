@@ -180,7 +180,7 @@ showed the old broken bright output. The logos blit byte-exactly to the source
   large for one frame; the original shows a momentary animation jump (and in
   P8's case read harmless garbage in DOS). The port wraps the sprite index
   instead — visually cleaner, same steady state.
-- **Windowed 960x600 D3D11 vs fullscreen mode 13h**; integer 3x upscale,
+- **Windowed 1280x800 D3D11 vs fullscreen mode 13h**; integer 4x upscale,
   point-sampled, 6-bit palette DAC behavior reproduced (round(v*255/63),
   no gamma encode - sRGB displays approximate the CRT's native gamma;
   ASSET_FORMATS.md section 7). Square pixels vs the CRT's 1.2:1 tall-pixel

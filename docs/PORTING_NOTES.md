@@ -144,7 +144,15 @@ for scratch; never reuse a register the original left live.**
 - `d3d11_present.cpp` uploads the 64,000-byte index frame to an R8 texture
   and the 768-byte palette to a 256x1 texture; a point-sampled fullscreen
   quad maps indices through the palette - pixel-identical to VGA DAC
-  behavior, 3x integer upscale into a 960x600 window.
+  behavior, 4x integer upscale into a 1280x800 window.
+- **Sampler pitfall (audit 2026-08-05):** the point sampler must be created
+  with every `D3D11_SAMPLER_DESC` field set. The original code only set
+  `Filter`/`AddressU/V`, leaving `AddressW=0` (not a valid address mode) in
+  the zero-init'd desc, so `CreateSamplerState` failed and the NULL state
+  bound via `PSSetSamplers` silently became D3D11's default
+  `MIN_MAG_MIP_LINEAR` - the "nearest-neighbour" upscale was actually
+  bilinear-smoothed. Verified by GPU-readback: with the fix, every presented
+  pixel is an exact palette texel (0 interpolated colours in a full frame).
 - 6-bit DAC -> 8-bit conversion happens only at palette-texture upload:
   **`round(v*255/63)` = `(v*255+31)/63`** (the linear mapping the DAC's
   analog output implements; identical formula in `frames2img`, so recordings

@@ -34,8 +34,10 @@ extern "C" void vk_set_entry_part(int part);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
-constexpr int kWinW = 960;
-constexpr int kWinH = 600;
+// 1280x800 = 320x200 logic upscaled exactly 4x; the presenter point-samples
+// (nearest-neighbour, no filtering), so each source texel is a clean 4x4 block.
+constexpr int kWinW = 1280;
+constexpr int kWinH = 800;
 }
 
 // ---- music module path resolution ------------------------------------------

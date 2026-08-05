@@ -505,14 +505,19 @@ exactly where naive brightening would be most visible.
 ### 7.4 Scaling, filtering, aspect ratio
 
 - `D3D11_FILTER_MIN_MAG_MIP_POINT`, `CLAMP`: nearest-neighbour, no
-  interpolation — preserves the hard pixel edges of mode 13h art.
-- Window is **960×600 = exact integer 3×** of 320×200: every source pixel
-  becomes a uniform 3×3 block, no fractional resampling anywhere.
+  interpolation — preserves the hard pixel edges of mode 13h art. The sampler
+  is explicitly created with **all** fields set (a zero-initialised desc left
+  `AddressW=0`, an invalid address mode, so `CreateSamplerState` returned
+  `E_INVALIDARG` and the pipeline silently ran D3D11's *default* sampler,
+  `MIN_MAG_MIP_LINEAR` — a blurred bilinear upscale. Fixed 2026-08-05; the
+  GPU readback now contains only exact palette texels, no blend colours).
+- Window is **1280×800 = exact integer 4×** of 320×200: every source pixel
+  becomes a uniform 4×4 block, no fractional resampling anywhere.
 - Aspect: real mode 13h on a 4:3 CRT displayed 320×200 with 1.2:1
   (tall) pixels — a 4:3-stretched image. The port presents square pixels
   (16:10 content), the same choice DOSBox and most emulators make by default;
-  a windowed 960×600 with CRT-stretch would need 960×720 and was rejected to
-  keep integer scaling. The demo's art is pixel-native (fonts, logos drawn
+  a windowed 1280×800 with CRT-stretch would need ~1067×800 and was rejected
+  to keep integer scaling. The demo's art is pixel-native (fonts, logos drawn
   for square-ish editing tools), so the difference is a mild vertical
   compression vs a 1996 CRT, not a distortion of layout.
 - Presentation: `Present(0)` (immediate). The demo is paced by the EOS

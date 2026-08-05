@@ -133,9 +133,28 @@ bool initPresent(void* hwnd, int winW, int winH) {
     if (FAILED(g_dev->CreateBuffer(&bd, &srd, &g_vb))) return false;
 
     D3D11_SAMPLER_DESC smd{};
-    smd.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;
-    smd.AddressU = smd.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
-    g_dev->CreateSamplerState(&smd, &g_samp);
+    // Set EVERY field: the zero-init'ed desc leaves AddressW (mode 0 is not a
+    // valid D3D11_TEXTURE_ADDRESS_MODE; the enum starts at WRAP=1) and a few
+    // LOD/explicit values, which made CreateSamplerState return E_INVALIDARG
+    // (0x80070057). The state then stayed NULL and PSSetSamplers bound the
+    // D3D11 DEFAULT sampler instead - MIN_MAG_MIP_LINEAR, i.e. a blurred
+    // bilinear upscale. Never rely on a zeroed sampler desc.
+    smd.Filter = D3D11_FILTER_MIN_MAG_MIP_POINT;      // nearest-neighbour: no filtering
+    smd.AddressU = D3D11_TEXTURE_ADDRESS_CLAMP;
+    smd.AddressV = D3D11_TEXTURE_ADDRESS_CLAMP;
+    smd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+    smd.MipLODBias = 0;
+    smd.MaxAnisotropy = 1;
+    smd.ComparisonFunc = D3D11_COMPARISON_NEVER;
+    smd.MinLOD = 0;
+    smd.MaxLOD = D3D11_FLOAT32_MAX;
+    HRESULT hsm = g_dev->CreateSamplerState(&smd, &g_samp);
+    if (FAILED(hsm) || !g_samp) {
+        logPrint("[d3d] CreateSamplerState failed %08x - falling back to default (BILINEAR!)\n",
+                 (unsigned)hsm);
+    } else {
+        logPrint("[d3d] sampler: MIN_MAG_MIP_POINT bound\n");
+    }
 
     // Fullscreen quad is a plain 2D pass - disable back-face culling. Without
     // this, the counter-clockwise triangle of the quad is culled by D3D's
