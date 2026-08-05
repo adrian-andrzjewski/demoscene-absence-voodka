@@ -93,7 +93,7 @@ No palette cycling anywhere; no part relies on >63 values or DAC truncation.
 |---|---|---|
 | DEMO | — | 64-pass startup fade-to-black (`DEMO.AS^:125-136`); not ported (port starts black = end state) |
 | P1 | `rm_eye.pal` ×2 (`pal`/`pal2`); `white` | white flash via `pal_fadein10` `bl=ModPos&63`; `znika` effects are **pixel dissolves** (threshold vs `_wlk1-3.dat`), not palette ops |
-| P2 | inline `jjdj` (tree) / `2WORLD.PAL` (shipped — see §2.5) | fade-in from white `bl=ileFadow>>1`; `lampa`/`bolek`/`wodda` flashes; end fade `bl=(ModPos&31)*2` |
+| P2 | inline `jjdj` (`WORLD.P!`; see §2.5) | fade-in from white `bl=ileFadow>>1`; `lampa`/`bolek`/`wodda` flashes; end fade `bl=(ModPos&31)*2` |
 | P2 water | `absence.pal` (vodka 18) | `SetPal` once at phase start |
 | P3 | `jup.pal`→16-level ramp + `tn.pal` at 240 | `make_pal` ramp (see §2.4), `set_pal tunel_pal,256-16,16`, entry 0 forced black |
 | P4 | `pal` built by 2× `make_pal` from sw/v_txr1/proc/metal; `tull.pal` for outro | per-channel signed deltas; ranges installed `set_pal spal1,0,64 / spal3,144,33 / spal4,192,64` |
@@ -123,14 +123,26 @@ No palette cycling anywhere; no part relies on >63 values or DAC truncation.
   bottom of `2WORLD.PAL`; the mirror pass ORs `(screen-224)&31` into the same
   range (`P5.AS^:432-450`).
 
-### 2.5 The P2 world palette discrepancy (tree vs shipped)
+### 2.5 The P2 world palette: jjdj (resolved 2026-08-05 audit)
 
-Tree `P2.AS^` installs an inline palette `jjdj` (`WORLD.P!`); the port
-installs `2WORLD.PAL` (vodka 37). They differ in 719/768 bytes — but `jjdj`
-is **absent from the release EXE** while the embedded `vodka.dat` (containing
-2WORLD.PAL) is byte-identical to the port's rebuild. The tree source is a
-different revision than the shipped build; the port matches the **release**
-(consistent with the validated stadium captures).
+The original `P2.AS^` installs the inline palette `jjdj` (`_pal dd jjdj`,
+`WORLD.P!`, 768 bytes) — **not** `2WORLD.PAL`. `2WORLD.PAL` (vodka 37) is
+P5's palette (used by P5.AS^) and maps the P2 stadium textures to
+olive/gold/tan instead of the shipped red/maroon/blue world.
+
+The DOSBox stadium capture settles the earlier "tree vs release" ambiguity:
+100% of the release's stadium pixels (all 46 used 6-bit colors) appear in
+`jjdj`, and zero appear in `2WORLD.PAL` outside the shared black/white. The
+prior claim that "`jjdj` is absent from the release EXE" was a false negative
+(a byte-layout assumption in the search), and the port's use of `2WORLD.PAL`
+was the bug. The port now incbin's `jjdj.pal` (extracted from the tree's
+`WORLD.P!`, guarded by the `jjdj.repro` CTest) and copies it into the arena
+at part start, matching the original's `_pal dd jjdj` semantics.
+
+Verified by frame recording: the P2 phase now shows the original capture's
+exact colors — e.g. t001 renders (158,8,8)/(190,48,32)/(206,130,89)/(231,
+166,130) and the env-mapped torus reads dark blue, matching the original's
+stadium; previously it read gold/brown under 2WORLD.PAL.
 
 ## 3. Raw bitmaps & textures (`.DAT`, `.INC` in DANE)
 

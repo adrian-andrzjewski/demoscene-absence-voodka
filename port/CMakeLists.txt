@@ -393,6 +393,11 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME pal.repro
              COMMAND "${Python3_EXECUTABLE}"
                      "${CMAKE_SOURCE_DIR}/tools/validate/pal_repro_check.py")
+    # P2 world-palette provenance: jjdj.pal == original CODE/P2/WORLD.P!
+    # (guards the P2 palette fix: P2 must install jjdj, not vodka-37 2WORLD.PAL)
+    add_test(NAME jjdj.repro
+             COMMAND "${Python3_EXECUTABLE}"
+                     "${CMAKE_SOURCE_DIR}/tools/validate/pal_jjdj_check.py")
     # build hygiene: 0 ADDR32 relocations in every core NASM object
     add_test(NAME build.addr32
              COMMAND "${Python3_EXECUTABLE}"

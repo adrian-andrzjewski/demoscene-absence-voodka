@@ -119,22 +119,53 @@ Also corrected in docs/comments: the .V3D UV block is per-vertex (nov*8),
 not per-face (loader.asm/v3d_crosscheck.cpp comments); `EOS_GET_INFO`
 comment said `bl` but the dispatcher returns `eax`.
 
+## Fixed divergences - full-pipeline audit (2026-08-05, second pass)
+
+A stage-by-stage audit (assets -> decode -> palette -> present) against the
+DOSBox reference captures and the recording of the current build found four
+port bugs and confirmed two already-faithful static pictures:
+
+21. **P2 world palette was P5's 2WORLD.PAL.** The original `P2.AS^` installs
+    the inline `jjdj` palette (`CODE/P2/WORLD.P!`); the port loaded vodka-37
+    (= `2WORLD.PAL`, which is P5's palette). Under 2WORLD.PAL the P2 stadium
+    textures rendered olive/gold/tan instead of the shipped red/maroon/blue
+    world (t001 -> olive, env -> gold; the "gold centerpiece" note below).
+    Fixed: `port/core/parts/jjdj.pal` copied into the arena at part start
+    (original `_pal dd jjdj` semantics). Frame-recorded: the P2 phase now
+    contains the original capture's exact 6-bit colors (e.g. t001's
+    (158,8,8),(190,48,32),(206,130,89),(231,166,130)). Guarded by
+    `jjdj.repro`.
+22. **P3 face shaded with swapped textures.** P3.ASM fo_1/fo_2 sample
+    `al=lgmap[es:bx(edx)]` + `ah=map[fs:bx(ecx)]`; the port sampled
+    `map[edx]` + `lgmap[ecx]`, so every shaded tunnel face used the wrong
+    texture in each coordinate channel. Fixed p3.asm `.fo_1` to the original
+    order. The tunnel's palette (make_pal ramp) was already byte-exact; the
+    wrong colors came from this sample swap.
+23. **P3 tunnel scroll offset did not accumulate.** Original tooneling ends
+    `add licznik,ax`; the port used `mov`, freezing the scrolling _yayo
+    window. Fixed to `add`.
+24. **P1 flash was presented instead of being a sub-frame transient.**
+    P1.ASM I_nie_znika copies the frame to the VGA first, then does a
+    `pal_fadein10` toward white and immediately restores rm_eye, so the wash
+    is a DAC-time transient no presented frame samples. The port faded
+    BEFORE `Ekran`, presenting every frame of ModPos 0x300..0x400 whitened
+    (up to full white at ModPos&63==63) - washing the red/blue edge bands
+    (indices 132/212) and the 240..255 logo pixels bright. Restored the
+    original order (present, then fade, then restore); frame-recorded: the
+    flash-window palette is now byte-identical to rm_eye.pal.
+
+Also verified faithful (no change needed): the P4 tull outro and P8 last.dat
+end screens are byte-exact (framebuffer AND palette) in the current build; the
+stale `reference/captures/port_outro.png` (pre-"presents added" fix) is what
+showed the old broken bright output. The logos blit byte-exactly to the source
+`_logoN.inc` data for every displayed frame.
+
 ## Remaining known differences
 
-- **P2 env-mapped object shade**: the stadium's env-mapped centerpiece
-  renders gold-ish where the original reads bluer. Structural content,
-  textures, water and camera path match; the shade nuance likely comes from
-  the env/normals arithmetic and is under observation, not blocking.
 - **P8 tone**: the port's P8 viewer reads slightly brighter/whiter than the
   original's silver-blue at some phases (palette-range nuance under
   observation). The sw/metal palettes themselves were verified byte-exact
   against the OBJ-recovered data.
-- **P2 world palette (tree vs release)**: the tree's `P2.AS^` installs an
-  inline palette `jjdj`; the port installs `2WORLD.PAL` (vodka 37) - they
-  differ in 719/768 bytes, but `jjdj` is absent from the release EXE while
-  the release's embedded vodka.dat matches the port byte-for-byte. The tree
-  source is a different revision than the shipped build; the port matches
-  the release (ASSET_FORMATS.md section 2.5).
 - **Sine table variant**: `INC/SIN` is `round(32766*sin(2pi*i/1023))` (a
   1023-interval table, hex-verified); the port generates a true 1024-step
   `round(32767*sin(2pi*i/1024))`. Max deviation 201 Q15 units (~0.6%); the

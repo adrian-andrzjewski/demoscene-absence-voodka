@@ -261,26 +261,23 @@ part1:
         jg      .znika2
         jmp     .znika1                 ; 0x10 < ModPos <= 0x20
 .i_nie_znika:
-        ; Screen flash (ModPos >= 0x300): wash the frame toward white by
-        ; (ModPos & 63) BEFORE presenting so the flash actually reaches the
-        ; presented frame. In the original this fade + immediate rm_eye reset
-        ; was a DAC-time transient that the CRT showed as a flicker; with a
-        ; vsynced D3D present the old order made it invisible, so apply the
-        ; wash first, present, then restore the scene palette for the interior
-        ; drawing that follows.
+        ; present backbuffer -> framebuffer (the old rep movsw to 0xA0000)
+        Ekran
+
+        ; Screen flash (ModPos >= 0x300), faithful to P1.ASM I_nie_znika: the
+        ; original copies the frame to the VGA FIRST, then does a pal_fadein10
+        ; toward white and IMMEDIATELY restores rm_eye - the wash is a DAC-time
+        ; transient between the two writes that the next retrace never samples,
+        ; so it never brightens the red/blue edges or the logos on screen. Keep
+        ; that order (wash after the present, then restore) so the port matches
+        ; the original instead of presenting a whitened frame.
         cmp     word [rel ModPos], 0x0300
-        jl      .flash_done
+        jl      .yogi
         mov     ax, [rel ModPos]
         and     ax, 63
         mov     bl, al
         lea     rdi, [rel white]
         call    pal_fadein10
-.flash_done:
-        ; present backbuffer -> framebuffer (the old rep movsw to 0xA0000)
-        Ekran
-
-        cmp     word [rel ModPos], 0x0300
-        jl      .yogi
         lea     rsi, [rel pal]
         call    pal_set
 .yogi:
@@ -349,9 +346,19 @@ part1:
         shl     eax, 10                 ; *1024
         add     ebx, eax                ; total byte offset
         cmp     ebx, 2544
-        jbe     .log_off_ok
-        mov     ebx, 2544               ; clamp to last full entry (safe +12)
-.log_off_ok:
+        jbe     .log_in
+        ; ModPos >= ~0x2A0 overruns the 160-entry (2560-byte) logo_tab, exactly
+        ; as in the original, which then reads the l_addr/l_add/l_x/l_y defaults
+        ; that immediately follow logo_tab in .data -> a tiny 2x2 logo1 splash
+        ; at offset 2 (index 0 = logo1, l_add=2, l_x=2, l_y=2). Reproduce that
+        ; defined overrun instead of clamping to a full-size tail entry.
+        mov     dword [rel l_addr], 0
+        mov     dword [rel l_add], 2
+        mov     dword [rel l_x], 2
+        mov     dword [rel l_sub], 318
+        mov     dword [rel l_y], 2
+        jmp     .zenek
+.log_in:
         lea     rsi, [rel logo_tab]
         add     rsi, rbx
         mov     eax, [rsi]

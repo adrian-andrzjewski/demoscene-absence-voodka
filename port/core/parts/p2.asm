@@ -74,8 +74,13 @@ bolek:      dd 1
 ileFadow:   dd 0
 znacznik:   dd 0
 lampa:      db 0
-; world palette (2WORLD.PAL, vodka 37) - arena offset, add Code32_addr to use.
+; world palette (jjdj, the original P2/world.p! inline palette) - the init
+; copies jjdj into the arena and stores the arena offset here (port convention:
+; add Code32_addr to use). NOT vodka 37: 2WORLD.PAL is P5's palette and maps the
+; P2 textures to olive/gold instead of the shipped red/blue world.
 _pal:       dd 0
+jjdj:
+        incbin "jjdj.pal"
 spos:       dd 0
 sun:        dd 0
 sun_step:   dd 0
@@ -257,9 +262,17 @@ part2:
         ; (eos_dispatch WAIT_VBL returns the per-frame delta, matching the
         ; original EOS; no last_vbl priming needed here anymore)
 
-        ; ---- world palette (2WORLD.PAL) for the stadium; P1 hands off with a
-        ; full-white palette (see p1.asm .virtual), so P2 fades into _pal below.
-        vodka   37, _pal
+        ; ---- world palette (jjdj = the original P2/world.p! inline palette)
+        ; for the stadium; P1 hands off with a full-white palette (p1.asm
+        ; .virtual), so P2 fades into _pal below. The original P2.AS^ defines
+        ; `_pal dd jjdj`; 2WORLD.PAL (vodka 37) is P5's palette and would map
+        ; the P2 textures to olive/gold instead of the shipped red/blue world.
+        AllocateMemory 768, _pal
+        lea     rsi, [rel jjdj]                  ; source (module .data)
+        mov     rdi, [rel _pal]
+        add     rdi, qword [rel Code32_addr]    ; dest (arena)
+        mov     ecx, 768
+        rep movsb
 
 ; ------------------------------------------------------------------- Main ---
 .main_loop:

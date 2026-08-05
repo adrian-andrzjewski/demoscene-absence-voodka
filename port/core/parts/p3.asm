@@ -676,7 +676,7 @@ tooneling:
         shl     eax, 1
         add     eax, 256
         imul    ebx, eax
-        mov     [rel licznik], ax
+        add     [rel licznik], ax       ; original: add licznik,ax (accumulates)
 
         add     rsp, 0x28
         pop     r15
@@ -1283,20 +1283,19 @@ face:
         add     edi, [rel y_1]
         inc     ebp
 .fo_1:
-        ; al = map[edx>>24] ; cl = lgmap[ecx>>24] ; sum -> screen
+        ; original fo_1/fo_2 (P3.ASM:1055/1168): al = lgmap[edx>>16] (es),
+        ; ah = map[ecx>>16] (fs), sum -> screen. The port had these swapped
+        ; (map sampled by the p/n_rot coordinate, lgmap by the m/pos
+        ; coordinate), which changed the color of every shaded tunnel face.
+        ; es = lgmap base is r14 (gsq), fs = map base is r13 (fsq).
         mov     bl, dh
         shld    ebx, edx, 8
         movzx   ebx, bx
-        movzx   eax, byte [r13 + rbx]    ; map
-        ; al = map[edx>>24] ; + lgmap[ecx>>24] ; sum -> screen
-        mov     bl, dh
-        shld    ebx, edx, 8
-        movzx   ebx, bx
-        movzx   eax, byte [r13 + rbx]    ; map (fs)
+        movzx   r8d, byte [r14 + rbx]    ; lgmap (es) sampled by p (edx)
         mov     bl, ch
         shld    ebx, ecx, 8
         movzx   ebx, bx
-        movzx   r8d, byte [r14 + rbx]    ; lgmap (es)
+        movzx   eax, byte [r13 + rbx]    ; map (fs) sampled by m (ecx)
         add     al, r8b
         mov     r10, rdi
         mov     byte [r9 + r10], al

@@ -110,6 +110,18 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   palette 6->8-bit rounding, `--part 5` boundary 0x1200->0x1400, P6 word-cmp.
   Full playthrough exit 0; P3 ramp/P2 water palette/P4/P8 outros
   frame-record-verified.
+- **Full-pipeline audit (2026-08-05, second pass)** compared every stage
+  (decode/palette/present) against the DOSBox captures: fixed P2's world
+  palette (was P5's 2WORLD.PAL, now the original inline `jjdj` from
+  `CODE/P2/WORLD.P!` -> `parts/jjdj.pal`; stadium renders red/maroon like
+  the original, env torus dark blue not gold), P3's face rasterizer sampled
+  map/lgmap swapped (`lgmap[edx]+map[ecx]`) and its `licznik` scroll offset
+  used `mov` instead of `add`, and P1 applied its ModPos>=0x300 white wash
+  BEFORE presenting (the original's fade is a post-present sub-frame
+  transient, so the red/blue edges + logos were never meant to show
+  brightened). Verified the P4 tull and P8 last.dat fullscreens are already
+  byte-exact (the checked-in `port_outro.png` capture predates the present
+  fixes). New `jjdj.repro` CTest guards the P2 palette provenance.
 - **Full playthrough runs clean end-to-end (exit 0, ~66-70 fps)** after the
   2026-08-04 validation pass fixed: P2 `_file_addr` qword load (64-bit read
   of a dword var scooped P1's `len`=81), P5 mirror/water 32-bit-vs-16-bit
@@ -136,13 +148,14 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (architecture/ABI/memory model/case studies), `BUILDING.md` (build/run/
   test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
   them in sync with the work.
-- **Tests:** 25 CTests (`port/build.ps1 -Config Release -Test`), sources in
+- **Tests:** 26 CTests (`port/build.ps1 -Config Release -Test`), sources in
   `port/tools/validate/` (the old empty `port/tests/` was removed): 17
   NASM-vs-C++ cross-checks + `vodka.golden_hash` + `v3d.crosscheck` (real
   .V3D/.V3M decode via the ported loader) + `tablica3.crosscheck` (generated
   NASM tables vs original TASM text, all five water/drop tables) +
   `pal.integrity` + `pal.repro`
-  (OBJ-extraction reproducibility) + `build.addr32` (COFF reloc hygiene);
+  (OBJ-extraction reproducibility) + `jjdj.repro` (P2 world-palette
+  provenance vs `CODE/P2/WORLD.P!`) + `build.addr32` (COFF reloc hygiene);
   the Python ones are skipped if no interpreter is found.
 
 ## Original DOS build (reference only)
