@@ -317,7 +317,14 @@ part3:
         call    copy
         call    sloneczko
 
-        v_sync
+        ; NOTE: the original P3.ASM main loop calls wait_vbl THEN v_sync
+        ; (VGA retrace poll). The port forwards BOTH to EOS_WAIT_VBL (a full
+        ; 70 Hz QPC wait), which waited twice per frame and halved the frame
+        ; rate (~35 fps instead of the original's ~70 fps). Since wait_vbl at
+        ; the top of this loop already lands on the frame boundary, v_sync is
+        ; dropped here so the object's per-frame rotation stays in sync with
+        ; the original (the whole P3 object phase cycle, including the solid
+        ; cog pose, is then reached).
         ; skrin -> framebuffer
         mov     esi, [rel skrin]
         add     rsi, qword [rel Code32_addr]
@@ -1354,8 +1361,9 @@ p3_slope:
         cdq
         idiv    ebx
         mov     si, ax
-        shl     esi, 16
-        or      esi, edi              ; (edi=0 here; keep simple)
+        ; the original packs (first_slope<<16) | second_slope here; the port
+        ; had an extra `shl esi,16` + `or esi,edi` that dropped the first
+        ; slope and ORed a stale face offset into the sub-pixel step.
         mov     [rel f_pstep], esi
         movzx   ecx, word [rel mem+4]
         movzx   eax, word [rel m_2]
@@ -1370,8 +1378,7 @@ p3_slope:
         cdq
         idiv    ebx
         mov     bp, ax
-        shl     ebp, 16
-        or      ebp, edi
+        ; same packing fix as f_pstep above.
         mov     [rel f_estep], ebp
         add     rsp, 0x20
         pop     r9
@@ -1513,7 +1520,11 @@ p3_engine_set:
         rep movsd
 
         AllocateMemory p_num*3*2, rcalc_a
-        AllocateMemory p_num*2, n_rot_a
+        ; n_rot is 2 words per vertex (rotate_normals writes 4 bytes/vertex),
+        ; so it needs p_num*4 bytes. p_num*2 under-allocated it, letting
+        ; rotate_normals overflow into n_vert every frame and corrupt the
+        ; first ~114 vertices' normals (scrambled texture coordinates).
+        AllocateMemory p_num*4, n_rot_a
         AllocateMemory p_num*3*2, n_vert_a
         AllocateMemory p_num*2, n_add_a
         AllocateMemory p_num*4, plane_a

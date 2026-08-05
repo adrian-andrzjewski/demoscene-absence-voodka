@@ -160,6 +160,45 @@ stale `reference/captures/port_outro.png` (pre-"presents added" fix) is what
 showed the old broken bright output. The logos blit byte-exactly to the source
 `_logoN.inc` data for every displayed frame.
 
+## Fixed divergences - P3 hero-object geometry/rotation audit (2026-08-05)
+
+A deep pass on the P3 tunnel's hero 3D object ("missing vertices/faces, mesh
+full of holes, doesn't resemble the original cog"). Runtime instrumentation
+(arena table dumps + per-face/per-row traces) verified the ENTIRE pipeline is
+faithful: shape/con tables byte-identical after the prepare double, plane
+projection, per-face backface cull (646/646 match the re-derived original
+arithmetic), the zet sort, and the face() rasterizer (dx1 edge switches to
+the v2->v3 slope at row y2 exactly like the original). The "holes" were a
+frame-rate/phase mismatch, plus two texture-interpolation bugs:
+
+25. **P3 main loop waited for TWO VBL ticks per frame (~35 fps, not 70).**
+    The ORIGINAL P3.ASM main loop calls EOS `wait_vbl` then `v_sync`; the
+    port forwarded BOTH to `EOS_WAIT_VBL` (a full QPC-paced 70 Hz wait). Two
+    waits per frame halved the frame rate, so the hero object's rotation
+    (advanced by `ramki` once per frame) ran at half the original's rate:
+    over the fixed music timeline P3 produced 433 frames (rotation r 32..465)
+    and never reached the solid-cog pose (r~528 at frame ~496), so the mesh
+    only ever showed its thin/fragmented/lobed phases while the original
+    cycles through the solid cog mid-scene. Since `wait_vbl` at the top of
+    the loop already lands on the frame boundary, the port now drops the
+    redundant `v_sync` (original `v_sync` is a VGA retrace poll that returns
+    at that same boundary). P3 now runs 860 frames (~65-70 fps); the object's
+    fill cycle peaks at the same ~53-67% of P3 as the original's, reaching
+    the hollow cog-ring + central emblem pose. (P4's .m_loop has the same
+    WaitVbl + per-frame v_sync pattern and should be checked with the same
+    method.)
+26. **P3 `p3_slope` dropped the first slope and ORed garbage into the span
+    step.** The original packs `(first_slope<<16)|second_slope`; the port's
+    `p3_slope` had an extra `shl esi/ebp,16` + `or ...edi` that shifted away
+    the first slope and ORed a stale face offset into the sub-pixel texture
+    step for every shaded tunnel face. Removed the extra `shl`/`or` (matches
+    the original packing).
+27. **P3 `n_rot` arena block under-allocated (`p_num*2` = 682 B, needs
+    `p_num*4` = 1364 B).** `rotate_normals` writes 4 bytes/vertex; the 682-byte
+    shortfall overflowed into `n_vert` every frame, corrupting the normals
+    (and thus the p/n_rot texture coordinates) of the first ~114 vertices.
+    Fixed the allocation size - no more cross-frame n_vert corruption.
+
 ## Remaining known differences
 
 - **P8 tone**: the port's P8 viewer reads slightly brighter/whiter than the

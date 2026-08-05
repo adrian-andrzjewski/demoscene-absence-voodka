@@ -81,6 +81,16 @@ Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
   outro presents, water 99-row loop, palette 6->8 rounding, part-5 boundary,
   P6 word-cmp) - all frame-record-verified; 25/25 tests + full playthrough
   exit 0.
+- [x] **Phase 8 - P3 hero-object geometry/rotation audit (2026-08-05)**: the
+  P3 tunnel's hero 3D object looked "hole-y / missing faces / not like the
+  original cog". Runtime instrumentation (arena dumps + per-face/per-row
+  traces) proved the whole pipeline faithful (shape/con, plane, cull
+  646/646, zet sort, face() rasterizer) and found the real cause: P3's main
+  loop waited on TWO 70 Hz VBLs per frame (~35 fps), halving the object's
+  rotation rate so it never reached the solid-cog pose within P3. Removed the
+  redundant v_sync wait (P3 now ~65-70 fps, reaches the cog pose mid-scene),
+  plus two texture bugs: p3_slope span-step packing and the n_rot arena
+  under-allocation. 26/26 tests + full-playthrough-frame verification.
 
 ## 4. Open questions / known approximations
 
