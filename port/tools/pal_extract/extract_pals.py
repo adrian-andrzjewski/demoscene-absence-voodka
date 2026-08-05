@@ -1,5 +1,6 @@
 import struct
 import os
+import sys
 
 # Extract the compile-time .pal palette includes that are MISSING from the repo.
 # The palettes were compiled into each part's TASM OMF .OBJ as raw 6-bit data
@@ -12,8 +13,13 @@ import os
 #   P4: pal(768 zero buffer) spal1(sw.pal,64c) spal2(v_txr1.pal,22c)
 #       spal3(proc.pal,33c) spal4(metal.pal,64c)
 #   P8: pal(sw.pal) mpal(metal.pal)
-
-ROOT = r'D:\Project\voodka2\reference\source\demoscene-absence-voodka-master'
+#
+# Reference tree root: argv[1] override, else derived from this script's
+# location (port/tools/pal_extract -> repo root is three levels up).
+_default_root = os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), '..', '..', '..'))
+ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(
+    _default_root, 'reference', 'source', 'demoscene-absence-voodka-master')
 
 
 def ledata_runs(path):
@@ -64,32 +70,27 @@ def main():
     sw = o4[a4:a4 + 64 * 3]
     open(os.path.join(out, 'sw.pal'), 'wb').write(sw)
 
-    # --- metal.pal (shared by P4 & P8) — mostly white fills, extract 64 colors ---
-    # P8: mpal region after its sw.pal (segment offset 0x75f). Find whites + the 0a marker.
-    mt8 = o8[0x760:0x760 + 64 * 3]
-    # ensure sane: find the '0a' grey entry inside
+    # --- metal.pal (shared by P4 & P8) — 64 colors, white-ramp start ---
+    # Verified location: P8.OBJ 0x8fb (192 bytes), cross-checked in P4.OBJ 0xb0b.
+    # (An earlier draft read 0x760, which lands one byte early of the ramp.)
+    assert o8[0x8fb:0x8fb + 12] == b'\x3f' * 12, 'metal.pal head missing'
+    mt8 = o8[0x8fb:0x8fb + 64 * 3]
+    assert o4[0xb0b:0xb0b + 48] == mt8[:48], 'P4/P8 metal.pal mismatch'
     open(os.path.join(out, 'metal.pal'), 'wb').write(mt8)
 
-    # --- v_txr1.pal (P4 only) — 22 colors grey ramp ---
-    vtx = b'\x02\x02\x02\x1e\x1e\x1e\x10\x10\x10\x2b\x2b\x2b\x0a\x0a\x0a\x26\x26\x26\x18\x18\x18\x31\x31\x31\x06\x06\x06\x22\x22\x22\x14\x14\x14\x2f\x2f\x2f\x0d\x0d\x0d\x29\x29\x29\x1b\x1b\x1b\x35\x35\x35'
-    p = o4.find(vtx)
-    assert p >= 0, 'v_txr1 head missing'
-    open(os.path.join(out, 'v_txr1.pal'), 'wb').write(vtx)
+    # --- v_txr1.pal (P4 only) — 22 colors grey ramp (66 bytes; the last 6
+    # colors are zero/black). The 12-byte head occurs exactly once in P4.OBJ.
+    vtx_head = b'\x02\x02\x02\x1e\x1e\x1e\x10\x10\x10\x2b\x2b\x2b'
+    p = o4.find(vtx_head)
+    assert p >= 0 and o4.find(vtx_head, p + 1) < 0, 'v_txr1 head not unique'
+    open(os.path.join(out, 'v_txr1.pal'), 'wb').write(o4[p:p + 22 * 3])
 
-    # --- proc.pal (P4 only) — 33 colors brown/tan ramp ---
-    proc = bytes([
-        0x08, 0x01, 0x00, 0x18, 0x07, 0x03, 0x24, 0x11, 0x09, 0x12, 0x04, 0x02,
-        0x1e, 0x0a, 0x04, 0x15, 0x06, 0x03, 0x1a, 0x08, 0x03, 0x0f, 0x03, 0x01,
-        0x29, 0x15, 0x0b, 0x20, 0x0d, 0x06, 0x1a, 0x0a, 0x06, 0x16, 0x08, 0x04,
-        0x2c, 0x1b, 0x0f, 0x23, 0x0d, 0x05, 0x1c, 0x09, 0x03, 0x16, 0x06, 0x03,
-        0x14, 0x05, 0x02, 0x0c, 0x02, 0x01, 0x10, 0x04, 0x02, 0x18, 0x08, 0x04,
-        0x29, 0x16, 0x0f, 0x1f, 0x0b, 0x06, 0x27, 0x12, 0x09, 0x1f, 0x0d, 0x08,
-        0x19, 0x09, 0x06, 0x1c, 0x0a, 0x06, 0x23, 0x0e, 0x07, 0x1c, 0x09, 0x04,
-        0x32, 0x22, 0x14, 0x1a, 0x09, 0x04, 0x16, 0x07, 0x04, 0x20, 0x0b, 0x04,
-    ])
-    pp = o4.find(proc)
-    assert pp >= 0, 'proc head missing'
-    open(os.path.join(out, 'proc.pal'), 'wb').write(proc)
+    # --- proc.pal (P4 only) — 33 colors brown/tan ramp (99 bytes). The
+    # 12-byte head occurs exactly once in P4.OBJ.
+    proc_head = bytes([0x08, 0x01, 0x00, 0x18, 0x07, 0x03, 0x24, 0x11, 0x09, 0x12, 0x04, 0x02])
+    pp = o4.find(proc_head)
+    assert pp >= 0 and o4.find(proc_head, pp + 1) < 0, 'proc head not unique'
+    open(os.path.join(out, 'proc.pal'), 'wb').write(o4[pp:pp + 33 * 3])
 
     # --- jup.pal (P3) — 16 colors (48 bytes), region verified at 0x369..0x399 ---
     jup = o3[0x369:0x399]

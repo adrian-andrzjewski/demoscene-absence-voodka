@@ -29,6 +29,7 @@ extern Code32_addr
 extern eos_dispatch
 
 extern _scr_Addr
+extern _scrSel
 extern _file_addr
 extern _screen
 extern GetModPos
@@ -79,6 +80,17 @@ DemoStart32:
         ; _scr_Addr = kBackbufferOffset
         call    vk_backbuffer_offset
         mov     [rel _scr_Addr], eax
+
+        ; _scrSel = selector over the backbuffer (DEMO.AS^ allocates the
+        ; screen selector at Start32; P1/P5/P8 read _scrSel for gs_sel).
+        ; Without this, standalone parts (--part N) inherit gs_sel=0 and
+        ; tm_face writes to a null screen base.
+        mov     eax, EOS_ALLOCATE_SELECTOR
+        mov     esi, [rel _scr_Addr]
+        add     rsi, qword [rel Code32_addr]
+        mov     edi, 320*200
+        call    eos_dispatch
+        mov     [rel _scrSel], ax
 
         ; shared tunnel tables (built once in Start32, used by the tunnel parts)
         ; _tableToonel = 128000-byte arena table: u/v coordinates for 320x200.

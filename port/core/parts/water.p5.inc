@@ -167,9 +167,14 @@ drawWaterP5:
         add     r10d, r11d
 
         ; sample = _obrazek[ row*128 + col ]  (base 0101h style: +1,+1)
+        ; The original computes the index in 16-BIT (shl ax,7 / add ax,dx):
+        ; out-of-range ripple cells wrap mod 65536 and read neighbouring data
+        ; (harmless in DOS flat memory). In x64 a negative 32-bit index would
+        ; zero-extend to +4GB and fault, so reproduce the 16-bit wrap.
         mov     eax, r9d
         shl     eax, 7
         add     eax, r10d
+        and     eax, 0xffff
         movzx   eax, byte [r13 + rax]
 
         ; ah = (sample * inner) & 31

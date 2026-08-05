@@ -905,13 +905,22 @@ sloneczko:
         push    rcx
         sub     rsp, 0x20
         ; (module var sun_step)
+        ; Clamp sun_step into the 19-frame table (log.inc = 19x4096 bytes).
+        ; The original's one-shot +-18 assumed per-frame deltas of ~1; EOS
+        ; wait_vbl returns the tick DELTA since the last call, which is huge
+        ; on the first frame after a part stall (DOS read neighbouring memory
+        ; and survived; the port's 64 MB arena does not), so wrap robustly.
+        ; Steady-state behaviour is identical to the original.
+.sun_dn:
         cmp     dword [rel sun_step], 19
         jl      .sun_ok1
         sub     dword [rel sun_step], 18
+        jmp     .sun_dn
 .sun_ok1:
         cmp     dword [rel sun_step], 0
         jg      .sun_ok2
         add     dword [rel sun_step], 18
+        jmp     .sun_ok1
 .sun_ok2:
         mov     esi, [rel sun_step]
         shl     esi, 12

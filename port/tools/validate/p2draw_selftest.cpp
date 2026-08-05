@@ -19,12 +19,14 @@
 #include <cstring>
 #include <cstdlib>
 #include <vector>
+#include <algorithm>
 
 extern "C" void vk_draw_object_trace(uint8_t* base, uint32_t objOff, int32_t* rec);
+extern "C" void ts_p2draw_set_base(uint8_t* base, void* rec);
 
 static int failures = 0;
-static void ck(const char* w, int32_t got, int32_t want){
-    if (got != want){ std::printf("FAIL %s: %d != %d\n", w, got, want); if(++failures>20) exit(1); }
+static void ck2(int idx, int32_t got, int32_t want){
+    if (got != want){ std::fprintf(stderr, "FAIL rec[%d]: %d (0x%08x) != %d\n", idx, got, got, want); if(++failures>20) exit(1); }
 }
 
 // reference persp (identical to persp.asm)
@@ -35,6 +37,27 @@ static void ref_persp(const int32_t* src, int32_t* dst, int n){
         long y = (long)src[i*3+1] * 185; y /= s; y += 100;
         dst[i*2+0]=(int32_t)x; dst[i*2+1]=(int32_t)y;
     }
+}
+
+// reference BITSORT.PM Sort (called by DrawZielonyLudek before the face walk):
+// sumz16 = lo16(z1>>4)+lo16(z2>>4)+lo16(z3>>4) + 15000, pack (i<<16)|sumz16,
+// stable sort DESCENDING by sumz16 (radix-equivalent), then >>16.
+static void ref_sort_faces(const int32_t* cvert, const int32_t* face, int nof,
+                           std::vector<int32_t>& order){
+    std::vector<uint32_t> e(nof);
+    for (int i=0;i<nof;i++){
+        uint16_t s=0;
+        for (int k=0;k<3;k++){
+            int v = face[i*3+k];
+            int16_t z = (int16_t)(cvert[v*3+2] >> 4);   // sar 4, keep low16
+            s = (uint16_t)(s + (uint16_t)z);
+        }
+        s = (uint16_t)(s + 15000);                       // SortAdd
+        e[i] = ((uint32_t)i << 16) | s;
+    }
+    std::stable_sort(e.begin(), e.end(),
+                     [](uint32_t a, uint32_t b){ return (a & 0xffff) > (b & 0xffff); });
+    for (int i=0;i<nof;i++) order[i] = (int32_t)(e[i] >> 16);
 }
 
 // reference DrawZielonyLudek record emitter (returns records appended to *out)
@@ -112,7 +135,7 @@ static void run_case(bool phong, int NV, int NOF){
 
     // faces: random triples in range
     for (int i=0;i<NOF*3;i++) fc[i]=(int32_t)(rand()%NV);
-    // order: 0..NOF-1
+    // order: 0..NOF-1 (the draw re-sorts it per BITSORT before walking)
     for (int i=0;i<NOF;i++) od[i]=i;
 
     obj[0]= phong?2:1;        // type
@@ -125,18 +148,19 @@ static void run_case(bool phong, int NV, int NOF){
     obj[19]= (uint32_t)(0x50000); // +76 wsp2d (scratch)
     obj[20]= ORD;             // +80 order
 
-    // reference records
+    // reference: face order after the BITSORT painter sort, then the walk
+    std::vector<int32_t> sorted(NOF);
+    ref_sort_faces(cv, fc, NOF, sorted);
     std::vector<int32_t> ref;
-    ref_draw(cv, NV, fc, NOF, tx, od, phong?0:1, ref);
-    std::vector<int32_t> ref0;
-    ref_draw(cv, NV, fc, NOF, tx, od, 0, ref0); // (not used)
+    ref_draw(cv, NV, fc, NOF, tx, sorted.data(), phong?0:1, ref);
 
     // run trace
     std::vector<int32_t> got(NOF*10);
+    ts_p2draw_set_base(base, got.data());
     vk_draw_object_trace(base, OBJ, got.data());
 
     int nrec = NOF*10;
-    for (int i=0;i<nrec;i++) ck("rec", got[i], ref[i]);
+    for (int i=0;i<nrec;i++) ck2(i, got[i], ref[i]);
     free(base);
 }
 

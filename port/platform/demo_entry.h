@@ -1,12 +1,9 @@
 // demo_entry.h - the boundary where the C++ app calls into the NASM core.
 //
-// The NASM core exposes a single C-like entry, DemoStart(), which mirrors the
-// original DEMO.AS^ start32 flow (arena setup, palette, module load, part1..8
-// sequence). The platform hands it the arena base so Code32_addr == arena().
-//
-// Until the assembly core lands (Phases 3-4), app.cpp uses this header to
-// declare the symbol; a C fallback is provided by platform/app.cpp so the
-// platform layer is buildable/runable standalone first.
+// The NASM core exposes a single C-like entry, DemoStart32(), which mirrors
+// the original DEMO.AS^ start32 flow (arena setup, palette, module load,
+// part1..8 sequence). The platform hands it the arena base so
+// Code32_addr == arena().
 
 #pragma once
 #include <cstdint>

@@ -27,6 +27,7 @@ static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 #include <string>
+#include <vector>
 
 // bridge symbols (extern "C"): select which part the assembly core runs
 extern "C" void vk_set_entry_part(int part);
@@ -35,6 +36,37 @@ namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
 constexpr int kWinW = 960;
 constexpr int kWinH = 600;
+}
+
+// ---- music module path resolution ------------------------------------------
+// Order: --music <path> override, then next to the exe (music\amnezja2.mod,
+// amnezja2.mod), then the dev-tree copy under VOODKA_REPO_ROOT. Missing file
+// is tolerated: audioInit falls back to a headless (silent) timeline.
+static std::string resolveMusicPath(const char* overridePath) {
+    if (overridePath && overridePath[0]) return overridePath;
+    wchar_t exePath[MAX_PATH] = {};
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+    std::wstring dir(exePath);
+    auto slash = dir.find_last_of(L"\\/");
+    if (slash != std::wstring::npos) dir = dir.substr(0, slash + 1);
+    auto exists = [](const std::wstring& p) {
+        DWORD a = GetFileAttributesW(p.c_str());
+        return a != INVALID_FILE_ATTRIBUTES && !(a & FILE_ATTRIBUTE_DIRECTORY);
+    };
+    std::vector<std::wstring> cands = {
+        dir + L"music\\amnezja2.mod",
+        dir + L"amnezja2.mod",
+    };
+    // dev-tree fallback (configure-time repo root; ASCII-safe widening)
+    std::wstring dev(VOODKA_REPO_ROOT, VOODKA_REPO_ROOT + strlen(VOODKA_REPO_ROOT));
+    cands.push_back(dev + L"/music/amnezja2.mod");
+    for (auto& c : cands) {
+        if (exists(c)) {
+            // the module filename is ASCII, so narrowing is lossless here
+            return std::string(c.begin(), c.end());
+        }
+    }
+    return std::string();
 }
 
 LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
@@ -86,6 +118,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     //       and  --diag <dir>   (GPU readback diagnostics)
     const char* recDir = nullptr;
     const char* diagDir = nullptr;
+    const char* musicOverride = nullptr;
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
         std::string f = "--" + std::string(flag);
         auto p = cmd.find(f);
@@ -102,6 +135,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         std::string cmd = lpCmd ? lpCmd : "";
         recDir = argDirOf(cmd, "record");
         diagDir = argDirOf(cmd, "diag");
+        musicOverride = argDirOf(cmd, "music");
         if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
@@ -184,7 +218,9 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     }
     vk::timerInit();
     vk::recInit(recDir);
-    vk::audioInit("D:/Project/voodka2/music/amnezja2.mod", 44100);
+    std::string musicPath = resolveMusicPath(musicOverride);
+    vk::logPrint("[app] music module: '%s'\n", musicPath.empty() ? "(none)" : musicPath.c_str());
+    vk::audioInit(musicPath.c_str(), 44100);
     if (!vk::initPresent(hwnd, kWinW, kWinH)) {
         vk::logPrint("[app] D3D11 init failed\n");
         return 1;

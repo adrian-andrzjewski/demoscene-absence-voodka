@@ -29,7 +29,6 @@ set(VOODKA_CORE_ASM
     parts/p6.asm
     parts/p7.asm
     parts/p8.asm
-    parts/p8.asm
   )
 
 add_library(voodka_core STATIC ${VOODKA_CORE_ASM})

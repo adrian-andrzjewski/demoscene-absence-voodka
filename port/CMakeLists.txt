@@ -12,6 +12,15 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Tests are registered throughout this file; enable before the first add_test.
+enable_testing()
+
+# Repo root at configure time: used only for dev-tree fallbacks (music path,
+# reference data for cross-check tests). The staged bin/ output is
+# self-contained and never needs it at runtime on another machine.
+get_filename_component(VOODKA_REPO_ROOT "${CMAKE_SOURCE_DIR}/.." ABSOLUTE)
+add_compile_definitions(VOODKA_REPO_ROOT="${VOODKA_REPO_ROOT}")
+
 if(NOT WIN32)
     message(FATAL_ERROR "VOODKA port currently targets Windows only (Win32 x64).")
 endif()
@@ -39,11 +48,13 @@ add_executable(vodka_pack tools/vodka_pack/vodka_pack.cpp)
 add_executable(tabl2nasm  tools/vodka_pack/tabl2nasm.cpp)
 add_executable(frames2img  tools/validate/frames2img.cpp)
 add_executable(sin_tables tools/vodka_pack/sin_tables.cpp)
+add_executable(world_pack tools/world_pack/world_pack.cpp)
 if(MSVC)
     target_compile_options(vodka_pack PRIVATE /W4)
     target_compile_options(tabl2nasm  PRIVATE /W4)
     target_compile_options(frames2img PRIVATE /W4)
     target_compile_options(sin_tables PRIVATE /W4)
+    target_compile_options(world_pack PRIVATE /W4)
 endif()
 
 add_custom_command(
@@ -53,6 +64,22 @@ add_custom_command(
     COMMENT "Packing vodka.dat from reference DANE/ (LINKER.PAS semantics)"
 )
 add_custom_target(voodka_data ALL DEPENDS "${VOODKA_DAT}")
+
+# ---- VIRTUAL viewer object archive (WORLD.PAS semantics) --------------------
+set(VOODKA_WORLD_MANIFEST
+    "${CMAKE_SOURCE_DIR}/../demoscene-absence-voodka-master/VIRTUAL/OBJECTS/WORLD.TXT")
+set(VOODKA_WORLD "${CMAKE_SOURCE_DIR}/data/world")
+add_custom_command(
+    OUTPUT "${VOODKA_WORLD}"
+    COMMAND world_pack "${VOODKA_WORLD_MANIFEST}" "${VOODKA_WORLD}"
+    DEPENDS world_pack "${VOODKA_WORLD_MANIFEST}"
+    COMMENT "Packing VIRTUAL objects/world (WORLD.PAS semantics)"
+)
+add_custom_target(voodka_world ALL DEPENDS "${VOODKA_WORLD}")
+# golden: the repacked archive must be byte-identical to the shipped one
+add_test(NAME virtual.world_golden
+         COMMAND "${CMAKE_COMMAND}" -E compare_files "${VOODKA_WORLD}"
+ "${CMAKE_SOURCE_DIR}/../reference/source/demoscene-absence-voodka-master/VIRTUAL/OBJECTS/WORLD")
 
 # ---- sine tables (generated; used by the engine + MROTATE) -----------------
 set(VOODKA_SIN "${CMAKE_SOURCE_DIR}/core/inc/sin_tables.asm")
@@ -339,12 +366,39 @@ add_test(NAME p2loop.crosscheck COMMAND p2loop_selftest)
 
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
-enable_testing()
 add_executable(golden_hash_test tools/vodka_pack/golden_hash_test.cpp)
 add_test(
     NAME vodka.golden_hash
     COMMAND golden_hash_test "${VOODKA_DAT}"
 )
+
+# ---- v3d.crosscheck: real .V3D/.V3M assets decoded by the ported loader -----
+add_executable(v3d_crosscheck tools/validate/v3d_crosscheck.cpp)
+target_compile_definitions(v3d_crosscheck PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(v3d_crosscheck PRIVATE loader_core_objects)
+add_test(NAME v3d.crosscheck COMMAND v3d_crosscheck)
+
+# ---- tablica3.crosscheck: generated NASM tables vs original TASM tables ----
+add_executable(tablica3_crosscheck tools/validate/tablica3_crosscheck.cpp)
+add_test(NAME tablica3.crosscheck COMMAND tablica3_crosscheck)
+
+# ---- pal.integrity: recovered palettes identical + 6-bit clean --------------
+add_executable(pal_integrity tools/validate/pal_integrity.cpp)
+add_test(NAME pal.integrity COMMAND pal_integrity)
+
+# ---- python-based checks (skipped when no interpreter is available) ---------
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    # palette recovery reproducibility (OBJ LEDATA -> committed .pal)
+    add_test(NAME pal.repro
+             COMMAND "${Python3_EXECUTABLE}"
+                     "${CMAKE_SOURCE_DIR}/tools/validate/pal_repro_check.py")
+    # build hygiene: 0 ADDR32 relocations in every core NASM object
+    add_test(NAME build.addr32
+             COMMAND "${Python3_EXECUTABLE}"
+                     "${CMAKE_SOURCE_DIR}/tools/validate/audit_addr32.py"
+                     "${CMAKE_BINARY_DIR}/core/voodka_core.dir/$<CONFIG>")
+endif()
 
 # ---- libxmp (vendored MOD player) ------------------------------------------
 add_subdirectory("${CMAKE_SOURCE_DIR}/../modules/libxmp"

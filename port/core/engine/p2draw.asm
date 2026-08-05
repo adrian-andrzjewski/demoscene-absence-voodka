@@ -31,6 +31,8 @@ extern x_1, y_1, x_2, y_2, x_3, y_3
 extern p_1, p_2, p_3
 extern tm_face
 extern fs_sel, gs_sel
+extern Code32_addr
+extern addr_tab
 
 section .bss align=16
 pz_base:  resq 1
@@ -44,6 +46,7 @@ pz_vis:   resb 1          ; isvisible result
 pz_cnt:   resq 1          ; face loop counter
 pz_aface: resq 1          ; real aFaces ptr
 pz_order: resq 1          ; real order ptr
+pz_slen:  resd 16         ; pz_sort bucket counters
 
 section .text
 
@@ -163,6 +166,10 @@ pz_walk:
         mov     eax, [r13 + 8]          ; nof
         mov     [pz_cnt], rax
 
+        ; per-face painter's sort (BITSORT.PM Sort, called by DrawZielonyLudek
+        ; for both texture and phong objects before walking the order table)
+        call    pz_sort
+
 .face_loop:
         mov     rax, [pz_cnt]
         test    rax, rax
@@ -254,6 +261,116 @@ pz_walk:
         mov     [pz_rec], rdi
 .next:
         jmp     .face_loop
+
+; ------------------------------------------------- per-face painter sort ----
+; Faithful port of BITSORT.PM Sort (DrawZielonyLudek calls it for texture and
+; phong objects alike): per face,
+;   sumz16 = lo16(z1>>4)+lo16(z2>>4)+lo16(z3>>4) + 15000 (SortAdd), z from
+;   copy-vert[face*12+8]; pack (faceIdx<<16)|sumz16 into the order table
+;   (+80); radix sort DESCENDING by sumz16 (4 x 4-bit passes, buckets gathered
+;   15..0 = far->near); then NaGut (shr eax,16 in place) leaves plain face
+;   indices far->near. Uses the engine's addr_tab/sort_mem scratch, so
+;   prep_sort must have run at part init (P2.AS^ calls SortMem likewise).
+%macro PZ_SORT_PASS 1
+        lea     rdi, [rel pz_slen]
+        xor     eax, eax
+        mov     ecx, 16
+        rep stosd
+        mov     esi, [r13 + 80]         ; order offset
+        add     rsi, qword [rel Code32_addr]
+        mov     ecx, [r13 + 8]          ; nof
+        lea     r14, [rel pz_slen]
+        lea     r15, [rel addr_tab]
+%%scatter:
+        lodsd
+        mov     ebx, eax
+        shr     ebx, %1
+        and     ebx, 0x0f
+        mov     edx, [r14 + rbx*4]
+        inc     dword [r14 + rbx*4]
+        mov     rdi, [r15 + rbx*8]
+        mov     [rdi + rdx*4], eax
+        dec     ecx
+        jnz     %%scatter
+        ; gather buckets 15..0 back into the order table (descending keys)
+        mov     edi, [r13 + 80]
+        add     rdi, qword [rel Code32_addr]
+        mov     r12d, 15
+%%gather:
+        lea     rax, [rel pz_slen]
+        mov     ecx, [rax + r12*4]
+        or      ecx, ecx
+        jz      %%gnext
+        lea     rax, [rel addr_tab]
+        mov     rsi, [rax + r12*8]
+        rep movsd
+%%gnext:
+        dec     r12d
+        jns     %%gather
+%endmacro
+
+pz_sort:
+        push    rbx
+        push    rsi
+        push    rdi
+        push    r12
+        push    r14
+        push    r15
+
+        ; ---- SumZ packing (BITSORT SumZ): entry = (i<<16) | sumz16 ----
+        mov     rsi, [pz_aface]         ; faces
+        mov     rdx, [pz_copy]          ; copy-vert
+        mov     rdi, [pz_order]         ; order/sumZ buffer (+80)
+        mov     ecx, [r13 + 8]          ; nof
+        xor     ebx, ebx
+.sumz:
+        mov     eax, [rsi]              ; face[0]
+        lea     eax, [eax*2 + eax]
+        mov     r8d, [rdx + rax*4 + 8]
+        sar     r8d, 4
+        mov     bx, r8w                 ; low16(z1>>4)
+        mov     eax, [rsi + 4]          ; face[1]
+        lea     eax, [eax*2 + eax]
+        mov     r8d, [rdx + rax*4 + 8]
+        sar     r8d, 4
+        add     bx, r8w
+        mov     eax, [rsi + 8]          ; face[2]
+        lea     eax, [eax*2 + eax]
+        mov     r8d, [rdx + rax*4 + 8]
+        sar     r8d, 4
+        add     bx, r8w
+        add     bx, 15000               ; SortAdd
+        mov     [rdi], ebx
+        add     rdi, 4
+        add     rsi, 12
+        add     ebx, 010000h            ; next face index in the high word
+        dec     ecx
+        jnz     .sumz
+
+        PZ_SORT_PASS 0
+        PZ_SORT_PASS 4
+        PZ_SORT_PASS 8
+        PZ_SORT_PASS 12
+
+        ; ---- NaGut: plain face indices far->near ----
+        mov     esi, [r13 + 80]
+        add     rsi, qword [rel Code32_addr]
+        mov     rdi, rsi
+        mov     ecx, [r13 + 8]
+.nagut:
+        lodsd
+        shr     eax, 16
+        stosd
+        dec     ecx
+        jnz     .nagut
+
+        pop     r15
+        pop     r14
+        pop     r12
+        pop     rdi
+        pop     rsi
+        pop     rbx
+        ret
 
 ; ------------------------------------------------- single vertex ------------
 ; in: ebx = vertex index, rcx = slot (0/1/2), pz_wsp/pz_tex/pz_copy set.

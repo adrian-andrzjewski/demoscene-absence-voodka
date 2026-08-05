@@ -64,7 +64,7 @@ static std::vector<int> parseWorld(const char* path){
 
 int main(){
     std::printf("A main\n"); std::fflush(stdout);
-    std::vector<int> wd = parseWorld("D:/Project/voodka2/reference/source/demoscene-absence-voodka-master/CODE/inc/WORLD");
+    std::vector<int> wd = parseWorld(VOODKA_REPO_ROOT "/reference/source/demoscene-absence-voodka-master/CODE/inc/WORLD");
     std::printf("B parsed %d ints\n", (int)wd.size()); std::fflush(stdout);
     int recs = (int)wd.size()/12;
     ck("worldmax", vk_p2_worldmax, 255);

@@ -1,0 +1,177 @@
+# Porting notes - architecture & hard-won invariants
+
+How the 1996 TASM/DOS demo became a native Windows x64 program without
+losing behavioral fidelity. Read this before touching `port/core`.
+
+## Big picture
+
+```
++----------------------------------------------------------+
+|  port/platform (C++17, Win32)                            |
+|   app.cpp  window/CLI/crash filter   d3d11_present.cpp   |
+|   audio.cpp (libxmp+WASAPI)          timer.cpp (QPC 70Hz)|
+|   arena.cpp (64MB arena + archive)   input/pause/progress|
+|   bridge.cpp  <-- the ONLY C symbols NASM may call (vk_*)|
++---------------------------+------------------------------+
+                            | extern "C", MS x64 ABI
++---------------------------v------------------------------+
+|  port/core (NASM x64, faithful port of the TASM sources) |
+|   eos_replace/  boot.asm(DemoStart32) eos_dispatch toonel|
+|   engine/       engine txtr mrotate cammat persp v2d ... |
+|   parts/        p1..p8 (+ generated/data includes)       |
++----------------------------------------------------------+
+```
+
+- The demo core is **kept in assembly on purpose**: it is a line-faithful
+  port, so every effect retains its original arithmetic (fixed-point,
+  16/32-bit wraparound, FPU quirks). Behavior parity matters more than
+  language purity.
+- Every performance-critical routine also has a **C++ reference
+  implementation inside the cross-check tests** (`port/tools/validate/*`),
+  compared byte-for-byte (or within documented FPU tolerance) by CTest.
+  Those references are the portable fallback and the documentation of intent.
+
+## Memory model (the one arena rule)
+
+- The whole demo universe is **one 64 MB arena** (`arena.cpp`,
+  `VirtualAlloc`). The demo stores 32-bit `Code32_addr`-relative offsets in
+  dwords; add the qword `Code32_addr` base before dereferencing.
+- Two VGA overlays are at fixed arena offsets (`platform_abi.h`):
+  `kBackbufferOffset = 0x10000` (parts draw here; the old `_screen`) and
+  `kFramebufferOffset = 0x20000` (presented; the old `0xA0000`).
+- Allocation is a bump allocator (`arenaAlloc`), free is a no-op - exactly
+  like the original's EOS usage pattern (parts allocate, nobody frees mid-part).
+- **There is NO module `.data`/`.bss` capacity limit.** Combined module data
+  is ~40 KB and rip-relative `[rel X]` reaches any image offset. The early
+  "arena migration" belief was a misdiagnosis - see the P4 case study below.
+
+## ABI rule (critical, #1 crash source)
+
+Every NASM -> C++ call must have **`RSP % 16 == 0` at the `call`**.
+Prologue accounting: at function entry `RSP % 16 == 8`; after `push rbp` it
+is 0; each extra push moves it by 8. Examples:
+
+- pushes rbp + 7 regs -> `sub rsp,0x28`
+- pushes rbp + 4 regs -> `sub rsp,0x20`
+- an *inlined* block that pushes rbp + subs must reach 0 relative to the
+  enclosing body
+
+Getting this wrong crashes inside MSVCRT / the NVIDIA D3D stack with /GS
+cookie or stack faults. When in doubt, count pushes.
+
+## EOS kernel replacement
+
+The original links binary-only `KERNEL.OBJ`/`EOS.OBJ` (EOS 2.07, sources
+never in the repo). The port reimplements the used services:
+
+- `eos_replace/eos.inc` defines service ids 0x01-0x11 (the original
+  `EOS.INC` is absent, so these ids are our own) plus
+  `AllocateMemory`/`AllocateMemoryFree`/`LoadFile`/`WaitVbl` macros.
+- `eos_replace/eos_dispatch.asm` adapts the EOS register convention to the
+  MS x64 ABI and forwards to `bridge.cpp`:
+  memory/selector alloc, `wait_vbl`, `Get_Info` (ModPos), file load.
+- `wait_vbl` = QPC-paced ~70 Hz retrace emulation (`timer.cpp`), sleep+spin.
+- Audio services (`Load_module`/`Play_module`/`Stop_module`...) are
+  deliberate no-ops in the dispatcher: the module is loaded and auto-started
+  by the platform (`audio.cpp`) before `DemoStart32` runs. Only P8's final
+  `EOS_STOP_MODULE` reaches the platform.
+- Keyboard: EOS hooked int 09 and exposed a scancode `Key_Map`; the port
+  fills the same table from Win32 messages (`input.cpp` maps virtual keys ->
+  PC scancodes, layout-independent).
+
+## Selectors (fs/gs are off-limits in user-mode x64)
+
+The original allocates *selectors* for texture data and reads them via
+`fs:[...]`. User-mode x64 forbids arbitrary fs/gs bases, so
+`sel_base_table[512]` in `bridge.cpp` maps `Allocate_Selector` handles to
+base pointers; the texture mappers read the base up front
+(`engine/txtr.asm`, P8's dual mapper).
+
+## Self-modifying code -> explicit state
+
+The original patches instruction immediates, which is read-only under DEP.
+These are ported as memory variables with identical arithmetic:
+
+- P6 bump map: `BUMPXXX`/`BUMPYYY` -> `bump_x`/`bump_y` (`parts/p6.asm`)
+- P7 water: `WaterX`/`WaterY`, `innerWater` patch sites (`core/inc/water.inc`)
+- P8: `DESTINY` immediate
+- `cammat.asm`: VIRTUAL.INC SMC sites -> bss vars
+
+## Register-collision case studies (why fidelity beats cleverness)
+
+Two of the nastiest port bugs were *introduced* by "optimizing" the ported
+code. Both are fixed; keep the pattern in mind.
+
+1. **P4 `calc_pts` runaway loop.** The original used a memory-operand
+   `shape[ebp*2+ebp]` + `loop`, never touching `ecx`. The port rewrote it as
+   `lea rcx,[rbp*2+rbp]`, clobbering the `ecx` loop counter; a garbage face
+   count (~millions) walked `rsi` past the 64 MB arena. Fix: use a spare
+   register (`r8`) for scratch so `ecx` stays the counter.
+2. **P4 `show()` texture selector.** The con3 face index was computed in
+   `eax`, then `P4AR con3_a, rbx` - and the `P4AR` macro internally does
+   `mov eax,[rel con3_a]`, clobbering the live index; the texture handle
+   read garbage (mapQ -> 0, crash in `face()`). Fix: keep live values in a
+   register the macro never touches (`r8`).
+3. **P8 frame-1 sort crash.** P8's `prepare`/`co_prepare` double con vertex
+   indices into byte-space, so `rotate`'s `rcalc[idx*2]` writes overran
+   module .bss into the engine's `addr_tab`. Fixed by moving rcalc/check to
+   the arena, using the reference's byte*2 rcalc stride (the port had *4),
+   and reading show()'s face vertex index from con (not rcalc).
+
+Rule of thumb: **port arithmetic exactly; reach for spare registers (r8+)
+for scratch; never reuse a register the original left live.**
+
+## FPU & fixed point
+
+- Heavy x87 use is preserved (`fpatan`, `fsqrt`, `fimul` in the toonel table
+  builder, engine `sqrt`). x64 still has x87; semantics are identical.
+- 15-bit fixed-point rotation (MROTATE.PM) and the 1024-entry `vkSin` /
+  2048-entry `sinus` tables are regenerated at build time
+  (`tools/vodka_pack/sin_tables.cpp`) and cross-checked byte-exact.
+- `normals.crosscheck` compares within documented FPU tolerance; everything
+  else compares byte-exact.
+
+## Video path
+
+- Parts render 320x200x256 into the backbuffer; `Ekran`/`ShowPicture`
+  (`core/inc/video.inc`) copies backbuffer -> framebuffer and calls
+  `vk_present_frame`.
+- `d3d11_present.cpp` uploads the 64,000-byte index frame to an R8 texture
+  and the 768-byte palette to a 256x1 texture; a point-sampled fullscreen
+  quad maps indices through the palette - pixel-identical to VGA DAC
+  behavior, 3x integer upscale into a 960x600 window.
+- Palette writes (`set_pal` macro / `pal_set`) go through
+  `applyPaletteRange` (`pal_range.h`), shared with `palette.crosscheck`.
+
+## Audio path
+
+- Original: DIAMOND.OBJ player (binary-only) driven by EOS, 44,000 Hz,
+  "SB & GUZ ONLY".
+- Port: **libxmp 4.6.2** (vendored, statically linked) + event-driven WASAPI
+  render thread at 44,100 Hz / 2 ch (`audio.cpp`). The module is a
+  14-channel FastTracker file ("<>Amnezja<>", 42 orders).
+- `ModPos = (order << 8) | row` is the demo's timeline currency; the parts
+  poll it via EOS `Get_Info`. `audio.cpp` tracks it with loop handling and
+  supports seeks (`--modpos/--ms/--order/--part`). Scene-start constants
+  (`kPartStartModPos` in `app.cpp`) are calibration-tuned - see
+  `docs/KNOWN_DIFFERENCES.md`.
+
+## Build hygiene
+
+- **Always use the vendored NASM 2.16.03** (`modules/nasm/nasm.exe`). A
+  system NASM 3.x miscompiles `[rel X]` references into high-VA `.bss`
+  (silent heap/stack corruption; sort/n_calc fail). `build.ps1` passes
+  `-DCMAKE_ASM_NASM_COMPILER=...` explicitly; if you reconfigure by hand,
+  verify `CMakeCache.txt`.
+- `tools/validate/audit_addr32.py` audits COFF relocations for unwanted
+  ADDR32 (run manually; a CTest wrapper is planned).
+- Frame capture: `VOODKA.exe --record <dir>` dumps per-frame
+  320x200-index + 768-palette to `frames.raw`; `frames2img` converts to PNG.
+  `--diag <dir>` does a GPU readback comparison.
+
+## DOS/DOSBox reference
+
+The original release (`reference/release/abc_voda/VOODKA.EXE`) runs under
+DOSBox 0.74-3 with SB16 emulation. Validation methodology and observed
+differences are in `docs/KNOWN_DIFFERENCES.md`; captures live in
+`reference/captures/`.

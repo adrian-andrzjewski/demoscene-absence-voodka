@@ -62,7 +62,7 @@ static std::vector<int> parseFile(const char* path){
 }
 
 int main(){
-    const char* refdir = "D:/Project/voodka2/reference/source/demoscene-absence-voodka-master/CODE/P2/";
+    const char* refdir = VOODKA_REPO_ROOT "/reference/source/demoscene-absence-voodka-master/CODE/P2/";
     std::vector<int> tr = parseFile((std::string(refdir)+"TRASA.!").c_str());
     std::vector<int> wd = parseFile((std::string(refdir)+"WIDOKI").c_str());
 

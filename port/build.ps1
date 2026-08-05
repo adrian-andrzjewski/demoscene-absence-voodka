@@ -19,7 +19,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$root = "D:\Project\voodka2"
+# Repo root derived from this script's location (port/build.ps1 -> repo root);
+# keeps the build relocatable across machines/checkouts.
+$root = Split-Path -Parent $PSScriptRoot
 $port = Join-Path $root "port"
 $buildDir = Join-Path $port "build"
 $EXE_PATH = $env:COMSPEC

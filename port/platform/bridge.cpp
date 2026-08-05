@@ -49,7 +49,21 @@ uint64_t vk_selector_base(uint16_t handle) {
     return 0;
 }
 
-uint64_t vk_wait_vbl()       { vk::waitVbl(); return vk::getFrameCounter(); }
+// Original EOS wait_vbl returns the ticks SINCE THE PREVIOUS CALL (~1 per
+// frame), not the absolute retrace counter: every part stores the result into
+// ramki/frames and uses it as a per-frame delta multiplier. Returning the
+// absolute counter made camera paths and sprite animations advance
+// quadratically fast (and P8's sun_step ran past its 19-frame sprite table
+// and faulted reading past the arena). The absolute counter stays available
+// to the platform via vk::getFrameCounter() (progress reporting).
+uint64_t vk_wait_vbl() {
+    static uint64_t prev = 0;
+    vk::waitVbl();
+    uint64_t now = vk::getFrameCounter();
+    uint64_t delta = now - prev;    // first call after boot/seek: one big delta,
+    prev = now;                     // exactly like the original EOS after a stall
+    return delta;
+}
 uint32_t vk_get_modpos()    { vk::audioPump(); return vk::getModPos(); }
 uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
 

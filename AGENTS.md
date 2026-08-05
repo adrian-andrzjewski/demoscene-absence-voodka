@@ -35,7 +35,10 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
 - **Run:** `VOODKA.exe [--record <dir>]` draws the demo in a 960x600 window
   (320x200x256 logic upscaled via D3D11 palette texture). `--record` dumps
   per-frame 320x200-index + 768-palette to `<dir>/frames.raw`; convert with
-  `port/bin/Release/frames2img.exe`.
+  `port/bin/Release/frames2img.exe`. `bin/<Config>/` is self-contained
+  (post-build stages `data/vodka.dat` + `music/amnezja2.mod` next to the
+  exe); `--music <file>` overrides the module path. Dev-tree fallbacks use
+  the configure-time `VOODKA_REPO_ROOT` define, not hardcoded paths.
 - **Architecture:** `port/core/*.asm` is the demo (faithful NASM x64 port of
   TASM parts); `port/platform/*.cpp` is the EOS replacement. The bridge
   (`bridge.cpp`) exposes the only C symbols NASM may call (`vk_*`).
@@ -97,6 +100,37 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   plus reading show()'s face vertex index from con (not rcalc). The standalone
   engine parts and precise ModPos calibration
   remain.
+- **Full playthrough runs clean end-to-end (exit 0, ~66-70 fps)** after the
+  2026-08-04 validation pass fixed: P2 `_file_addr` qword load (64-bit read
+  of a dword var scooped P1's `len`=81), P5 mirror/water 32-bit-vs-16-bit
+  index truncation (the original water samples with a 16-bit wrap - mask
+  `& 0xffff`), P5 `vk_p2_render_frame` stack-arg shift (+8) and `vodkasel`
+  truncated selector base, `_scrSel` init (boot allocates it like DEMO.AS^),
+  the VR face painter-sort (BITSORT Sort was never ported - now `pz_sort` in
+  p2draw.asm + `prep_sort` in P2/P5 init), EOS `wait_vbl` now returns the EOS
+  tick DELTA not the absolute counter (P2's local workaround macro reverted;
+  P8's sun_step clamp wraps robustly), P2 texture slots t[1]=t001 t[2..4]=t002
+  (was shifted), and Present(0) instead of vsync (two clocks had summed to
+  ~31 fps). ModPos scene table validated vs DOSBox (<=1.7 s over 4 min;
+  original plays ~5% slower - DIAMOND/SB16 rate, documented). See
+  docs/KNOWN_DIFFERENCES.md + reference/captures/.
+- **VIRTUAL viewer ported** (`VIRTUAL.exe`): `world_pack` (WORLD.PAS port)
+  repacks `data/world` byte-identically to the shipped object archive
+  (golden CTest); the exe decodes both torus objects through the real ported
+  loader (`--check` = load+exit for CI; Escape/window-close to quit).
+- **Docs:** `docs/` holds the reconstruction documentation -
+  `RECONSTRUCTION_PLAN.md` (audit/decisions/phase status), `ASSETS.md`
+  (vodka.dat format + 76-asset index map + recovery), `PORTING_NOTES.md`
+  (architecture/ABI/memory model/case studies), `BUILDING.md` (build/run/
+  test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
+  them in sync with the work.
+- **Tests:** 23 CTests (`port/build.ps1 -Config Release -Test`), sources in
+  `port/tools/validate/` (the old empty `port/tests/` was removed): 17
+  NASM-vs-C++ cross-checks + `vodka.golden_hash` + `v3d.crosscheck` (real
+  .V3D/.V3M decode via the ported loader) + `tablica3.crosscheck` (generated
+  NASM tables vs original TASM text) + `pal.integrity` + `pal.repro`
+  (OBJ-extraction reproducibility) + `build.addr32` (COFF reloc hygiene);
+  the Python ones are skipped if no interpreter is found.
 
 ## Original DOS build (reference only)
 

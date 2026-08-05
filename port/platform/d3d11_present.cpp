@@ -337,7 +337,12 @@ void presentFrame() {
 
     diagCapture(frame);          // read back GPU output before presenting
 
-    g_swap->Present(1, 0);   // vsync lock
+    // Present immediately: the demo is paced by the 70 Hz retrace emulation
+    // (waitVbl), like mode 13h on the original hardware. Vsync-locking here
+    // (Present(1)) would add a second, unrelated clock (60 Hz display) and the
+    // two waits summed to ~31 fps. Present(0) tears at worst like real VGA
+    // writes did, and the delta-driven animation keeps exact speed either way.
+    g_swap->Present(0, 0);
 }
 
 }  // namespace vk

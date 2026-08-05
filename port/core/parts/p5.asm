@@ -56,13 +56,17 @@ extern _waterWorld
 ruchow  EQU 3859
 
 ; vodka <idx>, <offvar> then allocate a selector on the file -> textury slot
+; NOTE: the selector base must be the FULL 64-bit real pointer
+; (Code32 + _file_addr + file offset). An earlier version passed
+; (Code32 + file offset) truncated to 32 bits: sel_base_table then held a
+; garbage low-32 "pointer" and tm_face faulted on the first textured face.
 %macro vodkasel 3
         mov     esi, [rel _file_addr]
         add     rsi, qword [rel Code32_addr]
         mov     eax, [rsi + (%1)*8]
         mov     r10, rax
-        add     r10, qword [rel Code32_addr]
-        mov     esi, r10d
+        add     r10, rsi                ; table_rt + file offset (full 64-bit)
+        mov     rsi, r10
         mov     edi, 0xffff
         mov     eax, EOS_ALLOCATE_SELECTOR
         call    eos_dispatch
@@ -156,6 +160,10 @@ part5:
         movzx   ebx, word [rel _scrSel]
         mov     [rel scr_selw], bx
         mov     [gs_sel], ebx
+
+        ; ---- sort scratch for the per-face painter sort (P2.AS^ SortMem) ----
+        extern prep_sort
+        call    prep_sort
 
         ; ---- waterWorld + texture selectors ----
         AllocateMemory 256*256, _waterWorld
@@ -405,8 +413,8 @@ part5:
         add     rsi, qword [rel Code32_addr]
         mov     edi, [rel _waterWorld]
         add     rdi, qword [rel Code32_addr]
-        add     esi, 32
-        add     edi, 25*256
+        add     rsi, 32                 ; 64-bit: a 32-bit add would zero the
+        add     rdi, 25*256             ; upper half of the real pointer
         mov     r12, 200
 .io01:
         mov     r13, 256
@@ -457,20 +465,25 @@ part5:
         lea     rax, [rel textury]
         mov     [rel r_tmp_tex], rax
 
-        sub     rsp, 0x20
+        ; vk_p2_render_frame(base, world, count, zet, kol, objects, textury, trace=0)
+        ; MS ABI stack args: [rsp+0x20]=kol [rsp+0x28]=objects [rsp+0x30]=textury
+        ; [rsp+0x38]=trace (the callee reads them at [rbp+0x30..0x48]).
+        ; (An earlier +8-shifted layout made the callee see trace=textury:
+        ;  it traced into the texture table instead of drawing.)
+        sub     rsp, 0x40
         mov     rax, [rel r_tmp_kol]
         mov     [rsp+0x20], rax
         mov     rax, [rel r_tmp_obj]
-        mov     [rsp+0x30], rax
+        mov     [rsp+0x28], rax
         mov     rax, [rel r_tmp_tex]
-        mov     [rsp+0x38], rax
-        mov     qword [rsp+0x40], 0
+        mov     [rsp+0x30], rax
+        mov     qword [rsp+0x38], 0
         mov     rcx, [rel Code32_addr]
         lea     rdx, [rel p5_world]
         mov     r8d, [rel p5_worldsobjects]
         lea     r9, [rel worldzet]
         call    vk_p2_render_frame
-        add     rsp, 0x20
+        add     rsp, 0x40
 
         call    drawWaterP5
         call    calculateWaterP5

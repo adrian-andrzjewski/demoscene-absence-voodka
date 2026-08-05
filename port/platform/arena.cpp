@@ -30,21 +30,19 @@ bool     g_arenaReady = false;
 std::vector<uint8_t> g_archive;
 
 bool loadArchive() {
-    // search order: exe dir /data/vodka.dat, then port/data/vodka.dat
+    // search order: exe dir data/vodka.dat, exe dir vodka.dat, dev-tree copy
     wchar_t exePath[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, exePath, MAX_PATH);
     std::wstring dir(exePath);
     auto slash = dir.find_last_of(L"\\/");
     if (slash != std::wstring::npos) dir = dir.substr(0, slash + 1);
 
-    const wchar_t* candidates[] = {
-        (dir + L"data\\vodka.dat").c_str(),   // runtime next to exe
-    };
-    // build stable candidates
     std::vector<std::wstring> c2;
     c2.push_back(dir + L"data\\vodka.dat");
     c2.push_back(dir + L"vodka.dat");
-    c2.push_back(L"D:\\Project\\voodka2\\port\\data\\vodka.dat");  // dev fallback
+    // dev-tree fallback (configure-time repo root; ASCII-safe widening)
+    std::wstring dev(VOODKA_REPO_ROOT, VOODKA_REPO_ROOT + strlen(VOODKA_REPO_ROOT));
+    c2.push_back(dev + L"/port/data/vodka.dat");
 
     for (auto& c : c2) {
         HANDLE h = CreateFileW(c.c_str(), GENERIC_READ, FILE_SHARE_READ, nullptr,

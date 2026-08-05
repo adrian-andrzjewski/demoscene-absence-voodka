@@ -1,0 +1,87 @@
+# Reconstruction plan & decision log
+
+Status snapshot: 2026-08-04. This document records the audit, the decisions
+taken, and the remaining work. Per-topic depth lives in `ASSETS.md`,
+`PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
+
+## 1. Audit conclusions (what the repository contains)
+
+- **Original source** (`demoscene-absence-voodka-master/`, byte-identical to
+  `reference/source/`): complete TASM 4.0 source for the demo
+  (`CODE/DEMO.AS^` -> `part1..part8`), shared includes (`CODE/INC/`), mesh
+  data (`CODE/DATAS/`), art sources (`CODE/FLI/`), camera-path compiler
+  (`CODE/COMS/`), the data packer (`CODE/LINKER/`), and the standalone VR
+  viewer (`VIRTUAL/`).
+- **Binary-only dependencies, sources absent:** EOS 2.07 kernel
+  (`KERNEL/EOS/EOSLITE/DEBUG.OBJ` from `..\EOS207\`), the DIAMOND MOD player
+  (`DIAMOND.OBJ`), `EOS.INC`, `macro.inc`, `sinus.inc`, and six compile-time
+  `.pal` includes. A from-scratch TASM rebuild of the original is therefore
+  impossible without reconstruction; the port replaces each piece
+  (`eos_replace/`, libxmp, generated sine tables, OBJ-recovered palettes).
+- **Assets:** all 76 runtime files exist in `CODE/LINKER/DANE/` and pack
+  into `vodka.dat` (see `ASSETS.md` for the full index map). The release
+  embeds the archive inside `VOODKA.EXE` (no external data file).
+- **Hardware surface:** BIOS mode 13h + VGA DAC/retrace (`INC/PAL`,
+  `VIDEO.PM`), DOS `int 21h` file I/O (`INC/FILE`), raw port-60h keyboard
+  (`KEYS.!`), PIT/SB/GUS inside the EOS kernel + DIAMOND. Everything else
+  goes through EOS services - which is why a service-level replacement
+  (`eos_dispatch.asm`) was the right seam.
+
+## 2. Decisions (locked 2026-08-04)
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Core language | **Keep the faithful NASM x64 core**; C++ references in the cross-check tests are the portable fallback | ~50 commits of validated work; byte-exact tests; zero regression risk. A full C++ retranslation was explicitly declined. |
+| Platform layer | Custom Win32 + D3D11 + WASAPI (no SDL) | Already complete and dependency-free; the brief allows this ("unless the repository already suggests a more suitable architecture"). |
+| VIRTUAL viewer | **Port at the end**, as a bonus exe | Not linked into the demo, not part of the shipped production; its VR engine is already ported (P2/P5/P8 reuse it). |
+| Reference validation | **Scene-level DOSBox comparison + ModPos calibration** | Frame-exact automated diffing is unrealistic across different MOD players and timing bases; tolerance documented instead. |
+| Original files | Untouched (archival) | Cleanup limited to the port's own debris. |
+
+## 3. Phase status
+
+- [x] **Phase 0 - port the demo** (pre-existing): platform layer, EOS
+  replacement, engine + all 8 parts in NASM x64, asset pipeline
+  (`vodka_pack` byte-identical; palettes recovered), 17 cross-check tests.
+- [x] **Phase 1 - housekeeping & relocatability**: stale cdb debris removed;
+  duplicate `p8.asm` fixed; `enable_testing()` ordering; stale comments;
+  empty `port/tests/` removed; `D:\Project\voodka2` hardcoding replaced by
+  script/configure-time paths (`VOODKA_REPO_ROOT`); `--music` override;
+  `bin/<Config>` self-contained (post-build staging of vodka.dat + module);
+  18/18 tests green; `--audiocheck` passes from the staged dir.
+- [x] **Phase 2 - documentation**: this file, `ASSETS.md`,
+  `PORTING_NOTES.md`, `BUILDING.md`, root `README.md`.
+- [x] **Phase 3 - DOSBox reference validation**: release runs clean under
+  DOSBox 0.74-3 (251 timed screenshots + video; tooling in
+  `reference/dosbox/`); all 8 transitions match the port's scene table within
+  +/-1.7 s over 4 min; ModPos encoding confirmed; original playback rate
+  measured at ~0.95x libxmp (documented); `docs/KNOWN_DIFFERENCES.md` +
+  `reference/captures/` written. The validation pass found and fixed 10 port
+  bugs (see KNOWN_DIFFERENCES "Fixed divergences"), ending with a clean full
+  playthrough (exit 0, all 8 parts, ~66-70 fps).
+- [x] **Phase 4 - test additions**: `v3d.crosscheck` (real .V3D/.V3M decode
+  via the ported loader), `tablica3.crosscheck` (generated NASM tables vs
+  original TASM text), `pal.integrity` + `pal.repro` (OBJ-extraction
+  reproducibility; the extract_pals metal/v_txr1/proc offsets were verified
+  against P4/P8.OBJ and corrected), `build.addr32` (COFF reloc hygiene as a
+  CTest). A `--record` determinism test was considered and dropped: the demo
+  is content-deterministic but the audio/video clock sampling phase is not
+  (one-frame jitter at scene edges is expected, not a bug).
+- [x] **Phase 5 - VIRTUAL viewer port**: `world_pack` (WORLD.PAS port) packs
+  `data/world` byte-identically to the shipped archive (golden test);
+  `VIRTUAL.exe` loads it and decodes every object through the real ported
+  loader (`--check` for CTest, Escape to quit).
+- [x] **Phase 6 - final polish**: dist recipe in BUILDING.md, docs synced,
+  full playthrough + 25-test suite green.
+
+## 4. Open questions / known approximations
+
+- **ModPos calibration** (Phase 3): `kPartStartModPos` is derived from the
+  parts' own exit thresholds; exact order/row at each scene transition in
+  the *original* (DIAMOND player) may differ by a row - to be measured.
+- **14-channel module**: unusual (FastTracker 14CH per libxmp). DIAMOND was
+  a custom player; any playback nuance differences go to
+  `KNOWN_DIFFERENCES.md`.
+- **`t002.dat` (40,896 B) and the odd-sized `.INC` blobs**: exact dimensions
+  are inferred from consumers, not from headers - flagged in `ASSETS.md`.
+- **P5 `vodka 45` (1-byte `voodka.dat`)**: loaded but effectively unused;
+  behavior preserved as-is.

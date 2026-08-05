@@ -27,17 +27,12 @@ DEFAULT REL
 %include "vodka.inc"
 %include "water.inc"
 
-; WaitVbl + compute ramki as the per-frame retrace delta (mirror of the
-; original EOS wait_vbl, which returned ticks since the last call ~= 1).
-; WITHOUT this, ramki was the absolute 70Hz counter (getFrameCounter), so
-; sloneczko/trasa/water advanced by ramki>>2 ~ hundreds per frame.
+; WaitVbl + store ramki. EOS wait_vbl returns the per-frame retrace DELTA
+; (~1); the port's eos_dispatch does the same (bridge vk_wait_vbl computes
+; the delta), so no local last_vbl bookkeeping is needed here anymore.
 %macro WaitVblDelta 0
-        mov     eax, EOS_WAIT_VBL
-        call    eos_dispatch            ; eax = absolute 70Hz frame counter
-        mov     ecx, eax
-        sub     ecx, [rel last_vbl]     ; delta since last vbl (~1)
-        mov     [rel ramki], ecx
-        mov     [rel last_vbl], eax
+        WaitVbl
+        mov     [rel ramki], eax
 %endmacro
 
 extern _screen
@@ -160,6 +155,10 @@ part2:
         movzx   edx, ax
         mov     [rel gs_sel], edx
 
+        ; ---- sort scratch for the per-face painter sort (P2.AS^ SortMem) ----
+        extern prep_sort
+        call    prep_sort
+
         ; ---- allocate waterWorld (256*256) + its selector into textury[0] ----
         AllocateMemory 256*256, waterWorld
         mov     eax, EOS_ALLOCATE_SELECTOR
@@ -170,11 +169,16 @@ part2:
         movzx   edx, ax
         mov     word [rel textury+0], dx       ; t[0] = waterWorld (unused as texture)
 
-        ; ---- real wall textures (reference CODE/PART2): t[1]=obrazek(0),
-        ;      t[2]=t001(1), t[3]=t002(2), t[4]=t002(2), t[5]=env(3);
-        ;      world types 1,2,4,5 use these ----
+        ; ---- wall textures (reference CODE/PART2): t[1]=t001(1),
+        ;      t[2..4]=t002(2), t[5]=env(3); world types 1,2,5 use these ----
+        ;      (an earlier version shifted t[1]/t[2] to obrazek/t001 - the
+        ;      floor then showed the gold obrazek noise instead of t001)
         %macro texsel_from_vodka 2       ; %1=vka idx, %2=textury word slot
-        mov     rsi, [rel _file_addr]
+        ; NOTE: _file_addr is a DWORD (globals.asm resd). A 64-bit load also
+        ; scoops the following dword (`len`, which P1 sets to 81), so after
+        ; P1 runs rsi becomes garbage (0x51_00040000) and the table deref
+        ; crashes. Keep this a 32-bit load (zero-extends cleanly).
+        mov     esi, [rel _file_addr]
         add     rsi, qword [rel Code32_addr]
         mov     r10, rsi                ; archive offset-table real ptr
         mov     eax, [r10 + (%1)*8]     ; file offset (relative to the table)
@@ -187,8 +191,8 @@ part2:
         movzx   edx, ax
         mov     word [rel %2], dx
         %endmacro
-        texsel_from_vodka 0, textury+2
-        texsel_from_vodka 1, textury+4
+        texsel_from_vodka 1, textury+2
+        texsel_from_vodka 2, textury+4
         texsel_from_vodka 2, textury+6
         texsel_from_vodka 2, textury+8
         texsel_from_vodka 3, textury+10
@@ -246,11 +250,8 @@ part2:
         mov     dword [rel trasa_ruch], 0
         mov     dword [rel ileFadow], 0
 
-        ; ---- prime last_vbl to the current frame counter so the first
-        ; WaitVblDelta computes a real per-vbl delta (~1), not a giant one. ----
-        mov     eax, EOS_WAIT_VBL
-        call    eos_dispatch
-        mov     [rel last_vbl], eax
+        ; (eos_dispatch WAIT_VBL returns the per-frame delta, matching the
+        ; original EOS; no last_vbl priming needed here anymore)
 
         ; ---- world palette (2WORLD.PAL) for the stadium; P1 hands off with a
         ; full-white palette (see p1.asm .virtual), so P2 fades into _pal below.

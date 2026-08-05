@@ -7,9 +7,10 @@ linker C4049/LNK2017 rejects, or worse silently truncates a high-VA address.
 The build hygiene standard (AGENTS.md) is: 0 ADDR32 relocations in every core
 object (esp. p8.obj, which must be confirmed on every build).
 
-Usage: python audit_addr32.py <obj...>
+Usage: python audit_addr32.py <obj-or-dir...>
+Directories are globbed recursively for *.obj. Exits 1 if any ADDR32 found.
 """
-import struct, sys, os
+import struct, sys, os, glob
 
 # IMAGE_REL_AMD64 types (note: ADDR32 = 2, ADDR64 = 1, REL32 = 4)
 IMAGE_REL_AMD64_ADDR32 = 0x0002
@@ -62,7 +63,13 @@ def parse(path):
 
 def main(argv):
     tot = 0
-    for path in argv:
+    paths = []
+    for a in argv:
+        if os.path.isdir(a):
+            paths.extend(sorted(glob.glob(os.path.join(a, '**', '*.obj'), recursive=True)))
+        else:
+            paths.append(a)
+    for path in paths:
         if not os.path.exists(path):
             print("MISSING", path); continue
         secs, bad = parse(path)
@@ -76,6 +83,7 @@ def main(argv):
             tot += 1
             print("    section=%-8s va=0x%-4x -> %s (symsec=%d)" % (sec, va, nm, tsec))
     print("TOTAL ADDR32 relocations: %d" % tot)
+    sys.exit(1 if tot else 0)
 
 if __name__ == '__main__':
     main(sys.argv[1:])
