@@ -85,8 +85,9 @@ all fixed and verified by frame recording (`--record` + palette/pixel diff):
     and the 64-step `pic_lo` fade + `brum` flashes ran, but no
     `vk_present_frame` occurred between the last 3D frame (~0x1200) and P5's
     first frame (~0x1400). Presents were added (v_sync-paced fade steps,
-    flash loop, wait loop) and verified before **P4 was removed from the
-    port (2026-08-06)** - the same present fix lives on in P8's outro.
+    flash loop, wait loop) and verified (P4 was briefly removed and restored
+    2026-08-06 with these presents intact) - the same fix lives on in P8's
+    outro.
 14. **P8 end screen was never presented.** Same class: the 3-slice last.dat
     reveal + `lopa`/`hopla` fades only touched the DAC/VGA memory in the
     original. Presents added (fades v_sync-paced, matching the original's
@@ -110,7 +111,7 @@ all fixed and verified by frame recording (`--record` + palette/pixel diff):
     the VGA DAC's analog output implements.
 19. **`--part 5` seeked 2 orders early** (`kPartStartModPos[4]` was 0x1200 =
     P4's outro start; P4 exited at >= 0x1400). Fixed to 0x1400; progress.cpp
-    gained the missing "P4 tull outro" scene row (both now removed with P4).
+    gained the missing "P4 tull outro" scene row (kept with P4's restore).
 20. **P6 exit compared a dword at the word var `ModPos`** (worked only
     because the adjacent `framebuffer_off` low word is 0). Now a word
     compare.
@@ -232,7 +233,7 @@ vs `bialy` substitutions below, now fixed:
   byte-identical from P8.OBJ 0x821 and P4.OBJ 0xdb2; the port copy (P8's) was
   updated and the extracter offset/assert fixed, so `pal.repro` regenerates
   the same data; the torus now shows the original's metallic gradient
-  shading. (P4's copy was removed with P4.)
+  shading. (P4's copy of metal.pal is back with P4.)
 - **Sine table variant**: `INC/SIN` is `round(32766*sin(2pi*i/1023))` (a
   1023-interval table, hex-verified); the port generates a true 1024-step
   `round(32767*sin(2pi*i/1024))`. Max deviation 201 Q15 units (~0.6%); the

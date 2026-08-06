@@ -47,8 +47,9 @@ paths, water/bump data, MOD, presentation conversion) see
 - **There is NO module `.data`/`.bss` capacity limit.** Combined module data
   is ~40 KB and rip-relative `[rel X]` reaches any image offset. The early
   "arena migration" belief was a misdiagnosis - see the P4 case study below.
-  (P4 itself was removed from the port on 2026-08-06; the case studies are
-  kept because the ABI/register lessons generalize.)
+  (P4 itself was removed from the port on 2026-08-06 and restored the same
+  day; the case studies are kept because the ABI/register lessons
+  generalize.)
 
 ## ABI rule (critical, #1 crash source)
 

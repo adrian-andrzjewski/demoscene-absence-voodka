@@ -161,7 +161,7 @@ These were `INCLUDE`d / `incbin`'d into the part .OBJs at assembly time:
 | `rm_eye.pal` (768 B) | P1 | missing from repo; recovered from `P1.OBJ` |
 | `jup.pal` | P3 | missing; recovered from `P3.OBJ` LEDATA |
 | `tn.pal` (16 colors) | P3 | ASCII `CODE/P3/TN.PAL` survives in-tree (60 values = 16 colors + 4 black; only 48 read) and matches the `P3.OBJ` recovery byte-for-byte |
-| `sw.pal`, `v_txr1.pal`, `proc.pal`, `metal.pal` | P4 | missing; recovered from `P4.OBJ` LEDATA |
+| `sw.pal`, `v_txr1.pal`, `proc.pal`, `metal.pal` | P4 | missing; recovered from `P4.OBJ` (sw/metal byte-identical to the P8 files; v_txr1 = 16 grays + 6 black, proc = 33 warm colors, verified against the textures' pixel ranges) |
 | `sw.pal`, `metal.pal` | P8 | missing; recovered from `P8.OBJ` (cross-checked vs P4) |
 | `macro.inc` | P1/P3/P4/P8 | missing; semantics reconstructed in the port |
 | `sinus.inc` | DEMO.AS^ | missing; regenerated as `core/inc/sin_tables.asm` by the `sin_tables` tool |

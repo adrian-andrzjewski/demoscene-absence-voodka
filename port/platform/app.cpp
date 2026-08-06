@@ -253,8 +253,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
             0x0000,  // part 1
             0x0400,  // part 2
             0x0B40,  // part 3
-            0x0D40,  // part 4 (removed from the modernized build 2026-08-06;
-                     //  row kept so --part 5..8 indices stay stable)
+            0x0D40,  // part 4 (restored 2026-08-06)
             0x1400,  // part 5
             0x1B40,  // part 6
             0x1C40,  // part 7
@@ -271,10 +270,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         } else if ((v = numAfter("--order")) >= 0) {
             uint32_t reached = vk::audioSeekOrder((int)v);
             vk::logPrint("[app] seek --order %ld -> reached ModPos %u\n", v, reached);
-        } else if ((v = numAfter("--part")) == 4) {
-            vk::logPrint("[app] --part 4 rejected: P4 was removed from the "
-                         "modernized build (seek --part 3/5 or --modpos 0x1400)\n");
-        } else if (v >= 1 && v <= 8) {
+        } else if ((v = numAfter("--part")) >= 1 && v <= 8) {
             uint32_t reached = vk::audioSeekRows(kPartStartModPos[v - 1]);
             vk::logPrint("[app] seek --part %ld -> ModPos 0x%x reached %u\n", v,
                          kPartStartModPos[v - 1], reached);

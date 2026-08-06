@@ -79,11 +79,14 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   arithmetic (see `p6.asm`, `water.inc`).
 - **Status:** platform layer, EOS-replacement ABI, and parts P6 (2D bump map)
   and P7 (7-phase water, 160x100->320x200 upscale) run end-to-end at
-  69.9 fps with audio and per-frame recording. **P4 was removed from the
-  modernized build (2026-08-06)**: `port/core/parts/p4.asm` and its tables
-  are deleted, `--part 4` is rejected (its ModPos seek row stays so `--part
-  5..8` indices are stable), and the full sequence holds the last P3 frame
-  until ModPos 0x1400 so P5+ keep their calibrated timeline. P1-P3 are
+  69.9 fps with audio and per-frame recording. **P4 is ported and wired
+  (2026-08-06)**: `port/core/parts/p4.asm` (multi-object 3D viewer with its
+  own `face` rasterizer, ob/ca Euler matrices, 2951-key camera path from
+  vodka 74, logo overlay, tull picture outro) runs `--part 4` (seek 0x0D40)
+  and the full sequence P1-P8 end to end, exit 0, frame-recorded. The
+  missing `v_txr1.pal`/`proc.pal` were recovered byte-identical from
+  `P4.OBJ` (16 grays + 6 black; 33 warm colors - verified against the
+  textures' pixel ranges). P1-P3 are
   ported and wired; part P5 (`--part 5`, the
   morphing-torus-over-water VR scene) is now ported and wired into boot.asm
   (+ core CMake) and runs crash-free: it reuses the P2 VR layer

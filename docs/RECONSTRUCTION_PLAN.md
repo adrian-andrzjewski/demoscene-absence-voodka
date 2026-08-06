@@ -1,7 +1,7 @@
 # Reconstruction plan & decision log
 
 Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). Updated
-2026-08-06: P4 removed from the modernized build (see Phase 3 note). This
+2026-08-06: P4 removed, then restored (see Phase 3 note). This
 document records the audit, the decisions taken, and the remaining work.
 Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
 `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
@@ -60,10 +60,12 @@ Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
   `reference/captures/` written. The validation pass found and fixed 10 port
   bugs (see KNOWN_DIFFERENCES "Fixed divergences"), ending with a clean full
   playthrough (exit 0, all 8 parts, ~66-70 fps). **P4 was removed from the
-  port on 2026-08-06** (per the maintainer): `port/core/parts/p4.asm` and
-  its tables are gone, `--part 4` is rejected, and the sequence runs P1-P3,
-  then holds the last frame while pumping `wait_vbl` until ModPos 0x1400
-  (its audio window), then P5-P8.
+  port on 2026-08-06 and restored the same day**: `port/core/parts/p4.asm`
+  (full NASM x64 port with the custom `face` rasterizer, ob/ca Euler
+  matrices, 2951-key camera path, logo overlay, tull outro) is back,
+  `--part 4` seeks to 0x0D40 again, and the sequence runs P1-P8 end to end
+  (exit 0, ~66-70 fps, frame-recorded; v_txr1.pal + proc.pal recovered
+  byte-identical from P4.OBJ).
 - [x] **Phase 4 - test additions**: `v3d.crosscheck` (real .V3D/.V3M decode
   via the ported loader), `tablica3.crosscheck` (generated NASM tables vs
   original TASM text), `pal.integrity` + `pal.repro` (OBJ-extraction
