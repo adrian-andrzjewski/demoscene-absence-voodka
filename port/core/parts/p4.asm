@@ -4,9 +4,9 @@
 ; 567-vertex model space. Per-face texture mapping over 4 textures (sw.inc,
 ; v_txr1.inc, proc.inc, metal.inc) with three mapping modes (plane-pkt,
 ; phong-n_rot, standard-pos), its OWN textured-triangle rasterizer (face),
-; Euler-angle object (ob1..9) + camera (ca1..9) rotation matrices, a 2951-key
-; camera path (vodka 74 -> trasa.dat), a scrolling logo overlay and a
-; picture + flash outro.
+; Euler-angle object (ob1..9) + camera (ca1..9) rotation matrices, a 2,964-key
+; camera path (vodka 74 -> trasa.dat; swing-clamp ruchow=2,951), a scrolling
+; logo overlay and a picture + flash outro.
 ;
 ; Memory model: stored dwords are arena offsets; deref via `add r, Code32_addr`.
 ; The 567-vertex model block (shape[222] + src1[81] + src2[8] + src3[256],

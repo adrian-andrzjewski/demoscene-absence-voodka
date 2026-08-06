@@ -7,8 +7,11 @@ Companion docs: `ASSETS.md` (the 76-entry index map + recovery),
 
 Everything below was reverse-engineered from the original sources
 (`demoscene-absence-voodka-master/`, cited as `CODE/...`) and hex-verified
-against the shipped data files. Port behavior was verified by the 25-CTest
-suite plus frame-recorded runtime checks (2026-08-05).
+against the shipped data files. Port behavior was verified by the 26-CTest
+suite plus frame-recorded runtime checks (2026-08-05). Documentation audit
+2026-08-06: added the full DATAS compile-time spec (§4.5), source-art-pipeline
+section (§9), resolved every inferred texture dimension, and corrected the
+camera-path text-source mapping and P2 widoki entry count (§4.6).
 
 ---
 
@@ -175,17 +178,17 @@ convention (index 0, or 0x60 for P3's sun), never a file property.
 |--:|---|--:|---|---|
 | 0 | `obrazek.dat` | 16384 | 128×128 | P2 (`PART2:2` → `_obrazek`); **dead load** in the shipped P2 (the port's P2 no longer loads it at all — its earlier water reuse was wrong) |
 | 1 | `t001.dat` | 32768 | **256×128** | P2 `textury[1]` (mapper stride is 256 → wide, not tall) |
-| 2 | `t002.dat` | 40896 | 256×~128 content | P2 `textury[2..4]`; **no header** (first/last bytes zero; content rows 0..127; 40896 = 256×159.75 — an unpadded export) |
+| 2 | `t002.dat` | 40896 | **256-wide, 160-row export** (159 full 256-B rows + a 192-B partial row) | P2 `textury[2..4]`; **no header** (first/last bytes zero; non-zero content rows 0..127; 40896 = 256×159.75 — an unpadded exporter truncation of a 160-row image; the mapper's 256-stride wrap makes the odd size harmless) |
 | 3 | `env.dat` | 65536 | 256×256 | P2 `textury[5]` env map (phong UV from normals) |
 | 4 | `_rm.inc` | 51200 | **256×200** | P1 head texture; P1 sets the selector limit to 256·200 (`P1.ASM:183-188`) — direct evidence |
 | 5-8 | `_logo1-4.inc` | 5880/9702/6300/6804 | 140×42 / 231×42 / 150×42 / 162×42 | P1 text overlays; index-0 transparent; biased `+240` into the palette top (dims from `logo_tab`, `P1.ASM:85-107`; sizes divide exactly) |
 | 9-11 | `_wlk1-3.dat` | 64000 ×3 | 320×200 | P1 "znika" dissolve masks (per-pixel threshold vs level) |
 | 17 | `absence.dat` | 64000 | 320×200 | P2 water refraction source (sampled from row 60) |
 | 19 | `water.abc` | 64000 | 320×200 | P2 water backdrop (re-copied to `_screen` every frame) |
-| 20 | `jup.inc` | 38912 | **256×152** | P3 face texture (UV from vertex pos +128/+96); **added** to the lgmap sample |
+| 20 | `jup.inc` | 38912 | **256×152** (38912/256 = 152 exact — confirmed by the P3 256-stride sample) | P3 face texture (UV from vertex pos +128/+96); **added** to the lgmap sample |
 | 21 | `lgmap.inc` | 51200 | 256×200 | P3 light map (UV from normals); pre-shifted `shl al,4` per texel at load |
 | 22 | `4toonel.dat` | 65536 | 256×256 | P3 tunnel texture; every texel += 240 at load (into `tn.pal`) |
-| 24 | `sw.inc` | 44032 | **256×172** | P4 `map1`, P8 `map1`; shade offset `add al,cl` per texel |
+| 24 | `sw.inc` | 44032 | **256×172** (44032/256 = 172 exact) | P4 `map1`, P8 `map1`; shade offset `add al,cl` per texel |
 | 25-27 | `v_txr1/proc/metal.inc` | 51200 | 256×200 | P4 `map2..4`; metal also P8 `map2` (phong) |
 | 28 | `logo_a.dat` | 48000 | **15 frames × 64×50** | P4 `show_logo` anim (not "240×200" — 15·3200 = 48000 exactly) |
 | 29 | `tull.inc` | 64000 | 320×200 | P4 outro picture |
@@ -193,14 +196,14 @@ convention (index 0, or 0x60 for P3's sun), never a file property.
 | 38-40 | `2ENV/2T001/2T002.DAT` | 65536/32768/32768 | 256×256 / 256×128 / 256×128 | P5 `textury[3]` env, `[1]`, `[2]` |
 | 41-44 | `w1-w4.dat` | 64000 ×4 | 320×200 | P5 intro overlays (full-screen copies) |
 | 45 | `voodka.dat` | 1 | — | placeholder; its P5 drawer is dead code |
-| 46-49 | `h1-h4.dat` | 14976 ×4 | **156×96** | per P5's (dead) `voodka2:` blitter (96 rows × 156 cols, index-0 skip); loaded but never drawn. 128×117 also multiplies to 14976, but the only consumer code says 156×96 |
+| 46-49 | `h1-h4.dat` | 14976 ×4 | **156×96** (14976/96 = 156 exact — confirmed by the dead `voodka2:` blitter: 96 rows × 156 cols) | per P5's (dead) `voodka2:` blitter (96 rows × 156 cols, index-0 skip); loaded but never drawn. 128×117 also multiplies to 14976, but the only consumer code says 156×96 |
 | 50 | `death.dat` | 64000 | 320×200 | P6 bump **height field** |
 | 52 | `mapa.dat` | 16384 | 128×128 | P6 bump **lighting LUT** (values 0..119) — not a height map |
 | 53 | `jaszczur.dat` | 64000 | 320×200 | P6 overlay mask (nonzero ⇒ shade += 128) |
 | 54-67 | P7 phase pics | 16000 ×7 | 160×100 | overlays; **0 = transparent** over `woda.dat` |
 | 55-67 | P7 phase data | 32000 ×7 | **160×100 int16** | initial wave-field states (one plane each; measured range −515..0) |
 | 68 | `woda.dat` | 16000 | 160×100 | P7 base water pic |
-| 71 | `last.dat` | 63680 | **320×199** | P8 end pic, revealed in strips 100+60+39 rows |
+| 71 | `last.dat` | 63680 | **320×199** (63680/320 = 199 exact) | P8 end pic, revealed in strips 100+60+39 rows |
 | 72 | `2world.inc` | 77824 | **19 frames × 64×64** | P5 sun sprite anim |
 | 73 | `log.inc` | 77824 | 19 × 64×64 | P8 sun sprite anim (same size/extents as 72 — same sequence) |
 
@@ -283,32 +286,127 @@ misnamed extension (matches P5/WORLD record 0 byte-for-byte).
 12 and 5680). Port `world_pack` reproduces it byte-identically (golden CTest);
 `VIRTUAL.exe --check` decodes both torus objects through the real loader.
 
-### 4.5 `CODE/DATAS` compile-time meshes
+### 4.5 `CODE/DATAS` compile-time meshes (full spec)
 
-Text includes of 16-bit words: `*_S.INC` = `;Vertices: N` + N rows
-`dw x,y,z` (6 B/vertex); `*_C.INC` = `;Faces: M` + M rows `dw i0,i1,i2`.
-Access stride `shape[ebp*2+ebp]` = index×3 words. P1 = shape3/constr3
-(602 v/1156 f); P3 = log_s/log_c (341/646); P4 = vws_1..4 + vwc_1..4
-(morph targets + zero buffers); P8 = sw_s/c, ob_s/c sets. P4/P8 also build
-`con2` tables with pre-doubled indices (byte offsets for `rcalc[ebx*2]` —
-the stride the port initially got wrong, see KNOWN_DIFFERENCES).
+Assembly-time **text** includes consumed by P1/P3/P4/P8 — not binary blobs.
+TASM `INCLUDE`s the text and assembles the rows into raw word tables inside
+the part OBJ. The `;Vertices:`/`;Faces:` line is a comment and is stripped;
+the emitted bytes are pure 16-bit words.
+
+**Vertex tables `*_S.INC`:** header comment `;Vertices: N`, then **N rows of
+`dw x,y,z`** → **6 B/vertex** assembled. Coordinates are signed 16-bit in
+object-space units (P1's torus spans ≈ −1200..+1150; a few thousand max).
+
+**Face tables `*_C.INC`:** header comment `;Faces: M`, then **M rows of
+`dw i0,i1,i2`** → **6 B/face**; 0-based vertex indices into the matching
+`*_S` table. Winding is CCW for front-facing.
+
+**Consumption:** rows are addressed as `shape[ebp*2+ebp]` = vertex index×3
+words (×6 B). The `prepare` routine doubles each face index into **byte
+offsets** for the `con2` table (stride ×2), which `rotate`/`show` consume
+against `rcalc[ebx*2]` — the byte stride the port initially got wrong (see
+KNOWN_DIFFERENCES).
+
+**P4 morph:** `shape` = vws_1 (222 v); `src1/2/3` = vws_2/3/4 (81/8/256 v)
+with zero-filled interpolation buffers `s1/s2/s3`
+(`dw NN*3 dup (0)`); per frame the morph lerps src→shape across the three
+pairs. Faces: `con1` = vwc_1 (440), `c1/c2/c3` = vwc_2/3/4 (158/12/384).
+Ported to `p4_vws_1..4.inc` / `p4_vwc_1..4.inc`.
+
+**P8 morph:** `shape` = sw_s_1 (40 v), `s2` = sw_s_2 (33 v), sources
+`src3/4/5` = ob_s_1/2/3 (114/128/128 v); the same ob_s files are re-included
+as buffers `s3/s4/s5`, and `s6` re-includes sw_s_1 (each `INCLUDE` emits its
+own copy). Faces: `con1` = sw_c_1 (40), `c2` = sw_c_2 (48), `c3/c4/c5` =
+ob_c_1/2/3 (224/256/256), `c6` = sw_c_1 again. Ported to `p8_sw_*.inc` /
+`p8_ob_*.inc`.
+
+**Complete DATAS inventory** (counts verified equal to the `;Vertices/Faces:`
+header AND the actual `dw` row count in every file):
+
+| File | Kind | Count | Consumer |
+|---|---|--:|---|
+| `SHAPE3.INC` | V | 602 | P1 `shape` |
+| `CONSTR3.INC` | F | 1156 | P1 `con` |
+| `LOG_S.INC` | V | 341 | P3 `shape` |
+| `LOG_C.INC` | F | 646 | P3 `con` |
+| `VWS_1.INC` | V | 222 | P4 `shape` |
+| `VWS_2.INC` | V | 81 | P4 `src1` / `s1` |
+| `VWS_3.INC` | V | 8 | P4 `src2` / `s2` |
+| `VWS_4.INC` | V | 256 | P4 `src3` / `s3` |
+| `VWC_1.INC` | F | 440 | P4 `con1` |
+| `VWC_2.INC` | F | 158 | P4 `c1` |
+| `VWC_3.INC` | F | 12 | P4 `c2` |
+| `VWC_4.INC` | F | 384 | P4 `c3` |
+| `SW_S_1.INC` | V | 40 | P8 `shape` / `s6` |
+| `SW_S_2.INC` | V | 33 | P8 `s2` |
+| `SW_S_3.INC` | V | 40 | **orphan** |
+| `SW_S_4.INC` | V | 40 | **orphan** |
+| `SW_C_1.INC` | F | 40 | P8 `con1` / `c6` |
+| `SW_C_2.INC` | F | 48 | P8 `c2` |
+| `SW_C_3.INC` | F | 40 | **orphan** |
+| `SW_C_4.INC` | F | 40 | **orphan** |
+| `OB_S_1.INC` | V | 114 | P8 `src3` / `s3` |
+| `OB_S_2.INC` | V | 128 | P8 `src4` / `s4` |
+| `OB_S_3.INC` | V | 128 | P8 `src5` / `s5` |
+| `OB_C_1.INC` | F | 224 | P8 `c3` |
+| `OB_C_2.INC` | F | 256 | P8 `c4` |
+| `OB_C_3.INC` | F | 256 | P8 `c5` |
+| `SHAPE.INC` | V | 434 | **orphan** |
+| `CONSTR.INC` | F | 820 | **orphan** |
+| `TOR_S.INC` | V | 384 | **orphan** |
+| `TOR_C.INC` | F | 768 | **orphan** |
+| `CND.INC` | F | 516 | **orphan** |
+| `SHD.INC` | V | 270 | **orphan** |
+
+**Orphans (10, not 6):** `SHAPE.INC`, `CONSTR.INC`, `TOR_S.INC`, `TOR_C.INC`,
+`CND.INC`, `SHD.INC`, `SW_S_3/4.INC`, `SW_C_3/4.INC` are **referenced by no
+current source** — verified by grep of the entire tree (working copy +
+reference mirror); nothing else references them. CND/SHD (516 f/270 v) and
+TOR (768 f/384 v) look like earlier, coarser iterations of the P1/P4 torus
+families. Document them as development artifacts from earlier iterations, not
+consumed by the shipped demo link (`CODE/M.BAT`). Earlier notes claiming
+"six orphaned includes" missed the four `SW_*_3/4` pairs.
+
+**Port status:** the 22 consumed files are ported as NASM includes under
+`port/core/parts/` (`p1_shape/p1_con`, `log_s/log_c`, `p4_vws_1..4`/`p4_vwc_1..4`,
+`p8_sw_s_1..2`/`p8_sw_c_1..2`, `p8_ob_s_1..3`/`p8_ob_c_1..3`); the orphans
+are not ported. `p2draw.crosscheck` and the engine selftests validate the
+rotation/render pipeline consuming them.
 
 ### 4.6 Camera paths
 
+Text sources and their compiled binary node arrays.
+
 - **Binary, P4/P8** (`trasa.dat` idx 74, `tr2.dat` idx 75): **36 bytes/node
   = 9 dwords** — (o_x,o_y,o_z) full dwords, (r_x,r_y,r_z) and (cm_x,cm_y,cm_z)
-  word-truncated on read; 2,964 / 2,508 nodes (sizes divide exactly; node 0
-  hex-verified against the text sources `P4/TRASA.DAT`, `COMS/TRASA.DAT` via
-  `MALE.ASM`+`tlink /t`). The path **ping-pongs** (`mnoznik` ±1, clamped at
-  0/`ruchow`), advanced `frames*2*mnoznik` nodes/frame. No interpolation.
-- **Text, P2/P5** (`P2/TRASA.!` 2,964 rows, `P5/TRASA.!` 3,859 rows):
-  **24 B/node = 6 dwords** (CameraX/Y/Z, EyeAx/Ay/Az), included at assembly
-  time; `trasa_ruch × 24`, advanced by `ramki`, P5 wraps at `ruchow-2`.
-- **P2 widoki** (scripted still cameras): 28-B entries, 7 dwords
-  (x,y,z,ax,ay,az,flashFlag); active when `ModPos > 0x63f`, indexed
-  `ModPos & 0x3f` (49 entries → benign over-read in the original, preserved).
-- Ports: `core/data/p2trasa.inc`, `p2widoki.inc`, `parts/p5_trasa.inc`
-  verbatim; `p2path.crosscheck` validates the camera switch logic.
+  word-truncated on read; **2,964 / 2,508 nodes** (sizes divide exactly:
+  106,704 / 90,288 B). Compiled from text by `CODE/COMS/MALE.ASM` — a 4-line
+  trivial assembler (`INCLUDE trasa.dat` inside a `use32` segment, `tlink /t`
+  to a `.COM`, renamed `.DAT`); node 0 hex-verified against the text sources.
+  The path **ping-pongs** (`mnoznik` ±1, clamped at 0/`ruchow`), advanced
+  `frames*2*mnoznik` nodes/frame. No interpolation.
+- **Text, P4/P8 (9 dwords/node):** `P4/TRASA.DAT` = **2,964 rows** of
+  `dd o_x,o_y,o_z,r_x,r_y,r_z,cm_x,cm_y,cm_z` (compiles to `trasa.dat`);
+  `COMS/TRASA.DAT` = **2,508 rows** of the same 9 `dd` form (compiles to
+  `tr2.dat`). Note `P4/TRASA.DAT` ends `ruchow equ 2951` — the swing-clamp
+  constant, not the row count. `COMS/TR2.DAT` is **not** a camera path (a
+  19-line scancode/string table); do not treat it as a path source.
+- **Text, P2/P5 (6 dwords/node, 24 B):** `P2/TRASA.!` = **2,964 rows**,
+  `P5/TRASA.!` = **3,876 rows** of
+  `dd CameraX,CameraY,CameraZ,EyeAx,EyeAy,EyeAz`, included at assembly time
+  (not compiled); `trasa_ruch × 24`, advanced by `ramki`, P5 wraps at
+  `ruchow-2`.
+- **P2 widoki** (scripted still cameras, `P2/WIDOKI`): **7 dwords/entry** =
+  `dd x,y,z,ax,ay,az,flashFlag` (28 B/entry). Written with `rept`/`endm`
+  blocks that expand to **64 entries** (8 blocks × 4 + `rept 2` × 4 blocks
+  × 4 = 32 + 32), each entry pairing the flash variant (flag 1) with three
+  non-flash copies (flag 0). Consumer (`P2.AS^:148-181`): active when
+  `ModPos > 0x63f`; index = `ModPos & 0x3f` (0..63) × 28 B → reads exactly
+  the 64-entry table, **no over-read** (the flag triggers the `plum` flash).
+  Earlier notes claiming 49 entries with a benign over-read were wrong.
+- Ports: `core/data/p2trasa.inc`, `core/data/p2widoki.inc` (NASM `%rep`
+  mirror of the original expansion), `parts/p5_trasa.inc` verbatim;
+  `p2path.crosscheck` validates the camera switch logic.
 
 ## 5. Water, bump & drop-path data
 
@@ -562,3 +660,38 @@ shade nuance; P8 tone nuance; sin-table 1023-interval vs 1024-step (max 201
 Q15 units); MOD 44.1 kHz pitch-correct vs the original's ~5%-slow SB16 rate;
 square vs CRT-tall pixels; out-of-grid water samples clamped where DOS read
 undefined memory.
+
+## 9. Source art pipeline (`CODE/FLI/`)
+
+The `CODE/FLI/` directory holds the raw art sources that became the packed
+sun/eye animation blobs (§3.4 `klatki.dat` idx 16 / `s2.dat` idx 23):
+
+- **`EYE_AN01..36.GIF`** (36 files): 64×64 GIF frames of the eye animation.
+  These were dumped to raw `.DAT` frames (K1..K36.DAT, each 4,096 B = 64×64
+  8-bit indexed) and concatenated into `klatki.dat` (P2 sun, idx 16) and
+  `s2.dat` (P3 sun, idx 23). Each `.DAT` has an accompanying `.PAL`
+  (768 B, per-frame palette — some frames share palette-only files).
+- **`K1..K36.DAT`** (36 × 4,096 B): raw 64×64 indexed pixel dumps, the
+  primary frames.
+- **`K1..K36.PAL`** (36 × 768 B): per-frame palettes (31 `K*.PAL` + 5
+  `EYE_AN15..19.PAL` palette-only files).
+- **`CLAT/K1..K36.DAT`** (36 × 4,096 B): the same frames as raw pixel
+  extractions — the **authoritative source** for the packed animation blobs.
+- **`CLAT/K1..K36.CEL`** (36 × 4,896 B): Autodesk Animator CEL frames;
+  **not RLE as previously guessed**. 4,896 = 4,096 pixels + 768 palette
+  + 32-byte header. Hex-verified from K1.CEL: first 8 bytes
+  `19 91 40 00 40 00 00 00` — byte 0 = `0x19` (header size? not 0x0A), bytes
+  2-3/4-5 = width/height `0x0040` = 64, not the textbook 8-byte CEL header
+  `width:u16,height:u16,xoff:s16,yoff:s16`. Constant 4,896-B size across all
+  36 files confirms **raw, not RLE**.
+- **`EYE_ANI.FLC` / `EYE_AN2.FLC`** (~46 KB each): Autodesk Animator FLC
+  animations — the sequence containers. **Not consumed by the demo at
+  runtime.**
+- **`AA.CFG`** (84 B): Autodesk Animator config file. Not consumed.
+- **`2`** (147,456 B = 36 × 4,096): raw dump of the first animation sequence
+  — the concatenation source, matching `klatki.dat`/`s2.dat` size.
+
+**Pipeline:** GIF/FLC → Autodesk Animator → per-frame CEL + raw
+`.DAT`/`.PAL` → concatenate the raw frames → `klatki.dat`/`s2.dat` in
+DANE/ → packed into vodka.dat. Nothing in FLI/ is read at runtime; it is
+the recoverable source art for the animation blobs.

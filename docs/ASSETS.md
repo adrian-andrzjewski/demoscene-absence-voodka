@@ -35,13 +35,15 @@ the index map + recovery notes.
 
 Sizes in bytes. "Consumer" is where the index is referenced (`vodka n,...`
 in the original source). Raw bitmap dimensions are the ones implied by the
-consuming code; entries marked *(inferred)* are from size/usage analysis only.
+consuming code; no dimensions remain marked *(inferred)* — every entry is
+resolved to an exact division or a consumer-code-confirmed size (see the
+notes below and ASSET_FORMATS.md §3.3).
 
 | # | File | Size | Format / content | Consumer |
 |--:|---|--:|---|---|
 | 0 | `obrazek.dat` | 16,384 | 128x128 8-bit pic | P2 (`PART2` -> `_obrazek`); **dead load** in the shipped P2 (never drawn) |
 | 1 | `t001.dat` | 32,768 | texture **256x128** (mapper stride is 256) | PART2 -> `textury[1]` (P2) |
-| 2 | `t002.dat` | 40,896 | texture 256-wide, content rows 0..127; **no header** (unpadded export, zero tail) | PART2 -> `textury[2..4]` (P2) |
+| 2 | `t002.dat` | 40,896 | texture **256-wide, 160-row export** (159 full rows + 192-B partial row); **no header** (unpadded exporter truncation of a 160-row image, zero tail) | PART2 -> `textury[2..4]` (P2) |
 | 3 | `env.dat` | 65,536 | 256x256 environment map | PART2 -> `textury` (P2) |
 | 4 | `_rm.inc` | 51,200 | texture blob (binary despite .inc) | P1 (`map` - head texture) |
 | 5 | `_logo1.inc` | 5,880 | logo graphic | P1 (`logo1`) |
@@ -59,11 +61,11 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 | 17 | `absence.dat` | 64,000 | 320x200 screen | P2 water part (`_obrazek2`) |
 | 18 | `absence.pal` | 768 | palette | P2 water part (`_paleta`) |
 | 19 | `water.abc` | 64,000 | 320x200 screen | P2 water part (`_waterPIC`) |
-| 20 | `jup.inc` | 38,912 | texture blob | P3 `prepare_twist` (`map`) |
+| 20 | `jup.inc` | 38,912 | texture blob **256x152** (38,912/256 = 152 exact — P3 256-stride) | P3 `prepare_twist` (`map`) |
 | 21 | `lgmap.inc` | 51,200 | texture blob | P3 `prepare_twist` (`lgmap`) |
 | 22 | `4toonel.dat` | 65,536 | 256x256 tunnel texture | P3 (`_yayo`) |
 | 23 | `s2.dat` | 147,456 | 36 x 4096 anim frames | P3 (`sun`) |
-| 24 | `sw.inc` | 44,032 | texture blob | P4 (`map1`), P8 (`map1`) |
+| 24 | `sw.inc` | 44,032 | texture blob **256x172** (44,032/256 = 172 exact) | P4 (`map1`), P8 (`map1`) |
 | 25 | `v_txr1.inc` | 51,200 | texture blob | P4 (`map2`) |
 | 26 | `proc.inc` | 51,200 | texture blob | P4 (`map3`) |
 | 27 | `metal.inc` | 51,200 | texture blob | P4 (`map4`), P8 (`map2`) |
@@ -85,7 +87,7 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
 | 43 | `w3.DAT` | 64,000 | 320x200 screen | P5 (`_adr1`) |
 | 44 | `w4.DAT` | 64,000 | 320x200 screen | P5 (`_voodka2`) |
 | 45 | `voodka.dat` | 1 | **1-byte placeholder** (name collision with the archive itself) | P5 (`_voodka`) |
-| 46 | `h1.dat` | 14,976 | small bitmap **156x96** (per the dead `voodka2:` blitter) | P5 (`_voodka2`); loaded, never drawn |
+| 46 | `h1.dat` | 14,976 | small bitmap **156x96** (14,976/96 = 156 exact — dead `voodka2:` blitter) | P5 (`_voodka2`); loaded, never drawn |
 | 47 | `h2.dat` | 14,976 | small bitmap | P5 (`_adr1`); never drawn |
 | 48 | `h3.dat` | 14,976 | small bitmap | P5 (`_voodka2`); never drawn |
 | 49 | `h4.dat` | 14,976 | small bitmap | P5 (`_adr1`); never drawn |
@@ -147,8 +149,15 @@ consuming code; entries marked *(inferred)* are from size/usage analysis only.
   (port: `engine/loader.asm vk_load_object`, covered by `v3d.crosscheck`).
   `.V3M` is the same blob minus the 36-byte header (P5 morph target).
 - **`trasa.dat` / `tr2.dat`** - binary camera-path node arrays consumed by P4
-  and P8 (9 dwords per node). Their text sources live in `CODE/COMS/`
-  (`TRASA.DAT`/`TR2.DAT` as `dd` rows, compiled by `MALE.ASM`).
+  and P8 (9 dwords per node). Text sources: `P4/TRASA.DAT` (2,964 rows)
+  compiles to `trasa.dat`; `COMS/TRASA.DAT` (2,508 rows) compiles to
+  `tr2.dat`; both via `CODE/COMS/MALE.ASM` (a 4-line include-assembler,
+  `tlink /t`). `COMS/TR2.DAT` is **not** a camera path (19-line string
+  table). P2/P5 use `P2/TRASA.!` (2,964 rows) and `P5/TRASA.!` (3,876 rows)
+  of `dd` — **6 dwords/node, 24 B** — included at assembly time, not
+  compiled. P2 `WIDOKI` = 7 dwords/entry (x,y,z,ax,ay,az,flashFlag),
+  `rept`-expanded to 64 entries, indexed `ModPos & 0x3f` (in-bounds, no
+  over-read). Full spec: ASSET_FORMATS.md §4.6.
 - **`do_water`, `mapa.dat`** - 128x128 8-bit grids (P5 water source pic /
   P6 bump lighting LUT).
 
@@ -165,7 +174,18 @@ These were `INCLUDE`d / `incbin`'d into the part .OBJs at assembly time:
 | `sw.pal`, `metal.pal` | P8 | missing; recovered from `P8.OBJ` (cross-checked vs P4) |
 | `macro.inc` | P1/P3/P4/P8 | missing; semantics reconstructed in the port |
 | `sinus.inc` | DEMO.AS^ | missing; regenerated as `core/inc/sin_tables.asm` by the `sin_tables` tool |
-| `EOS.INC` | all | external EOS 2.07 kernel header, never in the repo; replaced by `port/core/eos_replace/eos.inc` |
+EOS.INC | all | external EOS 2.07 kernel header, never in the repo; replaced by `port/core/eos_replace/eos.inc` |
+
+**Compile-time meshes (`CODE/DATAS/*.INC`)** — also assembled into the part
+OBJs, not in vodka.dat. These are the .obj mesh data (vertices `*_S.INC` /
+faces `*_C.INC`): P1 `shape3`/`constr3` (602 v / 1156 f), P3 `log_s`/`log_c`
+(341 / 646), P4 `vws_1..4` + `vwc_1..4` morph targets (222/81/8/256 v +
+440/158/12/384 f, plus zero-filled `s1..s3` interpolate buffers), P8 `sw_s/c`
+and `ob_s/c` sets (40/33 + 40/48 v·f, 114/128/128 v + 224/256/256 f).
+Ported to `port/core/parts/p{1,4,8}_*.inc` + `log_*.inc`. Full format
+spec (§4.5): text `dw` rows → raw word tables; the 10 orphan files
+(`TOR_C/TOR_S/SHAPE/CONSTR/CND/SHD.INC` + `SW_S_3/4` + `SW_C_3/4.INC`) are
+referenced by no current source.
 
 Palette recovery tool: `port/tools/pal_extract/extract_pals.py` walks OMF
 LEDATA records of the original OBJs (the palettes were ASCII `DB r,g,b`
@@ -177,10 +197,15 @@ in `port/data/pal/`.
 
 - `CODE/FLI/` + `CODE/FLI/CLAT/` - GIF/FLC eye-animation art sources and the
   dumped key frames that became `klatki.dat`/`s2.dat`-style anim blobs.
-- `CODE/DATAS/` - mesh data as `dd` tables (vertices/faces/normals) included
-  by P1/P3/P4/P8 (`shape3`, `constr3`, `log_s/log_c`, `vws/vwc`, `ob/sw`).
-  Six orphaned includes (`TOR_C/TOR_S/SHAPE/CONSTR/CND/SHD.INC`) are referenced
-  by no current source.
+- `CODE/DATAS/` - **compile-time mesh includes** (text `dw` rows → raw word
+  tables in the part OBJs), NOT in vodka.dat. Consumed: P1
+  (`shape3`/`constr3`, 602 v/1156 f), P3 (`log_s`/`log_c`, 341/646), P4
+  (`vws_1..4` + `vwc_1..4`, morph targets 222/81/8/256 v + 440/158/12/384 f,
+  with zero-filled `s1..s3` buffers), P8 (`sw_s/c`, `ob_s/c`, 40/33 + 40/48 + 114/128/128 v, 224/256/256 f). **Ten** orphaned includes
+  (`TOR_C/TOR_S/SHAPE/CONSTR/CND/SHD.INC` + `SW_S_3/SW_S_4/SW_C_3/SW_C_4.INC`)
+  are referenced by no current source (verified by grep of the whole tree).
+  Ported to `port/core/parts/p{1,4,8}_*.inc`, `log_*.inc`; full spec +
+  complete 32-file inventory: ASSET_FORMATS.md §4.5.
 - `CODE/P2/TABLICA3`, `P6/TABLICA3`, `P7/TABLICA3`, `P5/TABLICA3`,
   `P2/WATER/TAB` - precomputed drop-path/light-path tables
   (`P6/TABLICA.PAS` is the 480 B generator for P6's Lissajous light path);
@@ -189,8 +214,10 @@ in `port/data/pal/`.
   same-named `P2/TABLICA3` (a byte-identical stray copy of P7's table);
   P6's table is the bump-light path, not water. All five are covered by
   `tablica3.crosscheck`.
-- `CODE/P2/TRASA.!`, `P5/TRASA.!`, `COMS/TRASA.DAT` - camera paths as text
-  `dd` rows; ported to `core/data/p2trasa.inc` / `parts/p5_trasa.inc`.
+- `CODE/P2/TRASA.!`, `P5/TRASA.!`, `P4/TRASA.DAT`, `COMS/TRASA.DAT` - camera
+  paths as text `dd` rows; ported to `core/data/p2trasa.inc` /
+  `parts/p5_trasa.inc`. (See Format notes above; `P2/WIDOKI` →
+  `core/data/p2widoki.inc`.)
 - `music/amnezja2.mod` - the music: **14-channel** module ("<>Amnezja<>" by
   Sudi; libxmp identifies it as "Fast Tracker 14CH", 42 orders, 31
   instruments, 39 patterns), 381,890 bytes. Loaded by the original via EOS /

@@ -1,5 +1,6 @@
 ; p5_trasa.inc - P5 camera path (converted from TRASA.!)
-; 3859 records x 6 dwords (x,y,z,ax,ay,az) = 24B each
+; 3876 records x 6 dwords (x,y,z,ax,ay,az) = 24B each
+; (3859 = ruchow clamp constant from TRASA.!, not the record count)
 global p5_trasa
 p5_trasa:
 dd 1921,-5763,-30222,0,0,0
