@@ -274,7 +274,8 @@ vs `bialy` substitutions below, now fixed:
   MROTATE matrices, camera matrix, projection, normals, object loader, VR
   visibility/sort/prepare, the P2 camera path and world data, and the toonel
   table: byte-exact vs C++ references re-deriving the original arithmetic
-  (26 CTests, incl. all five water drop tables and the V3D/V3M decode).
+  (27 CTests, incl. all five water drop tables, the V3D/V3M decode, and the
+  asset viewer's own v3d.viewer_parse).
 - Asset-level runtime checks (2026-08-05, frame-recorded): P3 palette ramp
   matches the original's 8-bit make_pal semantics for all 720 bytes; the P2
   water installs absence.pal exactly (768/768); the P8 end screen equals

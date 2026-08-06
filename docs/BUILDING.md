@@ -36,6 +36,8 @@ checkout is relocatable.
 ```
 VOODKA.exe          the demo (statically linked libxmp; no DLLs needed)
 VIRTUAL.exe         the standalone VR-engine test viewer (Esc quits; --check loads+exits)
+asset_viewer.exe   the V3D/V3M asset viewer (loads all 9 3D models from data/vodka.dat)
+asset_viewer_selftest.exe  parse-only validation (CTest v3d.viewer_parse)
 data/vodka.dat      packed assets, byte-identical to the 1996 release archive
 data/world          VIRTUAL viewer object archive (byte-identical to the original)
 music/amnezja2.mod  the 14-channel module the demo plays
@@ -72,15 +74,16 @@ Esc                            quit (scene-dependent, as in the original)
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-25 tests: 17 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+27 tests: 17 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
 TASM text), `pal.integrity` + `pal.repro` (palette copies + OBJ-extraction
-reproducibility), `build.addr32` (COFF relocation hygiene), and
+reproducibility), `build.addr32` (COFF relocation hygiene),
 `virtual.world_golden` + `virtual.load` (the viewer's archive is
-byte-identical to the original and decodes). Python-based tests skip cleanly
-if no interpreter is found.
+byte-identical to the original and decodes), and `v3d.viewer_parse` (the
+asset viewer's parser vs every V3D/V3M header/count/index/spin). Python-based
+tests skip cleanly if no interpreter is found.
 
 ## Tools (`port/tools/`)
 
@@ -93,6 +96,9 @@ if no interpreter is found.
 | `frames2img` | `frames.raw` -> PNG (dependency-free encoder) |
 | `extract_pals.py` | recovers compile-time palettes from the original OMF OBJs |
 | `audit_addr32.py` | COFF relocation hygiene audit (wired as `build.addr32`) |
+| `extract_v3d` | pulls the 9 V3D/V3M assets (entries 12-15, 31-35) out of `data/vodka.dat` |
+| `asset_viewer` | D3D11 viewer: flat-shaded/wireframe orbit view of every V3D/V3M model |
+| `asset_viewer_selftest` | parse-only validation of all 9 assets (CTest `v3d.viewer_parse`) |
 
 ## Troubleshooting
 

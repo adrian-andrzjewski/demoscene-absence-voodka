@@ -409,6 +409,9 @@ endif()
 add_subdirectory("${CMAKE_SOURCE_DIR}/../modules/libxmp"
                  "${CMAKE_BINARY_DIR}/libxmp")
 
+# ---- V3D asset viewer (standalone validation tool) ---------------------------
+add_subdirectory(tools/asset_viewer)
+
 # ---- platform layer + assembly core (phases >0) -----------------------------
 add_subdirectory(core)
 add_subdirectory(platform)

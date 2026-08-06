@@ -148,15 +148,25 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (architecture/ABI/memory model/case studies), `BUILDING.md` (build/run/
   test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
   them in sync with the work.
-- **Tests:** 26 CTests (`port/build.ps1 -Config Release -Test`), sources in
+- **V3D asset viewer:** `port/tools/asset_viewer/` is a standalone
+  Win32+D3D11 tool that loads all 9 V3D/V3M models from `vodka.dat`
+  (archive entries 12-15 + 31-35) and renders the current one flat-shaded
+  or wireframe with an orbit camera (keys 1-9 switch model, Space =
+  wireframe, R = auto-rotate, mouse drag/wheel = orbit/zoom; metadata in
+  the title bar). `extract_v3d` pulls the raw files at build time for the
+  CTest; `asset_viewer_selftest` (CTest `v3d.viewer_parse`) validates every
+  header/count/index/spin against the known-good values.
+- **Tests:** 27 CTests (`port/build.ps1 -Config Release -Test`), sources in
   `port/tools/validate/` (the old empty `port/tests/` was removed): 17
   NASM-vs-C++ cross-checks + `vodka.golden_hash` + `v3d.crosscheck` (real
   .V3D/.V3M decode via the ported loader) + `tablica3.crosscheck` (generated
   NASM tables vs original TASM text, all five water/drop tables) +
   `pal.integrity` + `pal.repro`
   (OBJ-extraction reproducibility) + `jjdj.repro` (P2 world-palette
-  provenance vs `CODE/P2/WORLD.P!`) + `build.addr32` (COFF reloc hygiene);
-  the Python ones are skipped if no interpreter is found.
+  provenance vs `CODE/P2/WORLD.P!`) + `build.addr32` (COFF reloc hygiene) +
+  `v3d.viewer_parse` (the asset_viewer's own parse selftest: every V3D/V3M
+  header/count/index/spin verified); the Python ones are skipped if no
+  interpreter is found.
 
 ## Original DOS build (reference only)
 

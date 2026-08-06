@@ -89,6 +89,14 @@ Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
   outro presents, water 99-row loop, palette 6->8 rounding, part-5 boundary,
   P6 word-cmp) - all frame-record-verified; 25/25 tests + full playthrough
   exit 0.
+- [x] **Phase 9 - asset viewer (2026-08-06)**: `port/tools/asset_viewer/`
+  standalone Win32+D3D11 viewer loads all 9 V3D/V3M models from
+  `vodka.dat` (entries 12-15, 31-35), renders the current one flat-shaded
+  or wireframe with an orbit camera (1-9 switch, Space wireframe, R auto-
+  rotate, drag/wheel orbit+zoom, metadata in the title bar). `extract_v3d`
+  pulls the raw files at build time; `asset_viewer_selftest` (CTest
+  `v3d.viewer_parse`) validates every header/count/index/spin against
+  known-good values. 27/27 tests green.
 - [x] **Phase 8 - P3 hero-object geometry/rotation audit (2026-08-05)**: the
   P3 tunnel's hero 3D object looked "hole-y / missing faces / not like the
   original cog". Runtime instrumentation (arena dumps + per-face/per-row
