@@ -70,13 +70,19 @@ def main():
     sw = o4[a4:a4 + 64 * 3]
     open(os.path.join(out, 'sw.pal'), 'wb').write(sw)
 
-    # --- metal.pal (shared by P4 & P8) — 64 colors, white-ramp start ---
-    # Verified location: P8.OBJ 0x8fb (192 bytes), cross-checked in P4.OBJ 0xb0b.
-    # (An earlier draft read 0x760, which lands one byte early of the ramp.)
-    assert o8[0x8fb:0x8fb + 12] == b'\x3f' * 12, 'metal.pal head missing'
-    mt8 = o8[0x8fb:0x8fb + 64 * 3]
-    assert o4[0xb0b:0xb0b + 48] == mt8[:48], 'P4/P8 metal.pal mismatch'
-    open(os.path.join(out, 'metal.pal'), 'wb').write(mt8)
+    # --- metal.pal (shared by P4 & P8) — 64 colors, chrome/silver-blue ramp ---
+    # Verified location: P8.OBJ 0x821 (192 bytes), cross-checked in P4.OBJ 0xdb2.
+    # (The earlier 0x8fb/0xb0b pins hit the all-white `bialy` table and made the
+    # P8/P4 metal objects render pure white; the true data is the monotonic
+    # bluish ramp starting (5,6,7) -> (63,63,63).)
+    mt_head = bytes([0x05, 0x06, 0x07, 0x05, 0x07, 0x08, 0x06, 0x08, 0x09,
+                     0x07, 0x09, 0x0a])
+    a8m = o8.find(mt_head)
+    a4m = o4.find(mt_head)
+    assert a8m >= 0 and a4m >= 0, 'metal.pal head missing'
+    assert a8m == 0x821 and a4m == 0xdb2, 'metal.pal offset moved'
+    assert o8[a8m:a8m + 192] == o4[a4m:a4m + 192], 'P4/P8 metal.pal mismatch'
+    open(os.path.join(out, 'metal.pal'), 'wb').write(o8[a8m:a8m + 192])
 
     # --- v_txr1.pal (P4 only) — 22 colors grey ramp (66 bytes; the last 6
     # colors are zero/black). The 12-byte head occurs exactly once in P4.OBJ.

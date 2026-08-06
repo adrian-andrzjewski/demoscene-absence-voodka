@@ -201,10 +201,13 @@ frame-rate/phase mismatch, plus two texture-interpolation bugs:
 
 ## Remaining known differences
 
-- **P8 tone**: the port's P8 viewer reads slightly brighter/whiter than the
-  original's silver-blue at some phases (palette-range nuance under
-  observation). The sw/metal palettes themselves were verified byte-exact
-  against the OBJ-recovered data.
+- **P8 tone**: fixed 2026-08-06. The port's P8/P4 `metal.pal` had been a
+  white placeholder (extract_pals pinned P8.OBJ 0x8fb = the all-0x3f `bialy`
+  table), which rendered the P8 hero torus as a flat pure-white blob. The real
+  chrome/silver-blue ramp (64 entries, (5,6,7)->(63,63,63)) is now recovered
+  byte-identical from P8.OBJ 0x821 and P4.OBJ 0xdb2; both port copies updated
+  and the extracter offset/assert fixed, so `pal.repro` regenerates the same
+  data; the torus now shows the original's metallic gradient shading.
 - **Sine table variant**: `INC/SIN` is `round(32766*sin(2pi*i/1023))` (a
   1023-interval table, hex-verified); the port generates a true 1024-step
   `round(32767*sin(2pi*i/1024))`. Max deviation 201 Q15 units (~0.6%); the
