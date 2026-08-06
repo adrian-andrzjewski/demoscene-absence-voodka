@@ -47,6 +47,8 @@ paths, water/bump data, MOD, presentation conversion) see
 - **There is NO module `.data`/`.bss` capacity limit.** Combined module data
   is ~40 KB and rip-relative `[rel X]` reaches any image offset. The early
   "arena migration" belief was a misdiagnosis - see the P4 case study below.
+  (P4 itself was removed from the port on 2026-08-06; the case studies are
+  kept because the ABI/register lessons generalize.)
 
 ## ABI rule (critical, #1 crash source)
 
@@ -160,10 +162,11 @@ for scratch; never reuse a register the original left live.**
   space (`setPalette` masks `& 63`).
 - **Present rule (audit 2026-08-05):** anything that was directly visible in
   DOS - framebuffer writes *or* palette/DAC changes - needs an explicit
-  `vk_present_frame` to reach the window. The P4/P8 outros (VGA-memory
-  writes + pal_set fades with no `Ekran`) were invisible until presents were
-  added; when porting a new sequence, find every `rep movsd`/`pal_set` aimed
-  at the visible screen and ensure a present follows.
+  `vk_present_frame` to reach the window. The P8 outros (and P4's, before
+  its removal) are VGA-memory writes + pal_set fades with no `Ekran` and
+  were invisible until presents were added; when porting a new sequence,
+  find every `rep movsd`/`pal_set` aimed at the visible screen and ensure a
+  present follows.
 - Palette writes (`set_pal` macro / `pal_set`) go through
   `applyPaletteRange` (`pal_range.h`), shared with `palette.crosscheck`.
 - Aspect/gamma rationale (square pixels, no gamma encode): see

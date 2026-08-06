@@ -16,7 +16,7 @@ ROOT = os.path.normpath(os.path.join(HERE, '..', '..', '..'))
 SCRIPT = os.path.join(HERE, '..', 'pal_extract', 'extract_pals.py')
 OUT = os.path.join(HERE, '..', 'pal_extract', 'out')
 REF = os.path.join(ROOT, 'port', 'core', 'parts')
-PALS = ('jup.pal', 'tn.pal', 'sw.pal', 'v_txr1.pal', 'proc.pal', 'metal.pal')
+PALS = ('jup.pal', 'tn.pal', 'sw.pal', 'metal.pal')
 
 
 def main():

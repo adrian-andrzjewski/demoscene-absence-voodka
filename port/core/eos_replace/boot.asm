@@ -46,7 +46,6 @@ extern vk_make_toonel
 extern part1
 extern part2
 extern part3
-extern part4
 extern part5
 extern part6
 extern part7
@@ -118,8 +117,6 @@ DemoStart32:
         je      .single_p2
         cmp     eax, 3
         je      .single_p3
-        cmp     eax, 4
-        je      .single_p4
         cmp     eax, 5
         je      .single_p5
         cmp     eax, 6
@@ -140,9 +137,6 @@ DemoStart32:
 .single_p3:
         call    part3
         jmp     .done
-.single_p4:
-        call    part4
-        jmp     .done
 .single_p5:
         call    part5
         jmp     .done
@@ -157,13 +151,25 @@ DemoStart32:
         jmp     .done
 
 .full_sequence:
-        ; current implemented slice: P1 then P2 then P3 then P4 then P5 then P6 then P7 then P8
+        ; current implemented slice: P1 then P2 then P3 (hold to 0x1400),
+        ; then P5 then P6 then P7 then P8. P4 was removed 2026-08-06.
         ; (run progress is reported centrally by the platform via the ModPos
         ; timeline; see port/platform/progress.cpp)
         call    part1
         call    part2
         call    part3
-        call    part4
+        ; P4 was removed from the modernized build (2026-08-06). Its audio
+        ; window (0x0D40..0x1400) still plays; hold the last frame until P5's
+        ; calibrated start so the remaining parts keep their ModPos timeline.
+.p4_hold:
+        ; Must keep pumping EOS_WAIT_VBL: it services the main-thread audio
+        ; engine, so ModPos only advances here (P4's own loop used to do this).
+        mov     eax, EOS_WAIT_VBL
+        call    eos_dispatch
+        call    GetModPos
+        movzx   eax, word [rel ModPos]
+        cmp     eax, 0x1400
+        jb      .p4_hold
         call    part5
         call    part6
         call    part7

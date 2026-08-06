@@ -1,6 +1,7 @@
 # Reconstruction plan & decision log
 
-Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). This
+Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). Updated
+2026-08-06: P4 removed from the modernized build (see Phase 3 note). This
 document records the audit, the decisions taken, and the remaining work.
 Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
 `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
@@ -58,7 +59,11 @@ Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
   measured at ~0.95x libxmp (documented); `docs/KNOWN_DIFFERENCES.md` +
   `reference/captures/` written. The validation pass found and fixed 10 port
   bugs (see KNOWN_DIFFERENCES "Fixed divergences"), ending with a clean full
-  playthrough (exit 0, all 8 parts, ~66-70 fps).
+  playthrough (exit 0, all 8 parts, ~66-70 fps). **P4 was removed from the
+  port on 2026-08-06** (per the maintainer): `port/core/parts/p4.asm` and
+  its tables are gone, `--part 4` is rejected, and the sequence runs P1-P3,
+  then holds the last frame while pumping `wait_vbl` until ModPos 0x1400
+  (its audio window), then P5-P8.
 - [x] **Phase 4 - test additions**: `v3d.crosscheck` (real .V3D/.V3M decode
   via the ported loader), `tablica3.crosscheck` (generated NASM tables vs
   original TASM text), `pal.integrity` + `pal.repro` (OBJ-extraction

@@ -108,7 +108,7 @@ void     audioPump();         // must be called periodically from main loop
 // order-list position in the high byte and a pattern ROW in the low byte, i.e.
 //   ModPos = (orderIndex << 8) | row    (order index = position in the order list)
 // This is the authoritative clock every ported part compares against (e.g. P2
-// exits at ModPos > 0xB3F, P4 at 0x1400, ...). It is monotonic across module
+// exits at ModPos > 0xB3F, P5 starts at 0x1400, ...). It is monotonic across module
 // loops by adding `orders * 256` (== rowsPerLoop * 4) per loop. Seek can be
 // expressed in several units:
 //   audioSeekRows(modpos) : absolute ModPos ((order<<8)|row). Primary API.

@@ -27,7 +27,7 @@ static std::vector<unsigned char> readAll(const std::string& path) {
 }
 
 int main() {
-    const char* pals[] = { "jup.pal", "tn.pal", "sw.pal", "v_txr1.pal", "proc.pal", "metal.pal" };
+    const char* pals[] = { "jup.pal", "tn.pal", "sw.pal", "metal.pal" };
     std::string a = std::string(VOODKA_REPO_ROOT) + "/port/core/parts/";
     std::string b = std::string(VOODKA_REPO_ROOT) + "/port/data/pal/";
     for (const char* p : pals) {

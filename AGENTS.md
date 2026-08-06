@@ -51,16 +51,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   **There is NO module `.data`/`.bss` "capacity" limit** (combined module data
   is only ~40 KB; rip-relative `[rel X]` reaches any image offset). An early
   P4 "arena migration" was done under the belief the module data was full —
-  that was a misdiagnosis. The real P4 setup crash was a register collision in
-  `calc_pts`: the port's `lea rcx,[rbp*2+rbp]` overwrote the `ecx` loop
-  counter (the original used memory-operand `shape[ebp*2+ebp]` + `loop`, never
-  touching `ecx`). The count then looped a garbage face index (~millions) and
-  `rsi` walked past the 64 MB arena. Use a spare register (`r8`) for such
-  scratch so `ecx` stays the counter. A second collision fixed `show()`: it
-  computed the con3 face index into `eax`, then `P4AR con3_a, rbx` — the macro
-  internally does `mov eax,[rel con3_a]`, clobbering the live `eax` index, so
-  the texture-selector handle read garbage (mapQ -> 0, crash in `face()`).
-  Save such live values in a register `P4AR` won't touch (`r8`).
+  a misdiagnosis; the real P4 bugs were ported-register collisions, and P4
+  was removed from the port entirely on 2026-08-06 (see Status). The generic
+  lesson stands: use a spare register (e.g. `r8`) for scratch so `ecx` stays
+  a loop counter, and never load a memory variable whose helper macro
+  clobbers a value you still hold live in a register.
 - **ABI rule (critical):** every NASM->C++ call must have `RSP%16==0` at the
   `call` instruction. Prologue accounting: entry RSP%16==8; after `push rbp` it
   is 0; each extra push moves it by 8. A function pushing 7 regs after rbp
@@ -84,11 +79,12 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   arithmetic (see `p6.asm`, `water.inc`).
 - **Status:** platform layer, EOS-replacement ABI, and parts P6 (2D bump map)
   and P7 (7-phase water, 160x100->320x200 upscale) run end-to-end at
-  69.9 fps with audio and per-frame recording. P1-P4 are ported and wired;
-  part P4 (`--part 4`) now runs its full render loop crash-free at ~69 fps
-  with live per-frame recording, after fixing two ported-register collisions
-  (see Memory model note): calc_pts `ecx` counter and show() con3-index
-  preserved across P4AR (which clobbers `eax`). Part P5 (`--part 5`, the
+  69.9 fps with audio and per-frame recording. **P4 was removed from the
+  modernized build (2026-08-06)**: `port/core/parts/p4.asm` and its tables
+  are deleted, `--part 4` is rejected (its ModPos seek row stays so `--part
+  5..8` indices are stable), and the full sequence holds the last P3 frame
+  until ModPos 0x1400 so P5+ keep their calibrated timeline. P1-P3 are
+  ported and wired; part P5 (`--part 5`, the
   morphing-torus-over-water VR scene) is now ported and wired into boot.asm
   (+ core CMake) and runs crash-free: it reuses the P2 VR layer
   (vk_p2_render_frame / vk_load_object / vk_prepare+VKdraw / textury) plus a
@@ -105,11 +101,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   clamp semantics, P2 water rewritten faithful to `P2/WATER/WATER.PM` (was a
   P7-engine reuse: wrong picture, no absence.pal, white screen) as
   `parts/water.p2.inc` + `p2_watertab.asm`, P5 `vodka 72` sun load, P5 RIP
-  drop injection (`p5_tablica3.asm`, duplicate-+256 bug preserved), P4/P8
+  drop injection (`p5_tablica3.asm`, duplicate-+256 bug preserved), P8
   outros now actually presented (DAC/VGA writes need explicit
   `vk_present_frame`), water.inc 99-row loop (was 100 = 2-byte OOB write),
   palette 6->8-bit rounding, `--part 5` boundary 0x1200->0x1400, P6 word-cmp.
-  Full playthrough exit 0; P3 ramp/P2 water palette/P4/P8 outros
+  Full playthrough exit 0; P3 ramp/P2 water palette/P8 outros
   frame-record-verified.
 - **Full-pipeline audit (2026-08-05, second pass)** compared every stage
   (decode/palette/present) against the DOSBox captures: fixed P2's world
@@ -120,7 +116,7 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   used `mov` instead of `add`, and P1 applied its ModPos>=0x300 white wash
   BEFORE presenting (the original's fade is a post-present sub-frame
   transient, so the red/blue edges + logos were never meant to show
-  brightened). Verified the P4 tull and P8 last.dat fullscreens are already
+  brightened). Verified the P8 last.dat fullscreen is already
   byte-exact (the checked-in `port_outro.png` capture predates the present
   fixes). New `jjdj.repro` CTest guards the P2 palette provenance.
 - **Full playthrough runs clean end-to-end (exit 0, ~66-70 fps)** after the

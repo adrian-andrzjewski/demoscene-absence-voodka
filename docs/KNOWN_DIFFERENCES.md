@@ -81,12 +81,12 @@ all fixed and verified by frame recording (`--record` + palette/pixel diff):
     `P2/WATER/TAB` table (`p2_watertab.asm`; the shared `P2/TABLICA3` copy is
     unreferenced by the original P2 build). Verified: palette == absence.pal
     (768/768), live strip, correct backdrop.
-13. **P4 tull-picture outro was never presented.** The picture blit and the
-    64-step `pic_lo` fade + `brum` flashes ran, but no `vk_present_frame`
-    occurred between the last 3D frame (~0x1200) and P5's first frame
-    (~0x1400). Presents added (v_sync-paced fade steps, flash loop, wait
-    loop); verified: white -> tull picture fade-in visible, palette converges
-    to tull.pal exactly.
+13. **P4 tull-picture outro was never presented (moot).** The picture blit
+    and the 64-step `pic_lo` fade + `brum` flashes ran, but no
+    `vk_present_frame` occurred between the last 3D frame (~0x1200) and P5's
+    first frame (~0x1400). Presents were added (v_sync-paced fade steps,
+    flash loop, wait loop) and verified before **P4 was removed from the
+    port (2026-08-06)** - the same present fix lives on in P8's outro.
 14. **P8 end screen was never presented.** Same class: the 3-slice last.dat
     reveal + `lopa`/`hopla` fades only touched the DAC/VGA memory in the
     original. Presents added (fades v_sync-paced, matching the original's
@@ -109,8 +109,8 @@ all fixed and verified by frame recording (`--record` + palette/pixel diff):
     `round(v*255/63)` exactly (`(v*255+31)/63`) in both - the linear mapping
     the VGA DAC's analog output implements.
 19. **`--part 5` seeked 2 orders early** (`kPartStartModPos[4]` was 0x1200 =
-    P4's outro start; P4 exits at >= 0x1400). Fixed to 0x1400; progress.cpp
-    gained the missing "P4 tull outro" scene row.
+    P4's outro start; P4 exited at >= 0x1400). Fixed to 0x1400; progress.cpp
+    gained the missing "P4 tull outro" scene row (both now removed with P4).
 20. **P6 exit compared a dword at the word var `ModPos`** (worked only
     because the adjacent `framebuffer_off` low word is 0). Now a word
     compare.
@@ -154,8 +154,9 @@ port bugs and confirmed two already-faithful static pictures:
     original order (present, then fade, then restore); frame-recorded: the
     flash-window palette is now byte-identical to rm_eye.pal.
 
-Also verified faithful (no change needed): the P4 tull outro and P8 last.dat
-end screens are byte-exact (framebuffer AND palette) in the current build; the
+Also verified faithful (no change needed): the P8 last.dat
+end screen is byte-exact (framebuffer AND palette) in the current build (the
+P4 tull outro was verified the same way before P4's removal); the
 stale `reference/captures/port_outro.png` (pre-"presents added" fix) is what
 showed the old broken bright output. The logos blit byte-exactly to the source
 `_logoN.inc` data for every displayed frame.
@@ -184,9 +185,7 @@ frame-rate/phase mismatch, plus two texture-interpolation bugs:
     redundant `v_sync` (original `v_sync` is a VGA retrace poll that returns
     at that same boundary). P3 now runs 860 frames (~65-70 fps); the object's
     fill cycle peaks at the same ~53-67% of P3 as the original's, reaching
-    the hollow cog-ring + central emblem pose. (P4's .m_loop has the same
-    WaitVbl + per-frame v_sync pattern and should be checked with the same
-    method.)
+    hollow cog-ring + central emblem pose.
 26. **P3 `p3_slope` dropped the first slope and ORed garbage into the span
     step.** The original packs `(first_slope<<16)|second_slope`; the port's
     `p3_slope` had an extra `shl esi/ebp,16` + `or ...edi` that shifted away
@@ -230,9 +229,10 @@ vs `bialy` substitutions below, now fixed:
   white placeholder (extract_pals pinned P8.OBJ 0x8fb = the all-0x3f `bialy`
   table), which rendered the P8 hero torus as a flat pure-white blob. The real
   chrome/silver-blue ramp (64 entries, (5,6,7)->(63,63,63)) is now recovered
-  byte-identical from P8.OBJ 0x821 and P4.OBJ 0xdb2; both port copies updated
-  and the extracter offset/assert fixed, so `pal.repro` regenerates the same
-  data; the torus now shows the original's metallic gradient shading.
+  byte-identical from P8.OBJ 0x821 and P4.OBJ 0xdb2; the port copy (P8's) was
+  updated and the extracter offset/assert fixed, so `pal.repro` regenerates
+  the same data; the torus now shows the original's metallic gradient
+  shading. (P4's copy was removed with P4.)
 - **Sine table variant**: `INC/SIN` is `round(32766*sin(2pi*i/1023))` (a
   1023-interval table, hex-verified); the port generates a true 1024-step
   `round(32767*sin(2pi*i/1024))`. Max deviation 201 Q15 units (~0.6%); the
@@ -276,6 +276,6 @@ vs `bialy` substitutions below, now fixed:
   (25 CTests, incl. all five water drop tables and the V3D/V3M decode).
 - Asset-level runtime checks (2026-08-05, frame-recorded): P3 palette ramp
   matches the original's 8-bit make_pal semantics for all 720 bytes; the P2
-  water installs absence.pal exactly (768/768); the P4 outro converges to
-  tull.pal exactly; the P8 end screen equals last.dat/last.pal and fades to
-  all-black.
+  water installs absence.pal exactly (768/768); the P8 end screen equals
+  last.dat/last.pal and fades to all-black. (The P4 outro's tull.pal
+  convergence was verified the same way before P4's removal.)
