@@ -199,6 +199,31 @@ frame-rate/phase mismatch, plus two texture-interpolation bugs:
     (and thus the p/n_rot texture coordinates) of the first ~114 vertices.
     Fixed the allocation size - no more cross-frame n_vert corruption.
 
+## Fixed divergences - P8 palette audit (2026-08-06)
+
+Verified the full P8 color pipeline end-to-end against the original assembly
+and shipped OBJs; all color data/math is byte-faithful except the two `white`
+vs `bialy` substitutions below, now fixed:
+
+- `sw.pal`/`metal.pal` recover byte-identical from both P8.OBJ (0x524/0x821)
+  and P4.OBJ (0xdb2), cross-checked; `pal.repro` regenerates them. The working
+  palette is built exactly as the original (`make_pal` 8-bit signed clamps,
+  regions 0/64/128/192 = sw / sw+(-2,+4,+6) / sw+(1,-1,3) / metal).
+- `con3` per-face col offsets (0/64/128/192), the `face`/`show` texel fetch
+  (`add al,cl`), the projection/minus-`cdq` `imul`+`idiv` divides, the 6->8-bit
+  DAC conversion (round(v*255/63)) and the fade-in (`pal+1` end state) all
+  match the original; `sw.inc` (vodka 24) and `metal.inc` (vodka 27) loads are
+  byte-identical. Aligned frame captures (port vs DOSBox) match at region level
+  (ground C 74-86% overlap, same-texel fraction consistent with camera desync).
+- FIXED: the original uses the dedicated `bialy` (768 x 0x3f) table for the
+  part-start white screen, the three outro picture reveals and the `brum`
+  flash (`pal_set(bialy)` then `pal_set(white)`); the port reused the shared
+  `white` buffer there, which by then holds the stale fade output (approx the
+  working palette) instead of pure white. Added a local `bialy` table and
+  switched those call sites to it (`brum` now flashes bialy then white; the
+  outro reveals and part-start use bialy). Sub-frame transients, but now
+  faithful.
+
 ## Remaining known differences
 
 - **P8 tone**: fixed 2026-08-06. The port's P8/P4 `metal.pal` had been a

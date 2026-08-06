@@ -883,7 +883,10 @@ cmp     word [r8 + rax*4 + 2], 1
         je      .no_flash
         lea     r8, [rel tablica]
 mov     word [r8 + rax*4 + 2], 1
-        lea     rsi, [rel white]
+        ; original: pal_set(bialy) [true white flash] then pal_set(white)
+        ; [restore the fade buffer]. The port used `white` for both, so the
+        ; flash never actually went white.
+        lea     rsi, [rel bialy]
         call    pal_set
         lea     rsi, [rel white]
         call    pal_set

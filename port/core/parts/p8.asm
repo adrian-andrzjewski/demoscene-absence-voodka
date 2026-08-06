@@ -210,6 +210,14 @@ section .data align=16
 
 nazwa: db "p8.pal", 0
 
+; bialy = "white" (Polish) - the original's dedicated all-brightness palette
+; (768 x 0x3F), distinct from the `white` buffer that `fade`/`lopa`/`hopla`
+; overwrite with stepped values. The original uses bialy for the part-start
+; white screen, the outro picture reveals and the brum flash; the port
+; formerly reused the (stale) `white` buffer there, so those states didn't
+; actually go white.
+bialy:  times 768 db 63
+
 pal:    incbin "sw.pal"
         times 768-($-pal) db 0
 mpal:   incbin "metal.pal"
@@ -393,7 +401,7 @@ part8:
         mov     [rel scr_addr], eax
         mov     [_screen], eax
 
-        lea     rsi, [rel white]
+        lea     rsi, [rel bialy]
         call    pal_set
 
         mov     edi, [rel scr_addr]
@@ -681,7 +689,7 @@ section .text
 ; ---- outtro -----------------------------------------------------------------
 ; The original wrote these slices/fades straight to VGA memory + DAC; the port
 ; must present explicitly or none of the end sequence is ever shown.
-        lea     rsi, [rel white]
+        lea     rsi, [rel bialy]
         call    pal_set
 
         mov     edi, [rel framebuffer_off]
@@ -715,7 +723,7 @@ section .text
         cmp     word [rel ModPos], 2705h
         jl      .wa1
 
-        lea     rsi, [rel white]
+        lea     rsi, [rel bialy]
         call    pal_set
 
         mov     esi, [rel last_pic]
@@ -747,7 +755,7 @@ section .text
         cmp     word [rel ModPos], 2708h
         jl      .wa2
 
-        lea     rsi, [rel white]
+        lea     rsi, [rel bialy]
         call    pal_set
 
         mov     esi, [rel last_pic]
