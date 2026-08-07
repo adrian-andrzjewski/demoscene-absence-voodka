@@ -17,3 +17,14 @@ build_vs_env.cmd
 *.user
 *.suo
 *.VC.db
+
+# CTest artifacts
+/Testing/
+
+# Run/capture scratch (playthrough logs, recorded frames, diagnostics)
+/out/
+/out_*.log
+
+# Dev helper scripts (machine-specific paths)
+/.mon_voodka.ps1
+/.run_voodka.ps1
