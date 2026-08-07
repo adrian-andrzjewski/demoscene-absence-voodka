@@ -16,6 +16,14 @@
 ; a1/a2 screen-base).  W^X forbids that; ported as explicit globals
 ; f_pstep/f_estep + resolved register bases (identical arithmetic).
 ;
+; face() keeps BOTH raster paths like the original: draw_1 (middle vertex left
+; of the long edge, span right->left) and draw_2 (middle vertex right of the
+; long edge, span left->right, virtual-scanned off-left edge).  A previous port
+; only had draw_1 and routed the positive-span case into it, so `sub bp,di` was
+; negative every row and roughly half of all faces never rendered (the hero
+; "A" object looked full of holes).  Edge integer reads are signed 16-bit
+; (movsx), matching `mov di/bp, w ..+2` - movzx dropped off-screen-left rows.
+;
 ; Memory model (matches p1.asm): all engine-visible working tables (n_vert,
 ; n_add, rcalc, n_rot, plane, pos, zet_tab) are ARENA OFFSETS (dd); every
 ; routine adds Code32_addr before dereferencing.  shape/con statics are copied
@@ -206,6 +214,10 @@ fsq: resq 1    ; map texture base (real)
 gsq: resq 1    ; lgmap texture base (real)
 f_pstep: resd 1 ; edx (p) span step
 f_estep: resd 1 ; ecx (m) span step
+
+section .data align=16
+
+section .bss align=16
 
 section .text
 
@@ -1246,8 +1258,14 @@ face:
         call    p3_slope
         jmp     .draw_1
 .norm:
+        ; x_2 > pom: middle vertex is RIGHT of the long edge -> the span runs
+        ; left->right (draw_2). The original has a second raster path here
+        ; (draw_2 with its own a2/v3/v4 patch); the port used to fall back to
+        ; draw_1, which misreads x_1 as the left edge and x_s as the right,
+        ; so `sub ebp,edi` came out negative and EVERY row of these faces was
+        ; skipped (roughly half the hero object's faces never drew).
         call    p3_slope
-        jmp     .draw_1
+        jmp     .draw_2
 
 .draw_1:
         mov     r12, [rel esq]     ; screen base (reload)
@@ -1263,8 +1281,13 @@ face:
 .no_1:
         cmp     ebx, y2_min*320
         jl      .go_1
-        movzx   edi, word [rel x_1+2]
-        movzx   ebp, word [rel x_s+2]
+        ; signed 16-bit edge reads like the original `mov di,w x_1+2` /
+        ; `mov bp,w x_s+2` (movsx, not movzx): a left edge off-screen-LEFT has
+        ; a negative integer part, which the signed compare keeps in the row
+        ; (clamped to 0 below); movzx turned it into ~65000 and `je .go_1`
+        ; dropped the whole row - visible missing geometry on the left side.
+        movsx   edi, word [rel x_1+2]
+        movsx   ebp, word [rel x_s+2]
         cmp     edi, x2_max
         jge     .go_1
         cmp     ebp, x2_min
@@ -1327,6 +1350,95 @@ face:
         add     dword [rel y_1], 320
         dec     dword [rel dy_3]
         jne     .draw_1
+        jmp     .sk
+
+; -------------------------------------------------------------- draw_2 ------
+; Positive-span path (x_2 > pom): middle vertex is right of the long edge.
+; Faithful port of the original draw_2 (P3.ASM:1106-1167). Here the LEFT edge
+; is the v1->v3 interpolant x_s and the RIGHT edge is x_1 (v1->v2->v3), so:
+;   .add_1  virtually scans the left edge inward while it is off-screen left,
+;           stepping the texture so it stays aligned at x=0;
+;   .fo_2   fills the span left->right (inc edi) from x_s to x_1.
+; Both draw paths share the slope computed by p3_slope (f_pstep/f_estep) and
+; the same per-row interpolant advance; the original kept two code copies only
+; because the slope immediates/screen base were self-modifying.
+; ABI: same 8-push prologue as face - so .sk (shared exit) is reachable.
+.draw_2:
+        mov     r12, [rel esq]     ; screen base (reload; keep in sync w/ draw_1)
+        mov     ebx, [rel y_1]
+        cmp     [rel y_2], ebx
+        jne     .no_2
+        mov     eax, [rel x_3]
+        sub     eax, [rel x_2]
+        shl     eax, 16
+        cdq
+        idiv    dword [rel dy_2]
+        mov     [rel dx_1], eax
+.no_2:
+        cmp     ebx, y2_min*320
+        jl      .go_2
+        movsx   edi, word [rel x_s+2]
+        movsx   ebp, word [rel x_1+2]
+        cmp     edi, x2_max
+        jge     .go_2
+        cmp     ebp, x2_min
+        jl      .go_2
+        mov     edx, dword [rel p_1]
+        mov     ecx, dword [rel m_1]
+        cmp     edi, x2_min
+        jge     .no_c1
+.add_1:
+        ; virtual scan: step texture while the left edge is off-screen left
+        add     edx, [rel f_pstep]
+        add     ecx, [rel f_estep]
+        inc     edi
+        cmp     edi, x2_min
+        jl      .add_1
+.no_c1:
+        cmp     ebp, x2_max-1
+        jl      .no_c2
+        mov     ebp, x2_max-1
+.no_c2:
+        sub     ebp, edi
+        jl      .go_2
+        add     edi, [rel y_1]
+        inc     ebp
+.fo_2:
+        ; fo_2 (P3.ASM:1168): same sample order as fo_1 -
+        ; al = lgmap[edx>>16] (es/r14), ah = map[ecx>>16] (fs/r13), sum -> screen.
+        mov     bl, dh
+        shld    ebx, edx, 8
+        movzx   ebx, bx
+        movzx   r8d, byte [r14 + rbx]    ; lgmap (es) sampled by p (edx)
+        mov     bl, ch
+        shld    ebx, ecx, 8
+        movzx   ebx, bx
+        movzx   eax, byte [r13 + rbx]    ; map (fs) sampled by m (ecx)
+        add     al, r8b
+        mov     r10, rdi
+        mov     byte [r9 + r10], al
+        inc     edi
+        add     edx, [rel f_pstep]
+        add     ecx, [rel f_estep]
+        dec     ebp
+        jnz     .fo_2
+.go_2:
+        mov     eax, [rel dx_1]
+        add     [rel x_1], eax
+        mov     eax, [rel dx_2]
+        add     [rel x_s], eax
+        mov     ax, word [rel pd_2]
+        add     word [rel p_1], ax
+        mov     ax, word [rel pd_1]
+        add     word [rel p_1+2], ax
+        mov     ax, word [rel md_2]
+        add     word [rel m_1], ax
+        mov     ax, word [rel md_1]
+        add     word [rel m_1+2], ax
+        add     dword [rel y_1], 320
+        dec     dword [rel dy_3]
+        jne     .draw_2
+        jmp     .sk
 .sk:
         add     rsp, 0x28
         pop     r15

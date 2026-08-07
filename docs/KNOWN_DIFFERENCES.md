@@ -169,9 +169,9 @@ full of holes, doesn't resemble the original cog"). Runtime instrumentation
 (arena table dumps + per-face/per-row traces) verified the ENTIRE pipeline is
 faithful: shape/con tables byte-identical after the prepare double, plane
 projection, per-face backface cull (646/646 match the re-derived original
-arithmetic), the zet sort, and the face() rasterizer (dx1 edge switches to
-the v2->v3 slope at row y2 exactly like the original). The "holes" were a
-frame-rate/phase mismatch, plus two texture-interpolation bugs:
+arithmetic) and the zet sort. The "holes" were a frame-rate/phase mismatch,
+two texture-interpolation bugs, and - found later - the missing draw_2
+rasterizer path (item 28):
 
 25. **P3 main loop waited for TWO VBL ticks per frame (~35 fps, not 70).**
     The ORIGINAL P3.ASM main loop calls EOS `wait_vbl` then `v_sync`; the
@@ -198,6 +198,41 @@ frame-rate/phase mismatch, plus two texture-interpolation bugs:
     shortfall overflowed into `n_vert` every frame, corrupting the normals
     (and thus the p/n_rot texture coordinates) of the first ~114 vertices.
     Fixed the allocation size - no more cross-frame n_vert corruption.
+
+## Fixed divergences - P3 dual-texture rasterizer `draw_2` (2026-08-07)
+
+28. **P3 `face` only implemented `draw_1`; the positive-span case never
+    rendered.** P3.ASM has TWO raster paths: `draw_1` (middle vertex LEFT of
+    the long edge, `x_2 < pom`; span right->left via `dec edi`) and `draw_2`
+    (middle vertex RIGHT, `x_2 > pom`; span left->right via `inc edi`, with
+    the v1->v3 interpolant `x_s` as the left edge and `x_1` as the right ---
+    note the swap versus draw_1's `x_1`+`x_s` edge roles, kept in the port
+    with `movsx edi,[x_s+2] / movsx ebp,[x_1+2]`). The port routed `.norm`
+    (positive span, roughly half of all 646 faces) into `draw_1`, where
+    `sub ebp,edi` came out negative every row and the row was skipped, so
+    every norm face was invisible; the hero "A" object looked full of holes
+    (the earlier 2026-08-05 audit misattributed the holes to the frame-rate
+    phase mismatch). Fixed by porting the full `draw_2` block
+    (P3.ASM:1106-1167: `.add_1` virtual scan of an off-LEFT edge, `.no_c1`
+    clamp right <= 319, `.fo_2` fill with the original es/lgmap + fs/map
+    sample order, `.go_2` advance, `dec dy_3 / jne draw_2`) and routing
+    `.norm: call p3_slope; jmp .draw_2`.
+    - The added `.draw_2` block MUST NOT sit in the fall-through of
+      `draw_1`'s loop exit: `dec dy_3 / jne .draw_1` was originally followed
+      by `ret`, and dropping it (or placing `.draw_2` right after `jne
+      .draw_1`) re-rasterizes every face a second time with `dy_3` already at
+      0 -> it decrements below zero forever and walks off row 199, an
+      out-of-bounds AV in `make_anim` pre-roll (0xC0000005). The loop exits
+      via explicit `jmp .sk`.
+    - Edge integer reads are SIGNED 16-bit (`movsx`), matching the original
+      `mov di/bp, w ..+2`: a negative integer part means the edge is
+      off-screen-LEFT and is virtually scanned inward (`add_1`/`add_2`)
+      instead of `movzx`-wrapping to ~65000 (which both dropped off-left rows
+      in draw_1 and would spin the `.add_2` clamp ~65k times per row).
+    Verified: P3 standalone 855 frames, clean exit; hero object solid
+    (frame-recorded; port still `reference/captures/port_p3_tunnel_fixed.png`);
+    full playthrough 1->5 clean; all 27
+    CTests pass.
 
 ## Fixed divergences - P8 palette audit (2026-08-06)
 
