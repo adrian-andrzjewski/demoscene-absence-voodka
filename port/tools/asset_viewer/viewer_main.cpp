@@ -4,7 +4,7 @@
 // 31-35), renders the current one flat-shaded or wireframe with an orbit
 // camera, and shows the model's debug metadata in the window title.
 //
-// Keys:             1-9  switch model,  Space  wireframe,
+// Keys:             1-9 or [ ]  switch model,  Space  wireframe,
 //                    R    auto-rotate,   Esc    quit
 //  Mouse:            drag orbit camera,  wheel  zoom
 
@@ -183,7 +183,7 @@ void showAsset(int index) {
     char title[256];
     std::snprintf(title, sizeof title,
                   "V3D Asset Viewer - %s [%d/%d] %dv %df [%s]   "
-                  "(1-9 switch, Space wireframe, R rotate, drag orbit, wheel zoom)",
+                  "(1-9 or [ ] switch, Space wireframe, R rotate, drag orbit, wheel zoom)",
                   a.name.c_str(), index + 1, (int)g_assets.size(),
                   a.vertexCount, a.faceCount, typeName(a.type));
     if (g_hwnd) SetWindowTextA(g_hwnd, title);
@@ -204,6 +204,18 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
             if (wp >= '1' && wp <= '9') {
                 int idx = (int)(wp - '1');
                 if (idx < (int)g_assets.size()) showAsset(idx);
+                return 0;
+            }
+            if (wp == VK_OEM_4) {   // '[' - previous model (wraps)
+                int n = (int)g_assets.size();
+                int cur = g_current < 0 ? 0 : g_current;
+                if (n > 0) showAsset((cur + n - 1) % n);
+                return 0;
+            }
+            if (wp == VK_OEM_6) {   // ']' - next model (wraps)
+                int n = (int)g_assets.size();
+                int cur = g_current < 0 ? 0 : g_current;
+                if (n > 0) showAsset((cur + 1) % n);
                 return 0;
             }
             if (wp == VK_SPACE) {
