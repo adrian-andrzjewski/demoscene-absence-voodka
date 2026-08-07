@@ -695,10 +695,15 @@ MakeMorphTable:
         add     rdi, 12
         dec     r15
         jnz     .calcAllMor
+        ; The inner 128-vertex loop already advanced rsi/rdi by exactly one
+        ; frame (128*12B), so they now point at frame[i] / frame[i+1] - the
+        ; correct prev/cur pair for the next outer iteration. Only the delta
+        ; pointer (rbx) must be rewound to the table start. (The original
+        ; restores esi/edi via push/pop then adds 1536 once; adding 1536 here
+        ; ON TOP of the walked distance skips a frame and feeds zeros into the
+        ; chain - that is what collapsed every built morph frame to ~0.)
         mov     ebx, [rel _tabMorph]
         add     rbx, qword [rel Code32_addr]
-        add     rsi, 1536
-        add     rdi, 1536
         dec     r14
         jnz     .calcRest
 
