@@ -12,6 +12,16 @@
 namespace vk {
 
 namespace {
+// Window-close (WM_QUIT) turns the per-frame waitVbl tick into a full
+// teardown + process exit. waitVbl's body would otherwise return control to
+// the assembly demo loop, which never checks a quit flag on its own.
+void maybeShutdownAndExit() {
+    if (quitRequested())
+        shutdownAndExit();   // does not return
+}
+}
+
+namespace {
 constexpr double kHertz = 70.0;                 // nominal VGA retrace rate
 double        g_nominalPeriodUs = 1e6 / kHertz; // recomputed after calibration
 int64_t       g_qpcFreq = 0;
@@ -54,12 +64,17 @@ void waitVbl() {
     // parked, so all ramki/ModPos-driven animation, effects and transitions
     // freeze and resume at the exact same values -> audio/visual sync is kept.
     updateInput();
+    maybeShutdownAndExit();
     if (isPaused()) {
+        // Parked while paused: keep pumping so a window-close (Space-paused)
+        // is still seen. Break out so the exit path below can run.
         for (;;) {
             updateInput();
+            if (quitRequested()) break;
             if (!isPaused()) break;
             Sleep(5);
         }
+        maybeShutdownAndExit();
         // resumed: reset the pacing phase so the next frame waits a full tick
         QueryPerformanceCounter((LARGE_INTEGER*)&g_nextTickCount);
     }

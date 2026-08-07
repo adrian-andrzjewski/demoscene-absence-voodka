@@ -308,8 +308,12 @@ void presentFrame() {
     if ((cnt++ & 0x3fff) == 0) logPrint("[d3d] presentFrame #%ld\n", cnt);
     // Pump Win32 messages so the window stays responsive and input (keyboard)
     // reaches the demo. The assembly loop never touches Windows itself, so this
-    // is the single per-frame opportunity to service the message queue.
+    // is the single per-frame opportunity to service the message queue. If a
+    // window-close (WM_QUIT) was observed, tear down and exit before touching
+    // any D3D11 state this frame.
     vk::updateInput();
+    if (vk::quitRequested())
+        vk::shutdownAndExit();   // does not return
     const uint8_t* frame = arena() + kFramebufferOffset;
     recPush(frame);
 

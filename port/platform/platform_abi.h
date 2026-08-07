@@ -93,6 +93,14 @@ uint8_t* rawKeyMap();
 void clearEscapeQueue();
 bool escapeQueued();
 
+// ---- lifecycle / quit ---------------------------------------------------------
+// The demo core runs on the main thread (DemoStart32), so a window-close
+// (WM_CLOSE -> WM_DESTROY -> PostQuitMessage) lands in updateInput() as a
+// WM_QUIT message. It is recorded here; the per-frame choke points
+// (waitVbl / presentFrame) observe it and run a full deterministic teardown.
+void requestQuit();          // mark a quit request (earliest source wins)
+bool quitRequested();        // a WM_QUIT / window-close is pending
+
 // ---- audio (libxmp MOD player) ----------------------------------------------
 int  audioInit(const char* modFilePath, int sampleRate);
 void audioShutdown();
@@ -130,5 +138,13 @@ int  audioSelfCheck(int seconds);
 void logInit();                        // open debugger + voodka.log (once)
 void logPrint(const char* fmt, ...);      // printf-style to debugger+file
 void logFlush();
+
+// ---- shutdown / exit ---------------------------------------------------------
+// Deterministic wind-down, identical to the end-of-demo path in app.cpp:
+// recording + readback outputs closed, the audio render thread stopped/joined
+// and WASAPI released, log flushed. shutdownAndExit() additionally terminates
+// the process so nothing outlives the closed window.
+void shutdownAll();          // release all subsystems (safe on normal exit)
+void shutdownAndExit();      // shutdownAll() then terminate the process
 
 }  // namespace vk

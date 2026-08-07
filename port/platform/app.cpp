@@ -101,7 +101,17 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
             SetWindowPos(h, HWND_TOPMOST, 0, 0, 0, 0,
                          SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
         break;
+    case WM_CLOSE:
+        // Explicitly close on the titlebar X (DefWindowProc's default path
+        // also destroys, but spelling it out keeps the intent clear): the
+        // window goes away immediately and WM_DESTROY -> PostQuitMessage
+        // posts the WM_QUIT that the demo loop turns into a full shutdown.
+        DestroyWindow(h);
+        return 0;
     case WM_DESTROY:
+        // PostQuitMessage(0) posts WM_QUIT to the thread's queue. updateInput()
+        // (per frame) picks it up and flags the pending quit; waitVbl /
+        // presentFrame then run the teardown and terminate the process.
         PostQuitMessage(0);
         return 0;
     }
@@ -317,9 +327,33 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         rcode = DemoStart32(ab, 64ull * 1024 * 1024);
     }
 
+    vk::shutdownAll();
+    return rcode;
+}
+
+namespace vk {
+
+// Full deterministic wind-down; the single teardown sequence shared by the
+// normal end-of-demo path (above) and the window-close exit path. Order:
+// 1. recording + readback output files closed (nothing half-written),
+// 2. audio thread stopped + joined  and WASAPI released (sound halts,
+//    no background audio thread survives),
+// 3. log flushed to disk.
+void shutdownAll() {
     vk::recClose();
     vk::diagReadbackShutdown();
     vk::audioShutdown();
     vk::logFlush();
-    return rcode;
 }
+
+// Window closed mid-demo: called from the per-frame choke points (waitVbl /
+// presentFrame) while the demo core is still on the stack. Runs the same
+// teardown as the end-of-demo path, then terminates the process so no demo
+// loop, audio thread or other background activity outlives the closed window.
+void shutdownAndExit() {
+    vk::logPrint("[app] window closed - shutting down\n");
+    vk::shutdownAll();
+    ExitProcess(0);
+}
+
+}  // namespace vk

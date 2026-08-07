@@ -186,6 +186,27 @@ for scratch; never reuse a register the original left live.**
   (`kPartStartModPos` in `app.cpp`) are calibration-tuned - see
   `docs/KNOWN_DIFFERENCES.md`.
 
+## Lifecycle / window close (the quit path)
+
+- `DemoStart32` (**and every part loop inside it**) runs on the main thread
+  and never checks a quit flag - the original demo only ever exited when the
+  timeline ran out. A titlebar-X close therefore must not just destroy the
+  window (`WM_DESTROY -> PostQuitMessage`); something still on the main
+  thread has to notice and run the teardown.
+- The chain: `WM_CLOSE` (explicit in `app.cpp`'s `WndProc`) -> `DestroyWindow`
+  -> `WM_DESTROY` -> `PostQuitMessage(0)` -> **`WM_QUIT`** lands in
+  `updateInput()` (called from `waitVbl` and `presentFrame` every frame).
+  `updateInput` records it (`vk::requestQuit`/`quitRequested`) instead of
+  dispatching - `WM_QUIT` has no window.
+- The per-frame choke points (`waitVbl` in `timer.cpp` - including its
+  pause-park loop - and `presentFrame`) call `vk::shutdownAndExit()` when a
+  quit is pending: `recClose` -> `diagReadbackShutdown` -> `audioShutdown`
+  (stops the WASAPI thread, joins it, releases libxmp/COM) -> `logFlush` ->
+  `ExitProcess(0)`. `ExitProcess` is deliberate: the demo core is still on
+  the stack (assembly frames have no unwind info), so a normal return cannot
+  reach `WinMain`'s tail. `WinMain`'s tail path is the same `vk::shutdownAll()`
+  minus the exit, so both routes run one shared teardown sequence.
+
 ## Build hygiene
 
 - **Always use the vendored NASM 2.16.03** (`modules/nasm/nasm.exe`). A

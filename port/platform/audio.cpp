@@ -606,6 +606,13 @@ int audioSelfCheck(int seconds) {
         QueryPerformanceCounter((LARGE_INTEGER*)&w1);
         int64_t elapsedUs = (w1 - w0) * 1000000 / freq;
         if (elapsedUs >= (int64_t)seconds * 1000000) break;
+        // Service the queue so a window-close (X) aborts the check instead of
+        // letting the process linger; WinMain's tail shuts audio down after.
+        updateInput();
+        if (quitRequested()) {
+            logPrint("[audio] self-check aborted (window closed)\n");
+            return 0;
+        }
         audioPump();
         if (g_stop && WaitForSingleObject(g_stop, 10) == WAIT_OBJECT_0) break;
         Sleep(10);
