@@ -82,8 +82,9 @@ TASM text), `pal.integrity` + `pal.repro` (palette copies + OBJ-extraction
 reproducibility), `build.addr32` (COFF relocation hygiene),
 `virtual.world_golden` + `virtual.load` (the viewer's archive is
 byte-identical to the original and decodes), and `v3d.viewer_parse` (the
-asset viewer's parser vs every V3D/V3M header/count/index/spin). Python-based
-tests skip cleanly if no interpreter is found.
+asset viewer's parser vs all 27 original 3D assets: 9 archive V3D/V3M
+headers, all 16 CODE/DATAS mesh pair counts, 2 VIRTUAL world objects).
+Python-based tests skip cleanly if no interpreter is found.
 
 ## Tools (`port/tools/`)
 
@@ -97,8 +98,8 @@ tests skip cleanly if no interpreter is found.
 | `extract_pals.py` | recovers compile-time palettes from the original OMF OBJs |
 | `audit_addr32.py` | COFF relocation hygiene audit (wired as `build.addr32`) |
 | `extract_v3d` | pulls the 9 V3D/V3M assets (entries 12-15, 31-35) out of `data/vodka.dat` |
-| `asset_viewer` | D3D11 viewer: flat-shaded/wireframe orbit view of every V3D/V3M model |
-| `asset_viewer_selftest` | parse-only validation of all 9 assets (CTest `v3d.viewer_parse`) |
+| `asset_viewer` | D3D11 viewer: flat-shaded/wireframe orbit view of every 3D asset in the original (9 archive V3D/V3M + 16 CODE/DATAS meshes + 2 VIRTUAL world objects) |
+| `asset_viewer_selftest` | parse-only validation of all 27 assets (CTest `v3d.viewer_parse`) |
 
 ## Troubleshooting
 

@@ -112,6 +112,8 @@ bool parsePayload(V3DAsset& a, const uint8_t* payload, size_t payloadLen) {
 
 }  // namespace
 
+void computeFaceNormals(V3DAsset& a) { buildFaceNormals(a); }
+
 std::optional<V3DAsset> loadV3D(const std::string& path) {
     std::vector<uint8_t> d;
     if (!readFile(path, d)) return std::nullopt;

@@ -24,7 +24,7 @@ add_custom_command(
 add_custom_target(extract_v3d_assets DEPENDS "${ASSET_VIEWER_DATA_DIR}/.stamp")
 
 # ---- the viewer ---------------------------------------------------------------
-add_executable(asset_viewer WIN32 viewer_main.cpp v3d_parser.cpp renderer.cpp)
+add_executable(asset_viewer WIN32 viewer_main.cpp v3d_parser.cpp datas_parser.cpp renderer.cpp)
 target_compile_definitions(asset_viewer PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(asset_viewer PRIVATE d3d11 d3dcompiler dxgi)
 add_dependencies(asset_viewer extract_v3d_assets)
@@ -33,7 +33,7 @@ if(MSVC)
 endif()
 
 # ---- parse selftest (CTest v3d.viewer_parse) ---------------------------------
-add_executable(asset_viewer_selftest selftest.cpp v3d_parser.cpp)
+add_executable(asset_viewer_selftest selftest.cpp v3d_parser.cpp datas_parser.cpp)
 target_compile_definitions(asset_viewer_selftest PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN
     ASSET_VIEWER_DATA_DIR="${ASSET_VIEWER_DATA_DIR}")

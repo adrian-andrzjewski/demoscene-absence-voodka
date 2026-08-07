@@ -347,7 +347,13 @@ void Renderer::render() {
 
     // ---- diagnostic: dump the presented frame once (VOODKA_VIEWER_READBACK) -
     static int s_presented = 0;
-    if (++s_presented == 10) {
+    static int s_rbAt = -1;   // latching default: env VOODKA_VIEWER_READBACK_AT
+    if (s_rbAt < 0) {
+        s_rbAt = 10;
+        const char* at = getenv("VOODKA_VIEWER_READBACK_AT");
+        if (at && at[0]) s_rbAt = std::atoi(at);
+    }
+    if (++s_presented == s_rbAt) {
         const char* rb = getenv("VOODKA_VIEWER_READBACK");
         if (rb && rb[0]) {
             ID3D11Texture2D* back = nullptr;

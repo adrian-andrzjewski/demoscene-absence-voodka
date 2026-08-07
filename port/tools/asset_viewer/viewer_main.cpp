@@ -13,6 +13,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 #include <optional>
 #include <string>
@@ -21,6 +22,8 @@
 
 #include "v3d_entries.h"
 #include "v3d_parser.h"
+#include "datas_entries.h"
+#include "datas_parser.h"
 #include "renderer.h"
 
 namespace {
@@ -119,6 +122,7 @@ const char* typeName(int t) {
     switch (t) {
         case 0: return "PIXELS";
         case 1: return "TEXTURES";
+        case 3: return "DATAS";
         default: return "PHONG";
     }
 }
@@ -283,6 +287,96 @@ LRESULT CALLBACK wndProc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
 
 }  // namespace
 
+// ---- original-tree CODE/DATAS compile-time meshes ---------------------------
+// 16 vertex/face (.INC) pairs assembled into the EXE at TASM time; read
+// straight from the original source tree (dev/reference fallback via
+// VOODKA_REPO_ROOT).
+void loadDatasModels() {
+#ifdef VOODKA_REPO_ROOT
+    std::string base = std::string(VOODKA_REPO_ROOT) +
+                       "/demoscene-absence-voodka-master/CODE/DATAS/";
+    int loaded = 0;
+    for (int i = 0; i < kDatasPairCount; ++i) {
+        const DatasPair& p = kDatasPairs[i];
+        auto asset = loadDatasMesh(base + p.verts, base + p.faces, p.name);
+        if (!asset) {
+            std::fprintf(stderr, "[viewer] failed to parse DATAS %s\n", p.name);
+            continue;
+        }
+        loaded++;
+        std::printf("[viewer] %s: DATAS nov=%d nof=%d\n",
+                    p.name, asset->vertexCount, asset->faceCount);
+        g_assets.push_back(std::move(*asset));
+    }
+    if (!loaded)
+        std::fprintf(stderr,
+                     "[viewer] no DATAS meshes loaded (original tree missing at %s)\n",
+                     base.c_str());
+#else
+    std::fprintf(stderr, "[viewer] VOODKA_REPO_ROOT undefined; DATAS meshes skipped\n");
+#endif
+}
+
+// ---- VIRTUAL/OBJECTS V3Ds (packed into the objects/world archive) ----------
+// [count:u32][count x u32 offsets][raw blobs] (WORLD.PAS semantics).
+void loadWorldModels() {
+    wchar_t exePath[MAX_PATH] = {};
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+    std::wstring wdir(exePath);
+    auto slash = wdir.find_last_of(L"\\/");
+    if (slash != std::wstring::npos) wdir = wdir.substr(0, slash + 1);
+    std::string dir(wdir.begin(), wdir.end());   // exe dir is ASCII here
+
+    std::vector<std::string> cands;
+    cands.push_back(dir + "data\\world");
+    cands.push_back(dir + "world");
+#ifdef VOODKA_REPO_ROOT
+    cands.push_back(std::string(VOODKA_REPO_ROOT) + "/port/data/world");
+#endif
+
+    std::vector<uint8_t> data;
+    for (const std::string& c : cands) {
+        FILE* f = std::fopen(c.c_str(), "rb");
+        if (!f) continue;
+        std::fseek(f, 0, SEEK_END);
+        long n = std::ftell(f);
+        std::fseek(f, 0, SEEK_SET);
+        data.resize(n > 0 ? (size_t)n : 0);
+        if (n > 0) std::fread(data.data(), 1, (size_t)n, f);
+        std::fclose(f);
+        std::printf("[viewer] world archive %s (%zu bytes)\n", c.c_str(),
+                    data.size());
+        break;
+    }
+    if (data.size() < 12) {
+        std::fprintf(stderr, "[viewer] objects/world archive not found; VIRTUAL objects skipped\n");
+        return;
+    }
+
+    uint32_t count = le32(&data[0]);
+    for (uint32_t i = 0; i < count; ++i) {
+        uint32_t ofs = le32(&data[4 + i * 4]);
+        uint32_t end = (i + 1 < count) ? le32(&data[8 + i * 4])
+                                       : (uint32_t)data.size();
+        if (ofs >= end || end > data.size()) {
+            std::fprintf(stderr, "[viewer] world blob %u bounds %u..%u invalid\n",
+                         i, ofs, end);
+            continue;
+        }
+        // VIRTUAL/OBJECTS names: TORUS.V3D, TORUS2.V3D (indices 0/1)
+        std::string nm = (i == 0) ? "torus.v3d (virtual)" : "torus2.v3d (virtual)";
+        auto asset = loadV3DFromMemory(&data[ofs], (size_t)(end - ofs), nm);
+        if (!asset) {
+            std::fprintf(stderr, "[viewer] failed to parse world blob %u\n", i);
+            continue;
+        }
+        std::printf("[viewer] %s: %s nov=%d nof=%d\n",
+                    nm.c_str(), typeName(asset->type),
+                    asset->vertexCount, asset->faceCount);
+        g_assets.push_back(std::move(*asset));
+    }
+}
+
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
     (void)hInst;
     // Match the port's window setup: per-monitor DPI awareness keeps the
@@ -301,7 +395,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
         return 1;
     }
 
-    // ---- load all 9 models from the archive --------------------------------
+    // ---- load every 3D asset the original offers --------------------------
+    // 1) the 9 V3D/V3M packed in vodka.dat
     for (int i = 0; i < kV3DEntryCount; ++i) {
         const V3DEntry& e = kV3DEntries[i];
         std::vector<uint8_t> blob;
@@ -339,8 +434,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
         g_assets.push_back(std::move(*asset));
     }
 
+    // 2) the 16 CODE/DATAS compile-time meshes (original source tree)
+    loadDatasModels();
+    // 3) the 2 VIRTUAL/OBJECTS V3Ds (objects/world archive)
+    loadWorldModels();
+
+    std::printf("[viewer] loaded %zu 3D assets total\n", g_assets.size());
     if (g_assets.empty()) {
-        MessageBoxA(nullptr, "No V3D/V3M assets could be parsed.",
+        MessageBoxA(nullptr, "No 3D assets could be parsed.",
                     "V3D Asset Viewer", MB_ICONERROR);
         return 1;
     }
@@ -382,7 +483,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int nCmdShow) {
         return 1;
     }
     logLine("[viewer] D3D11 init OK");
-    showAsset(selectTorus());
+    int startIdx = selectTorus();
+    const char* st = getenv("VOODKA_VIEWER_START");
+    if (st && st[0]) {
+        int v = std::atoi(st);
+        if (v >= 0 && v < (int)g_assets.size()) startIdx = v;
+    }
+    showAsset(startIdx);
     logLine("[viewer] showing asset %d of %d", g_current, (int)g_assets.size());
 
     // ---- main loop ----------------------------------------------------------

@@ -149,13 +149,18 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
   them in sync with the work.
 - **V3D asset viewer:** `port/tools/asset_viewer/` is a standalone
-  Win32+D3D11 tool that loads all 9 V3D/V3M models from `vodka.dat`
-  (archive entries 12-15 + 31-35) and renders the current one flat-shaded
-  or wireframe with an orbit camera (keys 1-9 switch model, Space =
-  wireframe, R = auto-rotate, mouse drag/wheel = orbit/zoom; metadata in
-  the title bar). `extract_v3d` pulls the raw files at build time for the
-  CTest; `asset_viewer_selftest` (CTest `v3d.viewer_parse`) validates every
-  header/count/index/spin against the known-good values.
+  Win32+D3D11 tool that loads and renders **every 3D asset the original
+  demo ships** — the 9 V3D/V3M packed in `vodka.dat` (archive entries
+  12-15 + 31-35), the 16 `CODE/DATAS` compile-time mesh pairs (read from
+  the original source tree), and the 2 `VIRTUAL/OBJECTS` V3Ds (from the
+  `objects/world` archive) — 27 models total. Flat-shaded or wireframe,
+  orbit camera (keys 1-9 + [ ] switch model, Space = wireframe, R =
+  auto-rotate, mouse drag/wheel = orbit/zoom; metadata in the title bar;
+  `VOODKA_VIEWER_START=<idx>` picks the boot model). `extract_v3d` pulls
+  the raw V3D/V3M files at build time for the CTest;
+  `asset_viewer_selftest` (CTest `v3d.viewer_parse`) validates all 27
+  (headers/counts/indexes/spin + the DATAS inventory counts + the world
+  objects).
 - **Tests:** 27 CTests (`port/build.ps1 -Config Release -Test`), sources in
   `port/tools/validate/` (the old empty `port/tests/` was removed): 17
   NASM-vs-C++ cross-checks + `vodka.golden_hash` + `v3d.crosscheck` (real

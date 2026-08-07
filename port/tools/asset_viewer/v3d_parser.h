@@ -41,6 +41,11 @@ struct V3DAsset {
 // to stderr).
 std::optional<V3DAsset> loadV3D(const std::string& path);
 
+// Fill faceNormals (per face) for any already-populated asset (vertices +
+// faces). Degenerate faces fall back to (0,1,0). Reused by the DATAS mesh
+// parser.
+void computeFaceNormals(V3DAsset& a);
+
 // Same parse, from an in-memory blob (the viewer extracts directly from
 // vodka.dat without touching disk).
 std::optional<V3DAsset> loadV3DFromMemory(const uint8_t* data, size_t size,
