@@ -126,8 +126,25 @@ code. Both are fixed; keep the pattern in mind.
    the arena, using the reference's byte*2 rcalc stride (the port had *4),
    and reading show()'s face vertex index from con (not rcalc).
 
+4. **P5 morph-frame chain (golden-torus flicker).** The original's `CalcRest`
+   restores `esi/edi`/`ebx` to the start of the just-read/written frame with a
+   `push`/`pop` before its single `add 1536`; the port dropped the save/restore
+   and instead added 1536 to `rsi`/`rdi` on top of the inner 128-vertex walk
+   (which already advances them one full 1536-byte frame). Every outer
+   iteration then read the still-zero *next-next* frame, so each built morph
+   frame collapsed to ~0: a collapsed (all-vertices-identical) frame projects
+   to a single screen point, the 16-bit back-face test culled all 256 faces
+   (`skBF=256`), and the rotating torus vanished except on the occasional
+   ktoryMorph pass through frame 0 - the intermittent appear/disappear.
+   Fix (`p5.asm MakeMorphTable`): rewind only the delta pointer (`rbx`) each
+   iteration; `rsi`/`rdi` are already parked at `frame[i]`/`frame[i+1]`.
+   Verified: frames lerp exactly like a Python replication of the reference
+   chain, and the torus emits ~100-125 faces every rotation frame.
+
 Rule of thumb: **port arithmetic exactly; reach for spare registers (r8+)
-for scratch; never reuse a register the original left live.**
+for scratch; never reuse a register the original left live; preserve the
+original's save/restore (push/pop) discipline instead of 'simplifying'
+pointer advancement.**
 
 ## FPU & fixed point
 
