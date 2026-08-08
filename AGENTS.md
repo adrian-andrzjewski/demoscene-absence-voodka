@@ -144,7 +144,9 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   `RECONSTRUCTION_PLAN.md` (audit/decisions/phase status), `ASSETS.md`
   (vodka.dat format + 76-asset index map + recovery), `ASSET_FORMATS.md`
   (per-format reverse-engineering bible: structures, encodings, consumption,
-  port parity, presentation color/scaling pipeline), `PORTING_NOTES.md`
+  port parity, presentation color/scaling pipeline), `WORLD_ARCHITECTURE.md`
+  (the VR scene engine: world records, object instancing, camera paths,
+  per-frame pipeline, render-to-texture water, port parity), `PORTING_NOTES.md`
   (architecture/ABI/memory model/case studies), `BUILDING.md` (build/run/
   test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
   them in sync with the work.

@@ -1,10 +1,13 @@
 # Reconstruction plan & decision log
 
 Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). Updated
-2026-08-06: P4 removed, then restored (see Phase 3 note). This
+2026-08-06: P4 removed, then restored (see Phase 3 note). Updated
+2026-08-08: Phase 10 world-architecture analysis complete
+(`docs/WORLD_ARCHITECTURE.md`). This
 document records the audit, the decisions taken, and the remaining work.
-Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
-`BUILDING.md`, `KNOWN_DIFFERENCES.md`.
+Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`,
+`WORLD_ARCHITECTURE.md` (the VR scene engine: worlds, objects, camera,
+render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 
 ## 1. Audit conclusions (what the repository contains)
 
@@ -99,6 +102,19 @@ Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`, `PORTING_NOTES.md`,
   in the title bar). `extract_v3d` pulls the raw V3D/V3M at build time;
   `asset_viewer_selftest` (CTest `v3d.viewer_parse`) validates all 27
   against known-good values. 27/27 tests green.
+- [x] **Phase 10 - world architecture analysis (2026-08-08)**: reverse
+  engineered the complete VR scene engine - the demo's two 3D worlds (P2
+  stadium, P5 colosseum + VIRTUAL harness): 48-byte world records
+  (flat instancing), the 21-dword object struct / `.V3D`, camera paths
+  (`TRASA.!` / `WIDOKI`), `MakeCameraMatrix`, `CalculateVisiblating` +
+  `VirSort` (far->near on low-16 of zet; P5 adds `sar bx,4`), per-face
+  BITSORT, `tm_face`, and P5's render-to-texture water plane. Documented in
+  `docs/WORLD_ARCHITECTURE.md`; data parity verified (P2 world 212/212,
+  P5 world 45/45, trasa/widoki byte-identical). Corrections: `WORLD.V3D`
+  is a dev snapshot of the P5 world (44/45 records match; record 0 adders
+  (8,5,0)); world field `+44` is a texture-slot index, not a "type";
+  `+56 adders-to-color` is allocated-but-unused (no VR lighting). 27/27
+  tests green (fresh rebuild 2026-08-08).
 - [x] **Phase 8 - P3 hero-object geometry/rotation audit (2026-08-05)**: the
   P3 tunnel's hero 3D object looked "hole-y / missing faces / not like the
   original cog". Runtime instrumentation (arena dumps + per-face/per-row

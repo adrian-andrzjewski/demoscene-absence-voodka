@@ -3,7 +3,9 @@
 Scope: every asset format the 1996 original consumes, how the original
 assembly interprets it, and how the Windows x64 port (`port/`) reproduces it.
 Companion docs: `ASSETS.md` (the 76-entry index map + recovery),
-`PORTING_NOTES.md` (architecture/ABI), `KNOWN_DIFFERENCES.md` (validation).
+`WORLD_ARCHITECTURE.md` (how these assets become 3D worlds — world records,
+object instancing, camera, render pipeline), `PORTING_NOTES.md`
+(architecture/ABI), `KNOWN_DIFFERENCES.md` (validation).
 
 Everything below was reverse-engineered from the original sources
 (`demoscene-absence-voodka-master/`, cited as `CODE/...`) and hex-verified
@@ -277,7 +279,9 @@ P2 world (`CODE/INC/WORLD`, 212 records) and P5 world (`CODE/P5/WORLD`, 45):
 adders, +44 texture slot`. Ports: `core/data/p2world.inc`,
 `parts/p5_world.inc` (verbatim data, cross-checked by `p2world.crosscheck`).
 `CODE/WORLD/WORLD.V3D` (2,164 B = 4 + 45×48) is a *world table* in a
-misnamed extension (matches P5/WORLD record 0 byte-for-byte).
+misnamed extension — a **dev snapshot of the P5 world**: 44/45 records are
+byte-identical to `P5/WORLD`; only record 0 (the torus) differs (angle adders
+(8,5,0) vs the shipped (0,0,0)). See `WORLD_ARCHITECTURE.md` §12.1.
 
 ### 4.4 VIRTUAL `objects/world` archive
 

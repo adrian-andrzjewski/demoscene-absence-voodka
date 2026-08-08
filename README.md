@@ -46,6 +46,9 @@ Details: **[docs/BUILDING.md](docs/BUILDING.md)**
 - [docs/ASSET_FORMATS.md](docs/ASSET_FORMATS.md) - every asset format
   reverse-engineered: container, palettes, bitmaps, sprites, V3D/V3M, paths,
   water/bump data, the MOD, and the DOS->D3D11 color/scaling pipeline
+- [docs/WORLD_ARCHITECTURE.md](docs/WORLD_ARCHITECTURE.md) - the VR scene
+  engine: world records, object instancing, camera paths, per-frame render
+  pipeline, visibility/sort, render-to-texture water, port parity
 - [docs/PORTING_NOTES.md](docs/PORTING_NOTES.md) - architecture, ABI rules,
   memory model, case studies
 - [docs/BUILDING.md](docs/BUILDING.md) - build/run/test reference
