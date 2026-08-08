@@ -237,8 +237,21 @@ rasterizer path (item 28):
 ## Fixed divergences - P4 plate audit (2026-08-09)
 
 The P4 scene after the P3 tunnel was compared against the original P4 source,
-the recovered texture data, and the DOSBox still. Two port-only fidelity bugs
+the recovered texture data, and the DOSBox still. Port-only fidelity bugs
 were fixed:
+
+- **Rotated morph targets were bypassed:** the original `shape` pointer is
+  followed by the per-frame `s1/s2/s3` outputs written by `make_chip`. The
+  port was instead reading the raw, unrotated source targets for `calc_pts`
+  and projected vertices. It now rebuilds the same contiguous render view
+  after each `make_chip` call; the raw arena block remains available to
+  `n_calc` and the morph step.
+- **P4 source copy tail:** the combined 567-vertex block is 3,402 bytes, so
+  the previous dword-only copy dropped the final two bytes of `src3`. The
+  remainder is now copied explicitly.
+- **P4 string direction state:** the DOS `PART4` entry begins with `cld`;
+  the port now does the same before its asset and framebuffer copies, so P4
+  cannot inherit a reversed `rep` direction from a preceding scene.
 
 - **Signed rasterizer edge coordinates:** the P4 face rasterizer used zero-
   extended 16-bit edge coordinates. Negative off-screen-left coordinates then

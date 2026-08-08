@@ -9,14 +9,15 @@
 ; logo overlay and a picture + flash outro.
 ;
 ; Memory model: stored dwords are arena offsets; deref via `add r, Code32_addr`.
-; The 567-vertex model block (shape[222] + src1[81] + src2[8] + src3[256],
-; src1..3 PREPARED in place) lives in one arena block (shape_a8) so calc_pts,
-; rotate and n_calc all read it through code32-relative offsets (n_calc needs
-; shape_addr as an arena offset). The con1..c3 face tables (994x6, modified by
-; prepare/co_prepare) live in one arena block (con_a8) - n_calc's con_addr and
-; show()/rotate() both index it. n_vert_src/n_add/n_vert/n_rot are engine
-; working arrays (arena). draw_tab (sort_addr) is arena. rcalc/check live in
-; module .bss (small, only this part touches them).
+; The raw 567-vertex source block (shape[222] + src1[81] + src2[8] +
+; src3[256], src1..3 PREPARED in place) lives in the arena as shape_a8 for
+; n_calc and make_chip. The renderer's logical shape+s1+s2+s3 view is rebuilt
+; in p4_render_shape after make_chip, matching the original contiguous data
+; layout. The con1..c3 face tables (994x6, modified by prepare/co_prepare)
+; live in one arena block (con_a8) - n_calc's con_addr and show()/rotate()
+; both index it. n_vert_src/n_add/n_vert/n_rot are engine working arrays
+; (arena). draw_tab (sort_addr) is arena. rcalc/check live in module .bss
+; (small, only this part touches them).
 ;
 ; selectors: map1_sel..map4_sel = textures (fs), scr_sel = screen (es). con3
 ; stores the texture MAP INDEX (0..3) instead of a runtime selector handle;
@@ -202,10 +203,12 @@ j_offs:    resd 1
 j_add:     resd 1
 stary:     resw 1
 
-; make_chip scratch targets (s1/s2 in the original are written but never
-; read again; kept for fidelity of side effects)
+; make_chip scratch targets. The original's shape pointer is followed by the
+; rotated s1/s2/s3 working vertices; sync_render_shape rebuilds that logical
+; contiguous view after every make_chip call.
 p4_s1: resw 81*3
 p4_s2: resw (8+256)*3
+p4_render_shape: resw p_len*3
 
 ; --------------------------------------------------------------------- .data
 section .data align=16
@@ -351,6 +354,10 @@ part4:
         push    r15
         sub     rsp, 0x28
 
+        ; The DOS entry begins with CLD; keep all REP copies and string
+        ; operations independent of the direction flag left by the prior part.
+        cld
+
         ; original .data initializers
         mov     dword [rel mnoznik], 1
         mov     dword [rel ile_fade], 64
@@ -454,6 +461,11 @@ part4:
         lea     rsi, [rel sw_shape]
         mov     ecx, (p_len*6)>>2
         rep movsd
+        ; p_len*6 is 3402 bytes. Preserve the final two bytes of src3's
+        ; last vertex; the original assembler image contains them as part of
+        ; the static shape block, while a dword-only copy would drop them.
+        mov     ecx, (p_len*6)&3
+        rep movsb
 
         ; n_vert_src / n_add / n_vert / n_rot
         mov     eax, EOS_ALLOCATE_MEMORY
@@ -510,6 +522,7 @@ part4:
 
         call    co_prepare
         call    make_chip
+        call    sync_render_shape
         call    make_pts
         call    make_pos
 
@@ -623,6 +636,7 @@ part4:
         call    prep_rot1
         call    prep_rot2
         call    make_chip
+        call    sync_render_shape
         call    rotate
         neg     word [r_x]
         neg     word [r_y]
@@ -1069,9 +1083,7 @@ make_pts:
 ;            idiv by bx(=3), write x,y,z words. rsi = face table (arena),
 ;            rdi = pts out, ecx = faces.
 calc_pts:
-        mov     eax, [rel shape_a8]
-        add     rax, qword [rel Code32_addr]
-        mov     r14, rax                ; shape block base
+        lea     r14, [rel p4_render_shape]
 .cp:
         movzx   ebp, word [rsi]
         lea     r12d, [ebp*2+ebp]
@@ -1148,9 +1160,38 @@ swap:
         pop     rbp
         ret
 
+; ====================================================== sync_render_shape
+; Build the original logical shape+s1+s2+s3 view used by calc_pts and rotate.
+; The raw arena source block remains separate because make_chip reads those
+; prepared morph targets on every frame.
+sync_render_shape:
+        push    rsi
+        push    rdi
+
+        mov     eax, [rel shape_a8]
+        add     rax, qword [rel Code32_addr]
+        mov     rsi, rax
+        lea     rdi, [rel p4_render_shape]
+        mov     ecx, 222*6
+        rep movsb
+
+        lea     rsi, [rel p4_s1]
+        lea     rdi, [rel p4_render_shape+222*6]
+        mov     ecx, 81*6
+        rep movsb
+
+        lea     rsi, [rel p4_s2]
+        lea     rdi, [rel p4_render_shape+(222+81)*6]
+        mov     ecx, (8+256)*6
+        rep movsb
+
+        pop     rdi
+        pop     rsi
+        ret
+
 ; ================================================================== make_chip
 ; ro_z-rotate the moving sub-objects / centroids / normals:
-;   src1(81) -> s1 (dead, kept), src2+src3(264) -> s2 (dead, kept),
+;   src1(81) -> s1, src2+src3(264) -> s2+s3,
 ;   pts_src(554) -> pts_tab+440*6, n_vert_src(256) -> n_vert.
 make_chip:
         push    rbp
@@ -1441,7 +1482,7 @@ prep_rot2:
 ; Full 3D pass over the face centroids (pts_tab): object+view+project+clip.
 ; Visible faces go into draw_tab (zet+12000 | face byte offset). For each
 ; referenced vertex once, rotate+project it into rcalc. Uses the ob/ca
-; matrices from prep_rot1/prep_rot2 and the arena shape + con blocks.
+; matrices from prep_rot1/prep_rot2 and the render shape + arena con block.
 rotate:
         ; clear check
         lea     rdi, [rel check]
@@ -1451,14 +1492,12 @@ rotate:
 
         mov     dword [rel ile], 0
 
-        ; r13 = con block base, r14 = shape block base
+        ; r13 = con block base, r14 = render shape + rotated morph targets
         ; r8 = check base, r9 = rcalc base (register bases, not [rel sym+reg])
         mov     eax, [rel con_a8]
         add     rax, qword [rel Code32_addr]
         mov     r13, rax
-        mov     eax, [rel shape_a8]
-        add     rax, qword [rel Code32_addr]
-        mov     r14, rax
+        lea     r14, [rel p4_render_shape]
         lea     r8, [rel check]
         lea     r9, [rel rcalc]
         lea     rsi, [rel pts_tab]
