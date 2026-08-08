@@ -563,7 +563,11 @@ part4:
 
         v_sync
         set_pal pal, 0, 256
-        set_pal spal1, 0, 64
+        ; P4's sw texture reserves texel 0 for the black clear/unused value.
+        ; Keep palette entry 0 black, place the meaningful warm ramp at 1..63,
+        ; and leave entry 64 as the generated shaded sw ramp used by the
+        ; plane faces (con3 color offset 64).
+        set_pal spal1, 1, 63
         set_pal spal3, 128+16, 33
         set_pal spal4, 256-64, 64
         mov     dword [rel znacznik2], 1
@@ -2133,8 +2137,12 @@ face:
         cmp     ebx, y2_min*320
         jl      .go_1
 
-        movzx   edi, word [rel x_1+2]
-        movzx   r14d, word [rel x_s+2]
+        ; The original loads these integer edge coordinates into 16-bit
+        ; registers and uses signed comparisons for off-screen-left spans.
+        ; Zero-extending a negative coordinate turns it into ~65K and drops
+        ; the row before the virtual scan can clip it into the viewport.
+        movsx   edi, word [rel x_1+2]
+        movsx   r14d, word [rel x_s+2]
 
         cmp     edi, x2_max
         jge     .go_1
@@ -2238,8 +2246,8 @@ face:
         cmp     ebx, y2_min*320
         jl      .go_2
 
-        movzx   edi, word [rel x_s+2]
-        movzx   r14d, word [rel x_1+2]
+        movsx   edi, word [rel x_s+2]
+        movsx   r14d, word [rel x_1+2]
 
         cmp     edi, x2_max
         jge     .go_2

@@ -234,6 +234,26 @@ rasterizer path (item 28):
     full playthrough 1->5 clean; all 27
     CTests pass.
 
+## Fixed divergences - P4 plate audit (2026-08-09)
+
+The P4 scene after the P3 tunnel was compared against the original P4 source,
+the recovered texture data, and the DOSBox still. Two port-only fidelity bugs
+were fixed:
+
+- **Signed rasterizer edge coordinates:** the P4 face rasterizer used zero-
+  extended 16-bit edge coordinates. Negative off-screen-left coordinates then
+  became ~65K and were rejected instead of being virtually scanned into the
+  320-pixel viewport. The four edge loads now sign-extend like the original's
+  `mov di`/`mov bp` path (`port/core/parts/p4.asm`).
+- **P4 `sw` palette placement:** texture index 0 is the black clear/unused
+  value in the captured scene. The meaningful warm `sw` colors begin at
+  palette entry 1, while entry 64 remains the generated shaded ramp used by
+  P4's plane faces. The port now installs that layout without changing the
+  recovered `sw.pal` source asset.
+
+The P4 asset assignments remain unchanged: `sw.inc`, `v_txr1.inc`,
+`proc.inc`, `metal.inc`, and camera path `trasa.dat` are the original indices.
+
 ## Fixed divergences - P8 palette audit (2026-08-06)
 
 Verified the full P8 color pipeline end-to-end against the original assembly
