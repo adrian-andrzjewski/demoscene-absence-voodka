@@ -603,8 +603,8 @@ face:
 .no_1:
         cmp     ebx, y2_min*320
         jl      .go_1
-        movzx   edi, word [rel x_1+2]
-        movzx   r14d, word [rel x_s+2]
+        movsx   edi, word [rel x_1+2]
+        movsx   r14d, word [rel x_s+2]
         cmp     edi, x2_max
         jge     .go_1
         cmp     r14d, x2_min
@@ -688,8 +688,8 @@ face:
 .no_2:
         cmp     ebx, y2_min*320
         jl      .go_2
-        movzx   edi, word [rel x_s+2]
-        movzx   r14d, word [rel x_1+2]
+        movsx   edi, word [rel x_s+2]
+        movsx   r14d, word [rel x_1+2]
         cmp     edi, x2_max
         jge     .go_2
         cmp     r14d, x2_min

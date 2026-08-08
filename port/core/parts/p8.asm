@@ -218,7 +218,9 @@ nazwa: db "p8.pal", 0
 ; actually go white.
 bialy:  times 768 db 63
 
-pal:    incbin "sw.pal"
+; P8's sw palette is a full 256-entry base palette. It has an explicit black
+; entry at index 0; it is not the 64-entry P4 spal1 payload.
+pal:    incbin "p8_sw.pal"
         times 768-($-pal) db 0
 mpal:   incbin "metal.pal"
 

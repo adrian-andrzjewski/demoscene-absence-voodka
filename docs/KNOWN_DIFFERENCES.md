@@ -240,10 +240,15 @@ Verified the full P8 color pipeline end-to-end against the original assembly
 and shipped OBJs; all color data/math is byte-faithful except the two `white`
 vs `bialy` substitutions below, now fixed:
 
-- `sw.pal`/`metal.pal` recover byte-identical from both P8.OBJ (0x524/0x821)
-  and P4.OBJ (0xdb2), cross-checked; `pal.repro` regenerates them. The working
-  palette is built exactly as the original (`make_pal` 8-bit signed clamps,
-  regions 0/64/128/192 = sw / sw+(-2,+4,+6) / sw+(1,-1,3) / metal).
+- P4 and P8 use distinct `sw` palette includes. P4's `sw.pal` is the 64-entry
+  `spal1` payload beginning at P4.OBJ 0x4a7; P8's `p8_sw.pal` is the 768-byte
+  `pal` payload beginning three bytes before P8.OBJ 0x524, with explicit black
+  entry 0 and the warm colors shifted to entries 1..54. The earlier extractor
+  incorrectly reused P4's payload for P8, making every P8 `sw.inc` texel use
+  the next color. `metal.pal` remains the 192-byte ramp at P8.OBJ 0x821 and
+  P4.OBJ 0xdb2. `pal.repro` now guards all three copies. The working palette
+  is built exactly as the original (`make_pal` 8-bit signed clamps, regions
+  0/64/128/192 = sw / sw+(-2,+4,+6) / sw+(1,-1,+3) / metal).
 - `con3` per-face col offsets (0/64/128/192), the `face`/`show` texel fetch
   (`add al,cl`), the projection/minus-`cdq` `imul`+`idiv` divides, the 6->8-bit
   DAC conversion (round(v*255/63)) and the fade-in (`pal+1` end state) all

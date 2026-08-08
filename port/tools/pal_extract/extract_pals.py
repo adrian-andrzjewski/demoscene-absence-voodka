@@ -6,13 +6,16 @@ import sys
 # The palettes were compiled into each part's TASM OMF .OBJ as raw 6-bit data
 # (the includes are ASCII 'DB r,g,b,...' text files that TASM turned into bytes).
 # Provenance: verified byte-identical content against the DANE runtime textures and
-# cross-checked sw.pal/metal.pal between P4.OBJ and P8.OBJ.
+# P4 and P8 have distinct sw palette includes: P4's spal1 is a 64-entry
+# payload, while P8's pal is a full 256-entry base palette with an explicit
+# black entry at index 0. The earlier extractor incorrectly treated them as
+# shared and anchored P8 at its second color.
 #
 # Layout of the data section is established from the part sources:
 #   P3: spal(jup.pal, read as 16 colors by make_pal) then tunel_pal(tn.pal,16 colors)
 #   P4: pal(768 zero buffer) spal1(sw.pal,64c) spal2(v_txr1.pal,22c)
 #       spal3(proc.pal,33c) spal4(metal.pal,64c)
-#   P8: pal(sw.pal) mpal(metal.pal)
+#   P8: pal(p8_sw.pal,256c) mpal(metal.pal)
 #
 # Reference tree root: argv[1] override, else derived from this script's
 # location (port/tools/pal_extract -> repo root is three levels up).
@@ -59,16 +62,28 @@ def main():
     o8 = open(os.path.join(ROOT, r'CODE\P8\P8.OBJ'), 'rb').read()
     o3 = open(os.path.join(ROOT, r'CODE\P3\P3.OBJ'), 'rb').read()
 
-    # --- sw.pal (shared by P4 & P8) — 64 colors, first color (16,3,0) ---
+    # --- P4 sw.pal — 64 colors, first color (16,3,0) ---------------------
     sw_head = bytes([
         0x10, 0x03, 0x00, 0x24, 0x0d, 0x03, 0x05, 0x01, 0x00, 0x15, 0x0a, 0x04,
     ])
     a4 = o4.find(sw_head)
     a8 = o8.find(sw_head)
     assert a4 >= 0 and a8 >= 0, 'sw.pal head missing'
-    assert o4[a4:a4 + 128] == o8[a8:a8 + 128], 'P4/P8 sw.pal mismatch'
     sw = o4[a4:a4 + 64 * 3]
     open(os.path.join(out, 'sw.pal'), 'wb').write(sw)
+
+    # P8's pal starts three bytes before the warm-color head: index 0 is
+    # black, followed by the 63 meaningful warm entries and black padding.
+    # The next include, metal.pal, begins exactly 768 bytes after this label.
+    assert a8 >= 3 and o8[a8 - 3:a8] == b'\x00\x00\x00', \
+        'P8 sw.pal black entry missing'
+    p8_sw_start = a8 - 3
+    p8_sw = o8[p8_sw_start:p8_sw_start + 256 * 3]
+    assert len(p8_sw) == 768, 'P8 sw.pal size mismatch'
+    assert p8_sw[0:3] == b'\x00\x00\x00', 'P8 sw.pal index 0 is not black'
+    assert o4[a4:a4 + 128] == p8_sw[3:3 + 128], \
+        'P4/P8 warm sw palette body mismatch'
+    open(os.path.join(out, 'p8_sw.pal'), 'wb').write(p8_sw)
 
     # --- metal.pal (shared by P4 & P8) — 64 colors, chrome/silver-blue ramp ---
     # Verified location: P8.OBJ 0x821 (192 bytes), cross-checked in P4.OBJ 0xdb2.
@@ -106,7 +121,7 @@ def main():
     tn = o3[0x399:0x399 + 48]
     open(os.path.join(out, 'tn.pal'), 'wb').write(tn)
 
-    for f in ('sw.pal', 'metal.pal', 'v_txr1.pal', 'proc.pal', 'jup.pal', 'tn.pal'):
+    for f in ('sw.pal', 'p8_sw.pal', 'metal.pal', 'v_txr1.pal', 'proc.pal', 'jup.pal', 'tn.pal'):
         p = os.path.join(out, f)
         d = open(p, 'rb').read()
         print(f'{f}: {len(d)} bytes ({len(d)//3} colors) -> {p}')
