@@ -258,6 +258,13 @@ were fixed:
   became ~65K and were rejected instead of being virtually scanned into the
   320-pixel viewport. The four edge loads now sign-extend like the original's
   `mov di`/`mov bp` path (`port/core/parts/p4.asm`).
+- **P4 triangle coverage:** even after the edge fix, the x64 translation of
+  the legacy fixed-point scan converter dropped broad edge spans, leaving the
+  tunnel and plate as disconnected triangles. P4 now marshals the same
+  projected vertices, packed 8.8 UVs, 16-bit texture addressing, and shade
+  offset to a bounded scan converter in `platform/bridge.cpp`; projection,
+  culling, and depth order remain in the NASM scene code. A frame-recorded
+  P4 run now restores the continuous concentric environment and solid plate.
 - **P4 `sw` palette placement:** texture index 0 is the black clear/unused
   value in the captured scene. The meaningful warm `sw` colors begin at
   palette entry 1, while entry 64 remains the generated shaded ramp used by

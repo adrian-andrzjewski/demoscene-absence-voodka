@@ -61,6 +61,7 @@ extern n_calc
 extern rotate_normals
 extern prep_sort
 extern sort
+extern vk_p4_draw_triangle
 
 p_len   EQU 222+81+8+256
 f_len   EQU 440+158+12+384
@@ -209,6 +210,14 @@ stary:     resw 1
 p4_s1: resw 81*3
 p4_s2: resw (8+256)*3
 p4_render_shape: resw p_len*3
+align 8
+global p4_draw_args
+p4_draw_args:
+        resd 6
+        resd 3
+        resd 1
+        resq 2
+        resd 1
 
 ; --------------------------------------------------------------------- .data
 section .data align=16
@@ -1950,7 +1959,37 @@ show:
         sub     bx, cx
         js      .hide
 .draw:
-        call    face
+        lea     rax, [rel p4_draw_args]
+        mov     edx, [rel x_1]
+        mov     [rax], edx
+        mov     edx, [rel y_1]
+        mov     [rax + 4], edx
+        mov     edx, [rel x_2]
+        mov     [rax + 8], edx
+        mov     edx, [rel y_2]
+        mov     [rax + 12], edx
+        mov     edx, [rel x_3]
+        mov     [rax + 16], edx
+        mov     edx, [rel y_3]
+        mov     [rax + 20], edx
+        mov     edx, [rel p_1]
+        mov     [rax + 24], edx
+        mov     edx, [rel p_2]
+        mov     [rax + 28], edx
+        mov     edx, [rel p_3]
+        mov     [rax + 32], edx
+        mov     rdx, [rel fsq]
+        mov     [rax + 40], rdx
+        mov     rdx, [rel esq]
+        mov     [rax + 48], rdx
+        movzx   edx, byte [rel col]
+        mov     [rax + 56], edx
+        mov     rcx, rax
+        ; show() has one per-face push active here; it already restores the
+        ; entry alignment, so reserve the normal 32-byte shadow space.
+        sub     rsp, 0x20
+        call    vk_p4_draw_triangle
+        add     rsp, 0x20
 .hide:
         pop     rsi
         sub     rsi, 4
@@ -1962,7 +2001,9 @@ show:
 ; ===================================================================== face
 ; Textured-triangle rasterizer (P4's own, identical shape to txtr.asm's
 ; tm_face). x_1..3/y_1..3 + p_1..3 from show; low byte of `col` offset added
-; to every texel; texture base in fsq, screen base in esq.
+; to every texel; texture base in fsq, screen base in esq. The production
+; show path uses vk_p4_draw_triangle for bounded edge coverage; this original
+; fixed-point routine remains below as a source reference.
 face:
         push    rbp
         mov     rbp, rsp
