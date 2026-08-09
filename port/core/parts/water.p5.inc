@@ -147,12 +147,12 @@ drawWaterP5:
 .drw:
         add     rsi, qword [rel Code32_addr]
 
-        mov     dword [rel p5_water_y], 0
+        mov     word [rel p5_water_y], 0
         mov     rcx, -128*65536
 .loop0:
         ; low 16 of ecx = 128 (columns); count rows via high word sign.
         mov     cx, 128
-        mov     dword [rel p5_water_x], 0
+        mov     word [rel p5_water_x], 0
 .loop1:
         movzx   eax, word [rsi]
         movzx   edx, word [rsi + 128*2]
@@ -176,6 +176,9 @@ drawWaterP5:
         and     ebx, 0xFFFF
         mov     [rel p5_inner], bl
 
+        ; P5's self-modifying WaterY/WaterX immediates are reset to zero at
+        ; the start of each row/line, then incremented; these are the runtime
+        ; offsets (the source's literal 0101h is only the patch-site default).
         ; bx = (vdiff>>3) + water_y ; dx = (hdiff>>3) + water_x
         movsx   r9d, ax
         sar     r9d, 3
