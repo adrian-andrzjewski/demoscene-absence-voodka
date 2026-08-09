@@ -4,6 +4,10 @@ Validation is scene-level: the original 1996 release running in DOSBox 0.74-3
 (SB16) vs the Windows x64 port, compared by timed screenshots against the
 module's deterministic ModPos timeline. Evidence: `reference/captures/`.
 
+For the complete source-level reconstruction of the P4 and P8 scene
+composition, geometry buffers, camera paths, palette/material assignments,
+animation, rasterization, and outros, see docs/P4_P8_SCENES.md.
+
 ## Timing & synchronization
 
 - **Scene sync: matches.** All eight part transitions in the port occur at
