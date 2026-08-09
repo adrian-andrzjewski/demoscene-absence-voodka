@@ -265,21 +265,16 @@ part1:
         Ekran
 
         ; Screen flash (ModPos >= 0x300), faithful to P1.ASM I_nie_znika: the
-        ; original copies the frame to the VGA FIRST, then does a pal_fadein10
-        ; toward white and IMMEDIATELY restores rm_eye - the wash is a DAC-time
-        ; transient between the two writes that the next retrace never samples,
-        ; so it never brightens the red/blue edges or the logos on screen. Keep
-        ; that order (wash after the present, then restore) so the port matches
-        ; the original instead of presenting a whitened frame.
+        ; original copies the frame to VGA first, then brightens every DAC
+        ; component toward white by (ModPos & 63), holds that palette for one
+        ; retrace, and restores rm_eye.  The indexed frame itself is unchanged.
         cmp     word [rel ModPos], 0x0300
         jl      .yogi
         mov     ax, [rel ModPos]
         and     ax, 63
-        mov     bl, al
-        lea     rdi, [rel white]
-        call    pal_fadein10
-        lea     rsi, [rel pal]
-        call    pal_set
+        movzx   ebx, al
+        mov     ecx, 1
+        call    pal_flash_brighten
 .yogi:
 
 .nie_drawujemy:

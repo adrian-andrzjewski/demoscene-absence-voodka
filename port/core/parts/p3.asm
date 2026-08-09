@@ -130,7 +130,25 @@ shape:
 con:
 %include "log_c.inc"
 
-flesze: times 64 dd 0,0   ; 64 x {flash, done}
+flesze:
+        times 32 dd 0,0
+        dd 1,0                         ; 20h
+        dd 1,0                         ; 21h
+        dd 0,0
+        dd 0,0
+        dd 1,0                         ; 24h
+        dd 0,0
+        dd 1,0                         ; 26h
+        dd 0,0
+        dd 1,0                         ; 28h
+        dd 1,0                         ; 29h
+        dd 1,0                         ; 2ah
+        dd 0,0
+        dd 1,0                         ; 2ch
+        dd 1,0                         ; 2dh
+        dd 1,0                         ; 2eh
+        dd 0,0
+        times 16 dd 1,0                ; 30h..3fh
 
 tablica:
         times 4  dd 0,0,1,0
@@ -260,21 +278,6 @@ part3:
         dec     ecx
         jnz     .makl
 
-        ; flesze flash mask
-        xor     ecx, ecx
-.finit:
-        cmp     ecx, 64
-        jae     .fdone
-        mov     eax, ecx
-        and     eax, 7
-        jnz     .fskip
-        lea     rbx, [rel flesze]
-        mov     dword [rbx + rcx*8], 1
-.fskip:
-        inc     ecx
-        jmp     .finit
-.fdone:
-
         ; engine tables + texture selectors + anim pre-roll
         call    prepare_twist
 
@@ -386,11 +389,9 @@ part3:
         cmp     dword [rbx + rax*8 + 4], 0
         jne     .bez_fleszy
         mov     dword [rbx + rax*8 + 4], 0
+        mov     ebx, 1
         lea     rsi, [rel white]
-        call    pal_set
-        v_sync
-        set_pal mypal, 0, 256
-        set_pal tunel_pal, 256-16, 16
+        call    pal_flash_current
 .bez_fleszy:
         jmp     .main_loop
 

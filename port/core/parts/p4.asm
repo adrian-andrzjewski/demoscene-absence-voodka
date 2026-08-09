@@ -737,19 +737,11 @@ part4:
         cmp     word [r11 + rax*4 + 2], 1
         je      .no_flash
         mov     word [r11 + rax*4 + 2], 1
+        mov     ebx, 2
         lea     rsi, [rel white]
-        call    pal_set
-        lea     rsi, [rel white]
-        call    pal_set
-        sub     rsp, 0x20
-        call    vk_present_frame
-        add     rsp, 0x20
-        mov     esi, [rel pic_pal]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
-        sub     rsp, 0x20
-        call    vk_present_frame
-        add     rsp, 0x20
+        mov     edi, [rel pic_pal]
+        add     rdi, qword [rel Code32_addr]
+        call    pal_flash
 .no_flash:
         mov     eax, EOS_WAIT_VBL
         call    eos_dispatch

@@ -872,7 +872,10 @@ brum:
         push    rbp
         mov     rbp, rsp
         push    rsi
-        sub     rsp, 0x20
+        ; Keep RSP%16==0 for pal_flash's nested platform calls.  The old
+        ; pal_set-only helper used 0x20, but its one-register prologue needs
+        ; 0x28 when it calls the flash primitive.
+        sub     rsp, 0x28
         mov     ax, [rel ModPos]
         and     eax, 03fh
         lea     r8, [rel tablica]
@@ -884,14 +887,14 @@ cmp     word [r8 + rax*4 + 2], 1
         lea     r8, [rel tablica]
 mov     word [r8 + rax*4 + 2], 1
         ; original: pal_set(bialy) [true white flash] then pal_set(white)
-        ; [restore the fade buffer]. The port used `white` for both, so the
-        ; flash never actually went white.
+        ; [restore the mutable normal/fade palette]. Present both DAC states
+        ; over the already displayed indexed frame.
+        mov     ebx, 1
         lea     rsi, [rel bialy]
-        call    pal_set
-        lea     rsi, [rel white]
-        call    pal_set
+        lea     rdi, [rel white]
+        call    pal_flash
 .no_flash:
-        add     rsp, 0x20
+        add     rsp, 0x28
         pop     rsi
         pop     rbp
         ret

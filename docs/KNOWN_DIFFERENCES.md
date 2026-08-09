@@ -348,10 +348,13 @@ vs `bialy` substitutions below, now fixed:
   nuances are those of libxmp's FT2-accurate mixer vs DIAMOND's SB16 output.
   The module file carries 233,984 trailing bytes (61%) past the well-formed
   module end - inert for both players (ASSET_FORMATS.md section 6.1).
-- **Sub-frame palette transients**: same-retrace white flashes (P2 lampa,
-  P7 phase changes, P8 brum) were DAC updates inside one frame in the
-  original; in the port the last state before a present wins. Effectively
-  invisible in both.
+- **Palette flashes**: fixed 2026-08-09.  The original's full-screen flashes
+  are retrace-paced VGA-DAC palette replacements over the already displayed
+  indexed frame, not alpha overlays.  The port now presents the flash palette,
+  waits the source-equivalent retrace interval, restores the previous/target
+  palette, and presents again.  This covers P1/P2/P3/P4/P5/P7/P8, including
+  P2's `WIDOKI` flash flags and P3's exact `flesze` mask; see
+  `docs/FLASH_EFFECTS.md` for the trigger table and durations.
 - **Input:** Esc skips parts in the original; the port maps PC scancodes
   identically. Space = pause (port addition).
 

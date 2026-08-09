@@ -116,12 +116,11 @@ mieszanie:
         vodka   %1, _pulse
         vodka   %2, _pulseW
         call    mieszanie
+        mov     ebx, 1
         lea     rsi, [rel white]
-        call    pal_set
-        ; pal_set expects the palette pointer in rsi (not edi!)
-        mov     esi, [rel _paleta]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
+        mov     edi, [rel _paleta]
+        add     rdi, qword [rel Code32_addr]
+        call    pal_flash
 %%.frame_loop:
         woda
         call    drawWater
@@ -182,11 +181,11 @@ part7:
         vodka   54, _pulse
         vodka   55, _pulseW
         call    mieszanie
+        mov     ebx, 1
         lea     rsi, [rel white]
-        call    pal_set
-        mov     esi, [rel _paleta]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
+        mov     edi, [rel _paleta]
+        add     rdi, qword [rel Code32_addr]
+        call    pal_flash
 .seven_loop:
         woda
         call    drawWater

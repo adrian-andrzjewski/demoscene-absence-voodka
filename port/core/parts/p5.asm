@@ -883,15 +883,13 @@ intro_fade:
         push    rdi
         sub     rsp, 0x20
         mov     ax, word [rel ModPos]
-        mov     bl, al
-        lea     rdi, [rel white]
-        call    pal_fadein10
-        mov     esi, [rel _pal]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
-        mov     esi, [rel _pal]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
+        movzx   ebx, al
+        mov     ecx, 1
+        call    pal_flash_brighten
+        ; P5's source does three restore pal_set calls after the brightening
+        ; pal_fadein10 (one white retrace + two unchanged restore retraces).
+        v_sync
+        v_sync
         add     rsp, 0x20
         pop     rdi
         pop     rbx

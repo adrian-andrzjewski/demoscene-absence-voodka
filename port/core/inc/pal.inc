@@ -15,10 +15,15 @@
 extern vk_get_palette
 extern vk_set_palette
 extern vk_set_palette_range
+extern vk_present_frame
 
 section .bss
 ; per-part palette working buffer (each part includes pal.inc once; local)
 pal_pom: resb 768
+; Saved palette for a retrace-visible flash.  The VGA original changes only
+; the DAC; the indexed framebuffer remains the already displayed frame.
+pal_flash_restore: resb 768
+pal_flash_work:    resb 768
 
 section .text
 
@@ -98,6 +103,139 @@ pal_fadein10:
         call    vk_set_palette
         add     rsp, 0x20
         pop     rcx
+        pop     rdi
+        pop     rsi
+        pop     rbx
+        pop     rbp
+        ret
+
+; pal_flash - show one palette over the currently presented indexed frame,
+; hold it for EBX retraces, then restore the supplied palette and present it.
+; Inputs: RSI = flash palette, RDI = restore palette, EBX = white-retrace count.
+; This is the port equivalent of consecutive original pal_set calls: each
+; original pal_set waits for VGA retrace before changing the DAC.  Presenting
+; at both palette states is essential because the Windows renderer has a
+; separate framebuffer and palette texture.
+pal_flash:
+        push    rbp
+        mov     rbp, rsp
+        push    rbx
+        push    rsi
+        push    rdi
+        push    r12
+        push    r13
+        push    r14
+        sub     rsp, 0x20
+
+        mov     r12, rsi
+        mov     r13, rdi
+        mov     r14d, ebx
+
+        mov     rcx, r12
+        call    vk_set_palette
+        call    vk_present_frame
+
+.flash_wait:
+        test    r14d, r14d
+        jz      .flash_restore
+        mov     eax, EOS_WAIT_VBL
+        call    eos_dispatch
+        dec     r14d
+        jmp     .flash_wait
+
+.flash_restore:
+        mov     rcx, r13
+        call    vk_set_palette
+        call    vk_present_frame
+
+        add     rsp, 0x20
+        pop     r14
+        pop     r13
+        pop     r12
+        pop     rdi
+        pop     rsi
+        pop     rbx
+        pop     rbp
+        ret
+
+; pal_flash_current - flash over the current palette and restore that exact
+; palette. Inputs: RSI = flash palette, EBX = white-retrace count.
+pal_flash_current:
+        push    rbp
+        mov     rbp, rsp
+        push    rbx
+        push    rsi
+        push    rdi
+        push    r12
+        push    r13
+        sub     rsp, 0x28
+
+        mov     r12, rsi
+        mov     r13d, ebx
+        lea     rdi, [rel pal_flash_restore]
+        mov     rcx, rdi
+        call    vk_get_palette
+
+        mov     rsi, r12
+        lea     rdi, [rel pal_flash_restore]
+        mov     ebx, r13d
+        call    pal_flash
+
+        add     rsp, 0x28
+        pop     r13
+        pop     r12
+        pop     rdi
+        pop     rsi
+        pop     rbx
+        pop     rbp
+        ret
+
+; pal_flash_brighten - build the exact pal_fadein10-to-white palette, show it
+; for EBX retraces, and restore the palette that was current on entry.
+; Inputs: EBX = per-channel brightening delta, ECX = white-retrace count.
+; The P1/P5 callers then add any extra restore-only pal_set retraces required
+; by their original assembly loops.
+pal_flash_brighten:
+        push    rbp
+        mov     rbp, rsp
+        push    rbx
+        push    rsi
+        push    rdi
+        push    r12
+        push    r13
+        push    r14
+        sub     rsp, 0x20
+
+        movzx   r14d, bl
+        mov     r13d, ecx
+        lea     rdi, [rel pal_flash_restore]
+        mov     rcx, rdi
+        call    vk_get_palette
+
+        lea     rsi, [rel pal_flash_restore]
+        lea     rdi, [rel pal_flash_work]
+        mov     ecx, 768
+.brighten_loop:
+        movzx   eax, byte [rsi]
+        add     eax, r14d
+        cmp     eax, 63
+        jle     .brighten_store
+        mov     eax, 63
+.brighten_store:
+        stosb
+        inc     rsi
+        dec     ecx
+        jnz     .brighten_loop
+
+        lea     rsi, [rel pal_flash_work]
+        lea     rdi, [rel pal_flash_restore]
+        mov     ebx, r13d
+        call    pal_flash
+
+        add     rsp, 0x20
+        pop     r14
+        pop     r13
+        pop     r12
         pop     rdi
         pop     rsi
         pop     rbx

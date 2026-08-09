@@ -27,6 +27,8 @@ vk_p2_widoki:
 %include "p2widoki.inc"
 global vk_p2_widoki_entries
 vk_p2_widoki_entries: dd ($ - vk_p2_widoki) / 28
+global vk_p2_camera_flash_flag
+vk_p2_camera_flash_flag: dd 0
 
 section .text
 
@@ -36,6 +38,7 @@ vk_p2_camera:
         push    rsi
         push    rdi
         push    r12
+        xor     r12d, r12d
         cmp     ecx, 0x63f
         jle     .trasa
         ; --- widoki: idx = modpos & 0x3f ; node = widoki[idx*28] ---
@@ -45,6 +48,7 @@ vk_p2_camera:
         movsxd  rsi, eax
         lea     rdi, [rel vk_p2_widoki]
         add     rsi, rdi
+        mov     r12d, [rsi + 24]
         jmp     .read
 .trasa:
         ; --- trasa: idx = trasaRuch mod N ; node = trasa[idx*24] ---
@@ -62,6 +66,9 @@ vk_p2_camera:
         mov     rdi, r8
         mov     ecx, 6
         rep movsd
+        ; WIDOKI carries a seventh dword: the original `flashFlag` used by
+        ; P2's plum/lampa camera-cut flash guard.  TRASA leaves it zero.
+        mov     [rel vk_p2_camera_flash_flag], r12d
         pop     r12
         pop     rdi
         pop     rsi

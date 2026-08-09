@@ -55,6 +55,7 @@ extern gs_sel
 ; p2 render loop + camera path
 extern vk_p2_render_frame
 extern vk_p2_camera
+extern vk_p2_camera_flash_flag
 extern vk_make_camera_matrix
 extern vk_load_object
 
@@ -318,6 +319,20 @@ part2:
         mov     eax, [rel p2_cam_out+20]
         mov     [rel cam_eyeAZ], eax
 
+        ; WIDOKI's seventh dword marks the still-camera cuts that flash the
+        ; current world palette to pure white.  `plum` is the previous ModPos
+        ; guard from P2.AS^, so a held audio position cannot retrigger it.
+        cmp     dword [rel vk_p2_camera_flash_flag], 0
+        je      .no_widoki_flash
+        movzx   eax, word [rel ModPos]
+        cmp     dword [rel plum], eax
+        je      .no_widoki_flash
+        mov     ebx, 1
+        lea     rsi, [rel white]
+        call    pal_flash_current
+        neg     dword [rel bolek]
+.no_widoki_flash:
+
         ; ---- trasa-path camera advance + world rotation (P2.AS^ ruchamy) ----
         ; Only the trasa path (ModPos <= 0x63F) advances trasa_ruch / rotates the
         ; world; the scripted widoki phase does neither.
@@ -334,11 +349,11 @@ part2:
         cmp     byte [rel lampa], 0
         jne     .blysk_ok
         mov     byte [rel lampa], 1
+        mov     ebx, 1
         lea     rsi, [rel white]
-        call    pal_set
-        mov     esi, [rel _pal]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
+        mov     edi, [rel _pal]
+        add     rdi, qword [rel Code32_addr]
+        call    pal_flash
 .blysk_ok:
         ; trasa_ruch += ramki (full rate)
         mov     eax, [rel ramki]
@@ -403,6 +418,8 @@ part2:
         jmp     .katys
 .no_katys:
 .no_ruch:
+        movzx   eax, word [rel ModPos]
+        mov     [rel plum], eax
 
         Screen0
 
@@ -463,20 +480,23 @@ part2:
         call    pal_set
         call    pikus
 
-        ; restore stary (the pre-water screen) into the framebuffer
+        ; restore stary (the pre-water screen) into the presented framebuffer
+        ; before the final P2 water-transition flash, matching the original's
+        ; copy to VGA memory while its DAC is still white.
         mov     esi, [rel stary]
         add     rsi, qword [rel Code32_addr]
-        mov     edi, [rel _screen]
+        mov     edi, [rel framebuffer_off]
         add     rdi, qword [rel Code32_addr]
         mov     ecx, 16000
         rep movsd
 
-        WaitVbl
-        ; re-apply the world palette for the water stage (faithful port of
-        ; P2.AS^ wodda 331-334: wait_vbl then pal_set(_pal)).
-        mov     esi, [rel _pal]
-        add     rsi, qword [rel Code32_addr]
-        call    pal_set
+        ; P2/WATER ends with pal_set(white), followed by wodda's wait and
+        ; pal_set(_pal): one full-white retrace over stary, then restore.
+        mov     ebx, 1
+        lea     rsi, [rel white]
+        mov     edi, [rel _pal]
+        add     rdi, qword [rel Code32_addr]
+        call    pal_flash
 
         ; world[0] angle adders for Main2 water wobble
         lea     r12, [rel vk_p2_world]
@@ -764,9 +784,6 @@ pikus:
         movzx   eax, word [rel ModPos]
         cmp     eax, 0x73f
         jle     .pikus_loop
-
-        lea     rsi, [rel white]
-        call    pal_set
 
         add     rsp, 0x28
         pop     r15
