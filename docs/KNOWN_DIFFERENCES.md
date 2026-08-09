@@ -270,6 +270,11 @@ were fixed:
   palette entry 1, while entry 64 remains the generated shaded ramp used by
   P4's plane faces. The port now installs that layout without changing the
   recovered `sw.pal` source asset.
+- **P4 CPU texture palette:** `vws3`/`vwc3` use `proc.inc` with the 33-entry
+  palette recovered from `P4.OBJ`. The port copy had the final white entry
+  rotated to the front, shifting every CPU texel by one palette slot. The
+  recovered byte order is restored, so the CPU markings and brown surface
+  colors match the original palette contract.
 
 The P4 asset assignments remain unchanged: `sw.inc`, `v_txr1.inc`,
 `proc.inc`, `metal.inc`, and camera path `trasa.dat` are the original indices.

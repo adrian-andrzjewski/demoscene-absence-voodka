@@ -33,6 +33,13 @@ set(VOODKA_CORE_ASM
 
 add_library(voodka_core STATIC ${VOODKA_CORE_ASM})
 
+# NASM does not emit dependency edges for INCBIN payloads. Keep P4's embedded
+# palette inputs visible to the build graph so a palette correction is picked
+# up by an incremental build as well as a clean rebuild.
+set_source_files_properties(parts/p4.asm PROPERTIES
+    OBJECT_DEPENDS
+    "${CMAKE_CURRENT_SOURCE_DIR}/parts/sw.pal;${CMAKE_CURRENT_SOURCE_DIR}/parts/v_txr1.pal;${CMAKE_CURRENT_SOURCE_DIR}/parts/proc.pal;${CMAKE_CURRENT_SOURCE_DIR}/parts/metal.pal")
+
 # NASM include paths
 target_include_directories(voodka_core PUBLIC
     "${CMAKE_CURRENT_SOURCE_DIR}/eos_replace"
