@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (30 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (31 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -43,6 +43,7 @@ data/world          VIRTUAL viewer object archive (byte-identical to the origina
 music/amnezja2.mod  the 14-channel module the demo plays
 *_selftest.exe      cross-check test binaries + tools
 audio_oracle.exe    libxmp module/timing/PCM oracle for Phase 2 validation
+audio_mod_parse_probe.exe  NASM-vs-libxmp module parser cross-check
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -75,7 +76,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-30 tests: 17 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+31 tests: 17 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -87,7 +88,8 @@ asset viewer's parser vs all 27 original 3D assets: 9 archive V3D/V3M
 headers, all 16 CODE/DATAS mesh pair counts, 2 VIRTUAL world objects).
 `audio.oracle` inventories `amnezja2.mod` and records the current libxmp
 44.1 kHz stereo PCM and row-transition baseline for the dedicated assembly
-player.
+player. `audio.mod_parse` verifies that the native NASM module parser matches
+libxmp on the module layout, samples, orders, patterns, events, and effects.
 Python-based tests skip cleanly if no interpreter is found.
 
 ## Tools (`port/tools/`)
@@ -105,6 +107,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `asset_viewer` | D3D11 viewer: flat-shaded/wireframe orbit view of every 3D asset in the original (9 archive V3D/V3M + 16 CODE/DATAS meshes + 2 VIRTUAL world objects) |
 | `asset_viewer_selftest` | parse-only validation of all 27 assets (CTest `v3d.viewer_parse`) |
 | `audio_oracle` | Phase 2A host-side libxmp module inventory, PCM hash, and row/tick trace oracle (CTest `audio.oracle`) |
+| `audio_mod_parse_probe` | Phase 2B NASM module parser vs libxmp inventory cross-check (CTest `audio.mod_parse`) |
 
 ## Troubleshooting
 

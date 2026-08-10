@@ -440,6 +440,15 @@ add_test(NAME audio.oracle
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod"
                  "${CMAKE_CURRENT_BINARY_DIR}/audio_oracle_report.txt")
 
+add_executable(audio_mod_parse_probe tools/validate/audio_mod_parse_probe.cpp)
+target_compile_definitions(audio_mod_parse_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_mod_parse_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/validate")
+target_link_libraries(audio_mod_parse_probe PRIVATE xmp_static voodka_core)
+add_test(NAME audio.mod_parse
+         COMMAND audio_mod_parse_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
+
 # ---- V3D asset viewer (standalone validation tool) ---------------------------
 add_subdirectory(tools/asset_viewer)
 
