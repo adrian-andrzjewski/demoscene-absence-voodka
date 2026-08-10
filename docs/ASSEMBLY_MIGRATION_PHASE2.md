@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2U passed; default production swap remains**
+Status: **Phase 2A through Phase 2V passed; default production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -880,3 +880,43 @@ full final ModPos                                 0x2803
 This is a **GO** for moving audio storage and service-state ownership behind
 the assembly ABI. It is not yet a **GO** for removing C++ handle management,
 module loading, timeline preparation, or libxmp from the production build.
+
+## Phase 2V result: assembly-owned storage and module loading
+
+Phase 2V removes the remaining dynamic storage and file-I/O work from the
+dedicated assembly-audio path. `asm_audio_service_storage_init` now runs the
+complete pre-thread initialization in native x64 assembly:
+
+- opens and reads the MOD through `CreateFileA`, `GetFileSize`, `ReadFile`, and
+  `CloseHandle` using the Win64 ABI;
+- validates the module with the native NASM parser;
+- fills fixed assembly-owned tracker states, cumulative tick starts, ModPos and
+  millisecond timelines, ring PCM/marker buffers, producer scratch, and mixer
+  history; and
+- publishes those buffers through the 112-byte `AudioAssemblyStorage` record.
+
+The fixed capacities are explicit and bounded: 512 KiB for the module, 20,000
+tracker frames, 4,096 row-trace entries, 16,384 PCM frames, 16,384 markers, and
+65,536 producer scratch frames. C++ `audio_asm.cpp` now retains only the
+descriptor, synchronization records, thread handles, and application-facing
+orchestration. The default C++/libxmp path remains intact as the behavioral
+oracle.
+
+The Phase 2V validation is:
+
+```text
+focused lifecycle/integration CTest               4/4 passed; 56.17 s
+full Release CTest suite                          51/51 passed; 106.49 s
+full P1-P8 playback                               exit 0; 252.1 s
+full scene sequence                               P1, P2, P3, P5, P6, P7, P8
+full device stream                                11,079,243 frames; underruns 0; 12,820 markers
+full final ModPos                                 0x2803
+timeline rows                                     17,592 rendered frames
+```
+
+This is a **GO** for switching production audio selection to the dedicated
+assembly player behind a reversible diagnostic/oracle option. It is also a
+**GO** for removing the live path's C++ vector and module-reader ownership. It
+remains a **NO-GO** for deleting libxmp or `audio.cpp` until the default-path
+switch has passed the same full-run visual/audio witness and the oracle has
+been retained in a reference-only validation target.

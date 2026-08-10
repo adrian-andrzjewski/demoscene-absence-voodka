@@ -908,19 +908,20 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 2U
+## Current implementation checkpoint: Phase 2V
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
-WASAPI worker entry, native assembly producer, pause/resume protocol,
+WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
+timeline preparation, native Win32 module loading, pause/resume protocol,
 coordinated seek, repeated-seek stress, production-clock witnesses, and
 deterministic lifecycle/device-failure hooks are now implemented as reversible
 gates.
 Release validation includes the 51-test suite plus direct timeline runs.
 The opt-in `--asm-audio` path now uses the persistent service through the
 production `audioInit`, `audioPump`, seek, pause, and shutdown ABI, and the
-full eight-part run has passed against the libxmp timing oracle. The default
-executable still deliberately uses C++/libxmp. The next gate is moving the
-remaining audio-service ownership—fixed storage, timeline state, and module
-loading—behind an assembly ABI while retaining the host tools and behavioral
-oracle. Only after that boundary is stable should module loading and the
-default audio-path switch be reconsidered.
+full eight-part run has passed against the libxmp timing oracle. The dedicated
+path no longer uses C++ vectors or C++ file I/O; the default executable still
+deliberately uses C++/libxmp. The next gate is a reversible default-selection
+switch, followed by a reference-only libxmp build and a final production import
+audit. Only after that switch passes the full visual/audio witness should
+libxmp be removed from the shipped target.

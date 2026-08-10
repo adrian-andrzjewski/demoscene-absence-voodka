@@ -6,6 +6,41 @@
 #include <cstddef>
 #include <cstdint>
 
+// Fixed-capacity storage owned by audio_service.asm. The descriptor is
+// populated before any producer or WASAPI thread is created and remains valid
+// until the host has joined both threads.
+struct AudioAssemblyStorage {
+    const uint8_t* module;              // 0
+    uint32_t moduleSize;                // 8
+    uint32_t stateFrames;               // 12
+    uint32_t totalFrames;               // 16
+    uint32_t maxTickFrames;             // 20
+    uint32_t orderCount;                // 24
+    uint32_t rowsPerLoop;               // 28
+    uint32_t scratchFrames;             // 32
+    const uint32_t* tickStarts;         // 40
+    const uint32_t* modposByTick;       // 48
+    const uint32_t* tickTimesMs;        // 56
+    AudioTickState* states;             // 64
+    int16_t* ringSamples;               // 72
+    AudioRingMarker* ringMarkers;       // 80
+    AudioTickState* producerStates;     // 88
+    int16_t* producerPcm;               // 96
+    AudioMixerHistory* producerHistory; // 104
+};
+
+static_assert(offsetof(AudioAssemblyStorage, moduleSize) == 8);
+static_assert(offsetof(AudioAssemblyStorage, scratchFrames) == 32);
+static_assert(offsetof(AudioAssemblyStorage, tickStarts) == 40);
+static_assert(offsetof(AudioAssemblyStorage, states) == 64);
+static_assert(offsetof(AudioAssemblyStorage, producerHistory) == 104);
+static_assert(sizeof(AudioAssemblyStorage) == 112);
+
+// Loads the MOD through Win32 from native assembly and prepares the fixed
+// tracker/timeline storage without C++ allocation or file-I/O code.
+extern "C" uint32_t asm_audio_service_storage_init(
+    const char* modulePath, AudioAssemblyStorage* storage);
+
 // Fixed-width handoff from the transitional host shim to the native assembly
 // producer thread.  The pointers reference storage whose lifetime is owned by
 // the caller and remains fixed until the thread has joined.

@@ -44,6 +44,42 @@ DEFAULT REL
 %define TICK_CHUNK                  31
 %define HISTORY_QWORDS               28
 
+%define AUDIO_MODULE_CAPACITY        524288
+%define AUDIO_STATE_CAPACITY         20000
+%define AUDIO_RING_CAPACITY          16384
+%define AUDIO_MARKER_CAPACITY        16384
+%define AUDIO_TRACE_CAPACITY         4096
+%define AUDIO_SCRATCH_FRAMES         65536
+
+%define STORAGE_MODULE               0
+%define STORAGE_MODULE_SIZE          8
+%define STORAGE_STATE_FRAMES         12
+%define STORAGE_TOTAL_FRAMES         16
+%define STORAGE_MAX_TICK_FRAMES      20
+%define STORAGE_ORDER_COUNT          24
+%define STORAGE_ROWS_PER_LOOP        28
+%define STORAGE_SCRATCH_FRAMES       32
+%define STORAGE_TICK_STARTS          40
+%define STORAGE_MODPOS_BY_TICK       48
+%define STORAGE_TICK_TIMES_MS        56
+%define STORAGE_STATES               64
+%define STORAGE_RING_SAMPLES         72
+%define STORAGE_RING_MARKERS         80
+%define STORAGE_PRODUCER_STATES      88
+%define STORAGE_PRODUCER_PCM         96
+%define STORAGE_PRODUCER_HISTORY     104
+
+%define SUMMARY_STATUS               0
+%define SUMMARY_ROWS_PER_LOOP        28
+%define SUMMARY_ORDER_COUNT          36
+%define SUMMARY_CHANNEL_COUNT        44
+
+%define TRACE_FRAME                  0
+%define TRACE_TIME_MS                4
+%define TRACE_POSITION               8
+%define TRACE_ROW                    16
+%define TRACE_ENTRY_BYTES            36
+
 ; Local storage.  The tracker is 1184 bytes and starts above the outgoing
 ; Win64 home/argument area, which is used by the seven-argument mixer call.
 %define LOCAL_TRACKER               0x50
@@ -61,6 +97,13 @@ DEFAULT REL
 %define LOCAL_BYTES                 0x528
 
 extern Sleep
+extern CreateFileA
+extern GetFileSize
+extern ReadFile
+extern CloseHandle
+extern asm_audio_parse_mod
+extern asm_audio_trace_rows
+extern asm_audio_trace_tick_states
 extern asm_audio_live_init
 extern asm_audio_live_next
 extern asm_audio_mix_tick_states_continuous
@@ -70,6 +113,262 @@ extern asm_audio_ring_thread_probe
 
 global asm_audio_producer_thread
 global asm_audio_ring_thread_entry
+global asm_audio_service_storage_init
+
+section .text
+
+; uint32_t asm_audio_service_storage_init(const char* modulePath,
+;                                          AudioAssemblyStorage* storage)
+; Load the MOD and prepare immutable tracker/timeline tables into the fixed
+; assembly-owned buffers below. The host receives only pointers and scalar
+; counts through the descriptor.
+asm_audio_service_storage_init:
+        push    rbp
+        mov     rbp, rsp
+        push    rbx
+        push    rsi
+        push    rdi
+        push    r12
+        push    r13
+        push    r14
+        push    r15
+        sub     rsp, 0x48
+
+        mov     r12, rcx                    ; module path
+        mov     r13, rdx                    ; output descriptor
+        xor     r14d, r14d                  ; file handle, if opened
+
+        mov     rdi, r13
+        xor     eax, eax
+        mov     ecx, 14                     ; 112-byte descriptor
+        rep     stosq
+
+        mov     rcx, r12
+        mov     edx, 0x80000000             ; GENERIC_READ
+        mov     r8d, 1                      ; FILE_SHARE_READ
+        xor     r9d, r9d                    ; security attributes
+        mov     qword [rsp + 0x20], 3       ; OPEN_EXISTING
+        mov     qword [rsp + 0x28], 0x80    ; FILE_ATTRIBUTE_NORMAL
+        mov     qword [rsp + 0x30], 0       ; template handle
+        call    CreateFileA
+        cmp     rax, -1
+        je      .storage_fail_file
+        mov     r14, rax
+
+        mov     rcx, r14
+        xor     edx, edx                    ; high DWORD pointer unused
+        call    GetFileSize
+        cmp     eax, 0xffffffff
+        je      .storage_fail_size
+        test    eax, eax
+        jz      .storage_fail_size
+        cmp     eax, AUDIO_MODULE_CAPACITY
+        ja      .storage_fail_size
+        mov     ebx, eax                    ; module size
+
+        mov     rcx, r14
+        lea     rdx, [rel audio_storage_module]
+        mov     r8d, ebx
+        lea     r9, [rel audio_storage_bytes_read]
+        mov     qword [rsp + 0x20], 0       ; OVERLAPPED
+        call    ReadFile
+        test    eax, eax
+        jz      .storage_fail_read
+        cmp     dword [rel audio_storage_bytes_read], ebx
+        jne     .storage_fail_read
+
+        mov     rcx, r14
+        call    CloseHandle
+        xor     r14d, r14d
+
+        lea     rcx, [rel audio_storage_module]
+        mov     edx, ebx
+        lea     r8, [rel audio_storage_summary]
+        call    asm_audio_parse_mod
+        test    eax, eax
+        jnz     .storage_fail_parse
+        cmp     dword [rel audio_storage_summary + SUMMARY_STATUS], 0
+        jne     .storage_fail_parse
+        cmp     dword [rel audio_storage_summary + SUMMARY_CHANNEL_COUNT], CHANNEL_COUNT
+        jne     .storage_fail_parse
+        mov     eax, dword [rel audio_storage_summary + SUMMARY_ROWS_PER_LOOP]
+        test    eax, eax
+        jz      .storage_fail_parse
+        cmp     eax, AUDIO_TRACE_CAPACITY
+        ja      .storage_fail_parse
+        mov     dword [r13 + STORAGE_ROWS_PER_LOOP], eax
+
+        lea     rcx, [rel audio_storage_module]
+        mov     edx, ebx
+        lea     r8, [rel audio_storage_states]
+        mov     r9d, AUDIO_STATE_CAPACITY
+        call    asm_audio_trace_tick_states
+        test    eax, eax
+        jz      .storage_fail_states
+        cmp     eax, AUDIO_STATE_CAPACITY
+        ja      .storage_fail_states
+        mov     dword [r13 + STORAGE_STATE_FRAMES], eax
+        mov     dword [r13 + STORAGE_MODULE_SIZE], ebx
+
+        ; Build cumulative output-frame starts and the maximum tick size.
+        xor     ebx, ebx                    ; total frames
+        xor     r15d, r15d                  ; max tick frames
+        xor     ecx, ecx                    ; state frame index
+.storage_timing_loop:
+        cmp     ecx, dword [r13 + STORAGE_STATE_FRAMES]
+        jae     .storage_timing_done
+        mov     eax, ecx
+        imul    eax, TICK_STATE_BYTES
+        lea     rsi, [rel audio_storage_states]
+        mov     edx, dword [rsi + rax + 36]
+        test    edx, edx
+        jz      .storage_fail
+        lea     rsi, [rel audio_storage_tick_starts]
+        mov     dword [rsi + rcx * 4], ebx
+        add     ebx, edx
+        jc      .storage_fail
+        cmp     edx, r15d
+        jbe     .storage_timing_next
+        mov     r15d, edx
+.storage_timing_next:
+        inc     ecx
+        jmp     .storage_timing_loop
+
+.storage_timing_done:
+        lea     rsi, [rel audio_storage_tick_starts]
+        mov     eax, dword [r13 + STORAGE_STATE_FRAMES]
+        mov     dword [rsi + rax * 4], ebx
+        test    ebx, ebx
+        jz      .storage_fail
+        mov     dword [r13 + STORAGE_TOTAL_FRAMES], ebx
+        mov     dword [r13 + STORAGE_MAX_TICK_FRAMES], r15d
+        imul    r15d, TICK_CHUNK
+        jo      .storage_fail
+        test    r15d, r15d
+        jz      .storage_fail
+        cmp     r15d, AUDIO_SCRATCH_FRAMES
+        ja      .storage_fail
+        mov     dword [r13 + STORAGE_SCRATCH_FRAMES], r15d
+
+        lea     rcx, [rel audio_storage_module]
+        mov     edx, dword [r13 + STORAGE_MODULE_SIZE]
+        lea     r8, [rel audio_storage_rows]
+        mov     r9d, AUDIO_TRACE_CAPACITY
+        call    asm_audio_trace_rows
+        cmp     eax, dword [r13 + STORAGE_ROWS_PER_LOOP]
+        jne     .storage_fail_rows
+
+        ; Expand the compact row trace into per-tick ModPos/time tables.
+        xor     ebx, ebx                    ; current row index
+        xor     ecx, ecx                    ; state frame index
+.storage_timeline_loop:
+        cmp     ecx, dword [r13 + STORAGE_STATE_FRAMES]
+        jae     .storage_descriptor
+.storage_row_advance:
+        mov     eax, ebx
+        inc     eax
+        cmp     eax, dword [r13 + STORAGE_ROWS_PER_LOOP]
+        jae     .storage_row_ready
+        imul    eax, TRACE_ENTRY_BYTES
+        lea     rsi, [rel audio_storage_rows]
+        cmp     dword [rsi + rax + TRACE_FRAME], ecx
+        ja      .storage_row_ready
+        inc     ebx
+        jmp     .storage_row_advance
+.storage_row_ready:
+        mov     eax, ebx
+        imul    eax, TRACE_ENTRY_BYTES
+        lea     rsi, [rel audio_storage_rows]
+        mov     edx, dword [rsi + rax + TRACE_POSITION]
+        shl     edx, 8
+        or      edx, dword [rsi + rax + TRACE_ROW]
+        lea     rdi, [rel audio_storage_modpos]
+        mov     dword [rdi + rcx * 4], edx
+        mov     edx, dword [rsi + rax + TRACE_TIME_MS]
+        lea     rdi, [rel audio_storage_tick_times]
+        mov     dword [rdi + rcx * 4], edx
+        inc     ecx
+        jmp     .storage_timeline_loop
+
+.storage_descriptor:
+        lea     rax, [rel audio_storage_module]
+        mov     [r13 + STORAGE_MODULE], rax
+        lea     rax, [rel audio_storage_tick_starts]
+        mov     [r13 + STORAGE_TICK_STARTS], rax
+        lea     rax, [rel audio_storage_modpos]
+        mov     [r13 + STORAGE_MODPOS_BY_TICK], rax
+        lea     rax, [rel audio_storage_tick_times]
+        mov     [r13 + STORAGE_TICK_TIMES_MS], rax
+        lea     rax, [rel audio_storage_states]
+        mov     [r13 + STORAGE_STATES], rax
+        lea     rax, [rel audio_storage_ring_samples]
+        mov     [r13 + STORAGE_RING_SAMPLES], rax
+        lea     rax, [rel audio_storage_ring_markers]
+        mov     [r13 + STORAGE_RING_MARKERS], rax
+        lea     rax, [rel audio_storage_producer_states]
+        mov     [r13 + STORAGE_PRODUCER_STATES], rax
+        lea     rax, [rel audio_storage_producer_pcm]
+        mov     [r13 + STORAGE_PRODUCER_PCM], rax
+        lea     rax, [rel audio_storage_history]
+        mov     [r13 + STORAGE_PRODUCER_HISTORY], rax
+        mov     eax, dword [rel audio_storage_summary + SUMMARY_ORDER_COUNT]
+        mov     dword [r13 + STORAGE_ORDER_COUNT], eax
+        xor     eax, eax
+        jmp     .storage_return
+
+.storage_fail_close:
+        test    r14, r14
+        jz      .storage_fail_io
+        mov     rcx, r14
+        call    CloseHandle
+.storage_fail_io:
+        mov     eax, 2
+        jmp     .storage_return
+.storage_fail_size:
+        jmp     .storage_fail_close
+.storage_fail_read:
+        mov     eax, 3
+        jmp     .storage_return
+.storage_fail_parse:
+        mov     eax, 4
+        jmp     .storage_return
+.storage_fail_states:
+        mov     eax, 5
+        jmp     .storage_return
+.storage_fail_rows:
+        mov     eax, 6
+        jmp     .storage_return
+.storage_fail:
+        mov     eax, 7
+.storage_return:
+        add     rsp, 0x48
+        pop     r15
+        pop     r14
+        pop     r13
+        pop     r12
+        pop     rdi
+        pop     rsi
+        pop     rbx
+        pop     rbp
+        ret
+.storage_fail_file:
+        mov     eax, 1
+        jmp     .storage_return
+
+section .bss align=16
+audio_storage_module:          resb AUDIO_MODULE_CAPACITY
+audio_storage_states:          resb (AUDIO_STATE_CAPACITY * TICK_STATE_BYTES)
+audio_storage_tick_starts:     resd (AUDIO_STATE_CAPACITY + 1)
+audio_storage_modpos:          resd AUDIO_STATE_CAPACITY
+audio_storage_tick_times:      resd AUDIO_STATE_CAPACITY
+audio_storage_ring_samples:    resw (AUDIO_RING_CAPACITY * 2)
+audio_storage_ring_markers:    resb (AUDIO_MARKER_CAPACITY * 8)
+audio_storage_producer_states: resb (TICK_CHUNK * TICK_STATE_BYTES)
+audio_storage_producer_pcm:    resw (AUDIO_SCRATCH_FRAMES * 2)
+audio_storage_history:         resb 224
+audio_storage_summary:         resb 1204
+audio_storage_rows:            resb (AUDIO_TRACE_CAPACITY * TRACE_ENTRY_BYTES)
+audio_storage_bytes_read:      resd 1
 
 section .text
 

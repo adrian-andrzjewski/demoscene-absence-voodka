@@ -2,56 +2,34 @@
 //
 // The tracker, mixer, PCM ring, timeline markers, and WASAPI render worker
 // are native x64 assembly.  This file is intentionally only the transitional
-// host shim: it loads the module, owns Win32 thread handles and vectors, and
+// host shim: it owns Win32 thread handles and synchronization records, and
 // translates the existing platform audio ABI into the assembly contracts.
 // The old audio.cpp/libxmp path remains available as the behavioral oracle.
 
 #include "platform_abi.h"
 #include "../tools/validate/audio_mix_abi.h"
-#include "../tools/validate/audio_mod_abi.h"
 #include "../tools/validate/audio_ring_abi.h"
 #include "../tools/validate/audio_service_abi.h"
 #include "../tools/validate/audio_thread_abi.h"
 #include "../tools/validate/audio_tick_abi.h"
-#include "../tools/validate/audio_tracker_abi.h"
 
 #include <windows.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
-#include <fstream>
-#include <limits>
-#include <vector>
 
 namespace vk {
 
 namespace {
 
-constexpr uint32_t kChannels = 14;
-constexpr uint32_t kOutputChannels = 2;
-constexpr uint32_t kStateCapacity = 20000;
-constexpr uint32_t kTickChunk = 31;
-constexpr uint32_t kRingCapacity = 16384;
-constexpr uint32_t kMarkerCapacity = 16384;
 constexpr uint32_t kPrebufferFrames = 8192;
 constexpr uint32_t kSampleRate = 44100;
+constexpr uint32_t kRingCapacity = 16384;
+constexpr uint32_t kMarkerCapacity = 16384;
 
 struct Runtime {
-    std::vector<uint8_t> module;
-    std::vector<uint32_t> tickStarts;
-    std::vector<uint32_t> modposByTick;
-    std::vector<uint32_t> tickTimesMs;
-    uint32_t stateFrames = 0;
-    uint32_t totalFrames = 0;
-    uint32_t maxTickFrames = 0;
-    uint32_t orderCount = 0;
-
-    std::vector<int16_t> ringSamples;
-    std::vector<AudioRingMarker> ringMarkers;
-    std::vector<AudioTickState> producerStates;
-    std::vector<int16_t> producerPcm;
-    AudioMixerHistory producerHistory{};
+    AudioAssemblyStorage storage{};
     AudioAssemblyProducerArgs producerArgs{};
     AudioPcmRing ring{};
     AudioLiveControl control{};
@@ -78,65 +56,6 @@ struct Runtime {
 };
 
 Runtime g_runtime;
-
-bool readModule(const char* path, std::vector<uint8_t>* out) {
-    std::ifstream file(path, std::ios::binary | std::ios::ate);
-    if (!file) return false;
-    const std::streamoff size = file.tellg();
-    if (size <= 0 || size > std::numeric_limits<uint32_t>::max()) return false;
-    out->resize(static_cast<size_t>(size));
-    file.seekg(0, std::ios::beg);
-    return static_cast<bool>(file.read(reinterpret_cast<char*>(out->data()), size));
-}
-
-bool checkedTiming(const std::vector<AudioTickState>& states,
-                   uint32_t stateFrames, Runtime* runtime) {
-    if (!stateFrames || states.size() <
-            static_cast<size_t>(stateFrames) * kChannels) return false;
-    runtime->tickStarts.resize(static_cast<size_t>(stateFrames) + 1);
-    uint64_t total = 0;
-    uint32_t maxTick = 0;
-    for (uint32_t frame = 0; frame < stateFrames; ++frame) {
-        const uint32_t tickFrames =
-            states[static_cast<size_t>(frame) * kChannels].tickFrames;
-        if (!tickFrames || total > std::numeric_limits<uint32_t>::max())
-            return false;
-        runtime->tickStarts[frame] = static_cast<uint32_t>(total);
-        total += tickFrames;
-        maxTick = std::max(maxTick, tickFrames);
-    }
-    if (total > std::numeric_limits<uint32_t>::max() || !total) return false;
-    runtime->tickStarts[stateFrames] = static_cast<uint32_t>(total);
-    runtime->totalFrames = static_cast<uint32_t>(total);
-    runtime->maxTickFrames = maxTick;
-    return true;
-}
-
-bool buildTimeline(const uint8_t* module, uint32_t moduleSize,
-                   uint32_t stateFrames, Runtime* runtime) {
-    audio_abi::Summary summary{};
-    if (asm_audio_parse_mod(module, moduleSize, &summary) != 0 ||
-        summary.status != 0 || !summary.rowsPerLoop) return false;
-    runtime->orderCount = summary.orderCount;
-
-    std::vector<AudioTraceEntry> rows(summary.rowsPerLoop);
-    const uint32_t count = asm_audio_trace_rows(
-        module, moduleSize, rows.data(), summary.rowsPerLoop);
-    if (count != summary.rowsPerLoop || rows.empty() || rows[0].frame != 0)
-        return false;
-
-    runtime->modposByTick.resize(stateFrames);
-    runtime->tickTimesMs.resize(stateFrames);
-    size_t row = 0;
-    for (uint32_t frame = 0; frame < stateFrames; ++frame) {
-        while (row + 1 < rows.size() && rows[row + 1].frame <= frame)
-            ++row;
-        runtime->modposByTick[frame] =
-            (rows[row].position << 8) | rows[row].row;
-        runtime->tickTimesMs[frame] = rows[row].timeMs;
-    }
-    return true;
-}
 
 bool issueState(Runtime* runtime, uint32_t state, uint32_t* sequenceOut) {
     InterlockedExchange(
@@ -208,24 +127,25 @@ bool seekTick(Runtime* runtime, uint32_t targetTick) {
     runtime->seekBaseFrame = baseConsumed;
     runtime->seekSourceTick = targetTick;
     runtime->seekTimeBase =
-        static_cast<double>(runtime->tickStarts[targetTick]) / kSampleRate;
+        static_cast<double>(runtime->storage.tickStarts[targetTick]) /
+        kSampleRate;
     return issueState(runtime, 0, nullptr);
 }
 
 uint32_t tickForModPos(const Runtime* runtime, uint32_t modpos) {
-    const auto it = std::lower_bound(runtime->modposByTick.begin(),
-                                     runtime->modposByTick.end(), modpos);
-    if (it == runtime->modposByTick.end())
-        return runtime->stateFrames - 1;
-    return static_cast<uint32_t>(it - runtime->modposByTick.begin());
+    const uint32_t* begin = runtime->storage.modposByTick;
+    const uint32_t* end = begin + runtime->storage.stateFrames;
+    const auto it = std::lower_bound(begin, end, modpos);
+    if (it == end) return runtime->storage.stateFrames - 1;
+    return static_cast<uint32_t>(it - begin);
 }
 
 uint32_t tickForMs(const Runtime* runtime, uint32_t ms) {
-    const auto it = std::lower_bound(runtime->tickTimesMs.begin(),
-                                     runtime->tickTimesMs.end(), ms);
-    if (it == runtime->tickTimesMs.end())
-        return runtime->stateFrames - 1;
-    return static_cast<uint32_t>(it - runtime->tickTimesMs.begin());
+    const uint32_t* begin = runtime->storage.tickTimesMs;
+    const uint32_t* end = begin + runtime->storage.stateFrames;
+    const auto it = std::lower_bound(begin, end, ms);
+    if (it == end) return runtime->storage.stateFrames - 1;
+    return static_cast<uint32_t>(it - begin);
 }
 
 void clearRuntime() {
@@ -245,43 +165,19 @@ int audioAsmInit(const char* modPath, int) {
         logPrint("[audio-asm] forced device failure injection\n");
         return 0;
     }
-    if (!modPath || !readModule(modPath, &g_runtime.module)) return 0;
-
-    audio_abi::Summary summary{};
-    if (asm_audio_parse_mod(
-            g_runtime.module.data(),
-            static_cast<uint32_t>(g_runtime.module.size()), &summary) != 0 ||
-        summary.status != 0 || summary.channelCount != kChannels) {
-        logPrint("[audio-asm] NASM module parse failed\n");
+    const uint32_t storageStatus = modPath
+        ? asm_audio_service_storage_init(modPath, &g_runtime.storage) : 1;
+    if (storageStatus != 0) {
+        logPrint("[audio-asm] native module/storage preparation failed "
+                 "status=%u\n", storageStatus);
         clearRuntime();
         return 0;
     }
 
-    std::vector<AudioTickState> reference(
-        static_cast<size_t>(kStateCapacity) * kChannels);
-    g_runtime.stateFrames = asm_audio_trace_tick_states(
-        g_runtime.module.data(), static_cast<uint32_t>(g_runtime.module.size()),
-        reference.data(), kStateCapacity);
-    if (!g_runtime.stateFrames || g_runtime.stateFrames > kStateCapacity ||
-        !checkedTiming(reference, g_runtime.stateFrames, &g_runtime) ||
-        !buildTimeline(g_runtime.module.data(),
-                       static_cast<uint32_t>(g_runtime.module.size()),
-                       g_runtime.stateFrames, &g_runtime)) {
-        logPrint("[audio-asm] native timing preparation failed\n");
-        clearRuntime();
-        return 0;
-    }
-
-    g_runtime.ringSamples.resize(
-        static_cast<size_t>(kRingCapacity) * kOutputChannels);
-    g_runtime.ringMarkers.resize(kMarkerCapacity);
-    g_runtime.producerStates.resize(
-        static_cast<size_t>(kTickChunk) * kChannels);
-    const uint32_t scratchFrames = g_runtime.maxTickFrames * kTickChunk;
-    g_runtime.producerPcm.resize(
-        static_cast<size_t>(scratchFrames) * kOutputChannels);
-    if (asm_audio_ring_init(&g_runtime.ring, g_runtime.ringSamples.data(),
-                            kRingCapacity, g_runtime.ringMarkers.data(),
+    if (asm_audio_ring_init(&g_runtime.ring,
+                            g_runtime.storage.ringSamples,
+                            kRingCapacity,
+                            g_runtime.storage.ringMarkers,
                             kMarkerCapacity) != 0) {
         logPrint("[audio-asm] ring initialization failed\n");
         clearRuntime();
@@ -289,18 +185,18 @@ int audioAsmInit(const char* modPath, int) {
     }
 
     g_runtime.producerArgs = {
-        g_runtime.module.data(),
-        static_cast<uint32_t>(g_runtime.module.size()),
-        g_runtime.stateFrames,
-        g_runtime.maxTickFrames,
-        scratchFrames,
-        g_runtime.tickStarts.data(),
-        g_runtime.modposByTick.data(),
+        g_runtime.storage.module,
+        g_runtime.storage.moduleSize,
+        g_runtime.storage.stateFrames,
+        g_runtime.storage.maxTickFrames,
+        g_runtime.storage.scratchFrames,
+        g_runtime.storage.tickStarts,
+        g_runtime.storage.modposByTick,
         &g_runtime.ring,
         &g_runtime.control,
-        g_runtime.producerStates.data(),
-        g_runtime.producerPcm.data(),
-        &g_runtime.producerHistory,
+        g_runtime.storage.producerStates,
+        g_runtime.storage.producerPcm,
+        g_runtime.storage.producerHistory,
         reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
         reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
         reinterpret_cast<volatile uint32_t*>(&g_runtime.producerDone),
@@ -347,7 +243,7 @@ int audioAsmInit(const char* modPath, int) {
     InterlockedExchange(&g_runtime.playing, 1);
     InterlockedExchange(&g_runtime.initialized, 1);
     logPrint("[audio-asm] dedicated player active, orders=%u, 44100Hz stereo\n",
-             g_runtime.orderCount);
+             g_runtime.storage.orderCount);
     return 1;
 }
 
@@ -406,7 +302,7 @@ uint32_t audioAsmModPos() {
 }
 
 uint32_t audioAsmModLength() {
-    return g_runtime.initialized ? g_runtime.orderCount : 0;
+    return g_runtime.initialized ? g_runtime.storage.orderCount : 0;
 }
 
 double audioAsmElapsedSec() {
@@ -423,14 +319,14 @@ uint32_t audioAsmSeekRows(uint32_t modpos) {
     if (!g_runtime.initialized) return 0;
     const uint32_t tick = tickForModPos(&g_runtime, modpos);
     return seekTick(&g_runtime, tick)
-        ? g_runtime.modposByTick[tick] : 0;
+        ? g_runtime.storage.modposByTick[tick] : 0;
 }
 
 uint32_t audioAsmSeekMs(int ms) {
     if (!g_runtime.initialized || ms < 0) return 0;
     const uint32_t tick = tickForMs(&g_runtime, static_cast<uint32_t>(ms));
     return seekTick(&g_runtime, tick)
-        ? g_runtime.modposByTick[tick] : 0;
+        ? g_runtime.storage.modposByTick[tick] : 0;
 }
 
 uint32_t audioAsmSeekOrder(int order) {
