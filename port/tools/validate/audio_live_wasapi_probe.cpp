@@ -31,6 +31,8 @@ constexpr uint32_t kPrebufferFrames = 8192;
 constexpr uint32_t kPushChunk = 1024;
 constexpr uint32_t kDurationMs = 1000;
 constexpr uint32_t kControlDurationMs = 2200;
+constexpr uint32_t kSeekDurationMs = 3200;
+constexpr uint32_t kSeekTargetTick = 1024;
 constexpr uint64_t kFnvOffset = 14695981039346656037ull;
 constexpr uint64_t kFnvPrime = 1099511628211ull;
 
@@ -114,6 +116,7 @@ struct ProducerArgs {
     const uint32_t* tickStarts;
     const uint32_t* modposByTick;
     AudioPcmRing* ring;
+    AudioLiveControl* control;
     AudioTickState* stateScratch;
     uint32_t stateScratchCapacity;
     int16_t* pcmScratch;
@@ -127,6 +130,52 @@ struct ProducerArgs {
     uint32_t backpressure = 0;
     uint32_t markers = 0;
 };
+
+bool producerHandleSeek(ProducerArgs* args,
+                        AudioLiveTrackerContext* tracker,
+                        AudioMixerHistory* history,
+                        uint32_t* stateFrame,
+                        uint32_t* lastSeekSequence,
+                        uint32_t* segmentBaseTick,
+                        uint32_t* segmentRingBase,
+                        bool* seekSegment) {
+    if (!args->control) return true;
+    const uint32_t sequence = args->control->seekSequence;
+    if (sequence == *lastSeekSequence) return true;
+
+    // Stop producing before the controller flushes the consumer-owned ring.
+    InterlockedExchange(
+        reinterpret_cast<volatile LONG*>(&args->control->producerSeekAckSequence),
+        static_cast<LONG>(sequence));
+    while (args->control->seekCommitSequence != sequence) {
+        if (InterlockedCompareExchange(&args->stopRequested, 0, 0) != 0)
+            return false;
+        Sleep(1);
+    }
+
+    uint32_t target = args->control->requestedSeekTick;
+    if (target >= args->stateFrames) target = args->stateFrames - 1;
+    AudioLiveTrackerContext fresh{};
+    if (asm_audio_live_init(args->module, args->moduleSize, &fresh) != 0) {
+        InterlockedExchange(&args->failed, 1);
+        return false;
+    }
+    AudioTickState discarded[kChannels]{};
+    for (uint32_t i = 0; i < target; ++i) {
+        if (asm_audio_live_next(&fresh, discarded) != 1) {
+            InterlockedExchange(&args->failed, 1);
+            return false;
+        }
+    }
+    *tracker = fresh;
+    *history = AudioMixerHistory{};
+    *stateFrame = target;
+    *segmentBaseTick = target;
+    *segmentRingBase = args->control->seekRingBaseFrame;
+    *seekSegment = true;
+    *lastSeekSequence = sequence;
+    return true;
+}
 
 struct ProbeThreadArgs {
     AudioRingThreadArgs* args;
@@ -163,6 +212,27 @@ bool issueControl(AudioLiveControl* control, uint32_t state,
     return false;
 }
 
+bool issueSeek(AudioLiveControl* control, uint32_t targetTick,
+               uint32_t* sequenceOut) {
+    if (!control) return false;
+    InterlockedExchange(
+        reinterpret_cast<volatile LONG*>(&control->requestedSeekTick),
+        static_cast<LONG>(targetTick));
+    const LONG sequence = InterlockedIncrement(
+        reinterpret_cast<volatile LONG*>(&control->seekSequence));
+    for (uint32_t i = 0; i < 5000; ++i) {
+        if (control->producerSeekAckSequence ==
+            static_cast<uint32_t>(sequence)) {
+            if (sequenceOut) *sequenceOut = static_cast<uint32_t>(sequence);
+            return true;
+        }
+        if (control->seekSequence != static_cast<uint32_t>(sequence))
+            return false;
+        Sleep(1);
+    }
+    return false;
+}
+
 DWORD WINAPI producerThread(void* raw) {
     auto* args = static_cast<ProducerArgs*>(raw);
     AudioLiveTrackerContext tracker{};
@@ -173,8 +243,17 @@ DWORD WINAPI producerThread(void* raw) {
     }
 
     uint32_t stateFrame = 0;
+    uint32_t lastSeekSequence = 0;
+    uint32_t segmentBaseTick = 0;
+    uint32_t segmentRingBase = 0;
+    bool seekSegment = false;
     while (stateFrame < args->stateFrames &&
            InterlockedCompareExchange(&args->stopRequested, 0, 0) == 0) {
+        if (!producerHandleSeek(args, &tracker, &history, &stateFrame,
+                                &lastSeekSequence, &segmentBaseTick,
+                                &segmentRingBase, &seekSegment)) {
+            break;
+        }
         const uint32_t chunkStates = std::min(
             kTickChunk, args->stateFrames - stateFrame);
         if (chunkStates > args->stateScratchCapacity) {
@@ -183,9 +262,15 @@ DWORD WINAPI producerThread(void* raw) {
         }
 
         uint32_t chunkFrames = 0;
+        bool seekChanged = false;
         for (uint32_t i = 0; i < chunkStates; ++i) {
-            if (InterlockedCompareExchange(&args->stopRequested, 0, 0) != 0)
+            if (InterlockedCompareExchange(&args->stopRequested, 0, 0) != 0) {
                 break;
+            }
+            if (args->control && args->control->seekSequence != lastSeekSequence) {
+                seekChanged = true;
+                break;
+            }
             auto* state = args->stateScratch +
                 static_cast<size_t>(i) * kChannels;
             if (asm_audio_live_next(&tracker, state) != 1 ||
@@ -204,6 +289,7 @@ DWORD WINAPI producerThread(void* raw) {
         if (InterlockedCompareExchange(&args->failed, 0, 0) != 0 ||
             InterlockedCompareExchange(&args->stopRequested, 0, 0) != 0)
             break;
+        if (seekChanged) continue;
         if (chunkFrames > args->pcmScratchCapacity) {
             InterlockedExchange(&args->failed, 1);
             break;
@@ -220,6 +306,10 @@ DWORD WINAPI producerThread(void* raw) {
         uint32_t pushed = 0;
         while (pushed < mixed &&
                InterlockedCompareExchange(&args->stopRequested, 0, 0) == 0) {
+            if (args->control && args->control->seekSequence != lastSeekSequence) {
+                seekChanged = true;
+                break;
+            }
             const uint32_t got = asm_audio_ring_push(
                 args->ring,
                 args->pcmScratch + static_cast<size_t>(pushed) * kOutputChannels,
@@ -237,10 +327,20 @@ DWORD WINAPI producerThread(void* raw) {
         }
         if (InterlockedCompareExchange(&args->stopRequested, 0, 0) != 0)
             break;
+        if (seekChanged) continue;
 
         for (uint32_t i = 0; i < chunkStates; ++i) {
+            if (args->control && args->control->seekSequence != lastSeekSequence) {
+                seekChanged = true;
+                break;
+            }
+            uint32_t markerFrame = args->tickStarts[stateFrame + i];
+            if (seekSegment) {
+                markerFrame = segmentRingBase +
+                    (markerFrame - args->tickStarts[segmentBaseTick]);
+            }
             if (asm_audio_ring_push_marker(
-                    args->ring, args->tickStarts[stateFrame + i],
+                    args->ring, markerFrame,
                     args->modposByTick[stateFrame + i]) != 1) {
                 InterlockedExchange(&args->failed, 1);
                 break;
@@ -249,6 +349,7 @@ DWORD WINAPI producerThread(void* raw) {
         }
         if (InterlockedCompareExchange(&args->failed, 0, 0) != 0)
             break;
+        if (seekChanged) continue;
         stateFrame += chunkStates;
         args->producedStates = stateFrame;
         args->mixedFrames += mixed;
@@ -271,8 +372,10 @@ uint32_t expectedModPos(const std::vector<uint32_t>& tickStarts,
 
 int main(int argc, char** argv) {
     const bool controlMode = argc == 3 && std::strcmp(argv[2], "--control") == 0;
-    if (argc != 2 && !controlMode) {
-        std::cerr << "usage: audio_live_wasapi_probe <module.mod> [--control]\n";
+    const bool seekMode = argc == 3 && std::strcmp(argv[2], "--seek") == 0;
+    const bool commandMode = controlMode || seekMode;
+    if (argc != 2 && !commandMode) {
+        std::cerr << "usage: audio_live_wasapi_probe <module.mod> [--control|--seek]\n";
         return 2;
     }
 
@@ -298,6 +401,7 @@ int main(int argc, char** argv) {
     uint32_t totalFrames = 0;
     uint32_t maxTickFrames = 0;
     if (!stateFrames || stateFrames > kStateCapacity ||
+        (seekMode && kSeekTargetTick >= stateFrames) ||
         !checkedFrameTotal(reference, stateFrames, &tickStarts, &totalFrames,
                            &maxTickFrames)) {
         std::cerr << "audio_live_wasapi_probe: native timing failed\n";
@@ -339,10 +443,11 @@ int main(int argc, char** argv) {
         static_cast<size_t>(kTickChunk) * kChannels);
     std::vector<int16_t> pcmScratch(
         static_cast<size_t>(scratchFrames) * kOutputChannels);
+    AudioLiveControl control{};
     ProducerArgs producer{
         module.data(), static_cast<uint32_t>(module.size()), stateFrames,
-        tickStarts.data(), modposByTick.data(), &ring, stateScratch.data(),
-        kTickChunk, pcmScratch.data(), scratchFrames};
+        tickStarts.data(), modposByTick.data(), &ring, &control,
+        stateScratch.data(), kTickChunk, pcmScratch.data(), scratchFrames};
 
     HANDLE producerHandle = CreateThread(nullptr, 0, producerThread, &producer,
                                          0, nullptr);
@@ -362,17 +467,21 @@ int main(int argc, char** argv) {
         Sleep(1);
     }
 
-    AudioLiveControl control{};
     AudioRingThreadArgs args{
-        &ring, controlMode ? kControlDurationMs : kDurationMs,
-        controlMode ? &control : nullptr};
+        &ring,
+        controlMode ? kControlDurationMs :
+            (seekMode ? kSeekDurationMs : kDurationMs),
+        commandMode ? &control : nullptr};
     AudioRingThreadReport report{};
     uint32_t result = 1;
-    bool controlOk = !controlMode;
-    bool pausedStable = !controlMode;
+    bool controlOk = !commandMode;
+    bool pausedStable = !commandMode;
+    bool seekPrebuffered = !seekMode;
+    uint32_t seekBaseConsumed = 0;
+    uint32_t seekSequence = 0;
     DWORD probeWait = WAIT_OBJECT_0;
     if (prebuffered) {
-        if (!controlMode) {
+        if (!commandMode) {
             result = asm_audio_ring_thread_probe(&args, &report);
         } else {
             ProbeThreadArgs probe{&args, &report};
@@ -383,17 +492,58 @@ int main(int argc, char** argv) {
                 uint32_t pauseSequence = 0;
                 const bool pauseAck = issueControl(&control, 1, &pauseSequence);
                 const uint32_t pausedAtAck = ring.readFrame;
+                MemoryBarrier();
+                seekBaseConsumed = control.workerConsumedFrames;
                 Sleep(250);
                 pausedStable = ring.readFrame == pausedAtAck;
+                bool commandOk = pauseAck && pausedStable;
                 uint32_t resumeSequence = 0;
-                const bool resumeAck = issueControl(&control, 0, &resumeSequence);
-                Sleep(500);
+                bool resumeAck = false;
+                if (seekMode && commandOk) {
+                    InterlockedExchange(
+                        reinterpret_cast<volatile LONG*>(&control.seekRingBaseFrame),
+                        static_cast<LONG>(seekBaseConsumed));
+                    const bool producerAck = issueSeek(
+                        &control, kSeekTargetTick, &seekSequence);
+                    if (producerAck) {
+                        // Both owners are quiescent: the worker is paused at
+                        // an audio boundary and the producer has acknowledged
+                        // that it will not write again until commit.  Move
+                        // both ring cursors together so no pre-seek samples or
+                        // markers can leak into the post-seek stream.
+                        MemoryBarrier();
+                        ring.readFrame = ring.writeFrame;
+                        ring.markerRead = ring.markerWrite;
+                        MemoryBarrier();
+                        InterlockedExchange(
+                            reinterpret_cast<volatile LONG*>(
+                                &control.seekCommitSequence),
+                            static_cast<LONG>(seekSequence));
+
+                        for (uint32_t i = 0; i < 5000; ++i) {
+                            if (ring.writeFrame - ring.readFrame >=
+                                kPrebufferFrames) {
+                                seekPrebuffered = true;
+                                break;
+                            }
+                            if (InterlockedCompareExchange(
+                                    &producer.failed, 0, 0) != 0)
+                                break;
+                            Sleep(1);
+                        }
+                    }
+                    commandOk = commandOk && producerAck && seekPrebuffered;
+                }
+                if (commandOk) {
+                    resumeAck = issueControl(&control, 0, &resumeSequence);
+                    Sleep(500);
+                }
                 probeWait = WaitForSingleObject(probeHandle, INFINITE);
                 result = static_cast<uint32_t>(
                     InterlockedCompareExchange(&probe.result, 0, 0));
                 CloseHandle(probeHandle);
-                controlOk = pauseAck && resumeAck &&
-                    pauseSequence != resumeSequence && pausedStable &&
+                controlOk = commandOk && resumeAck &&
+                    pauseSequence != resumeSequence &&
                     probeWait == WAIT_OBJECT_0;
             } else {
                 controlOk = false;
@@ -413,12 +563,37 @@ int main(int argc, char** argv) {
     CloseHandle(producerHandle);
 
     const auto& common = report.common;
+    std::vector<int16_t> expectedSeekPcm;
+    uint32_t expectedSeekFrames = 0;
+    if (seekMode && kSeekTargetTick < stateFrames) {
+        expectedSeekFrames = totalFrames - tickStarts[kSeekTargetTick];
+        expectedSeekPcm.resize(
+            static_cast<size_t>(expectedSeekFrames) * kOutputChannels);
+        expectedSeekFrames = asm_audio_mix_tick_states(
+            module.data(), static_cast<uint32_t>(module.size()),
+            reference.data() + static_cast<size_t>(kSeekTargetTick) * kChannels,
+            stateFrames - kSeekTargetTick, expectedSeekPcm.data(),
+            expectedSeekFrames);
+    }
+    const uint32_t postSeekFrames = seekMode &&
+        report.consumedFrames >= seekBaseConsumed
+        ? report.consumedFrames - seekBaseConsumed : 0;
     Fnv64 expectedPrefix;
-    if (report.consumedFrames <= totalFrames) {
-        expectedPrefix.add(
-            expectedPcm.data(),
-            static_cast<size_t>(report.consumedFrames) *
-                kOutputChannels * sizeof(int16_t));
+    if ((!seekMode && report.consumedFrames <= totalFrames) ||
+        (seekMode && seekBaseConsumed <= totalFrames &&
+         postSeekFrames <= expectedSeekFrames)) {
+        if (seekMode) {
+            expectedPrefix.add(
+                expectedPcm.data(), static_cast<size_t>(seekBaseConsumed) *
+                    kOutputChannels * sizeof(int16_t));
+            expectedPrefix.add(
+                expectedSeekPcm.data(), static_cast<size_t>(postSeekFrames) *
+                    kOutputChannels * sizeof(int16_t));
+        } else {
+            expectedPrefix.add(
+                expectedPcm.data(), static_cast<size_t>(report.consumedFrames) *
+                    kOutputChannels * sizeof(int16_t));
+        }
     }
     std::printf(
         "audio_live_wasapi_probe result=%u prebuffered=%u states=%u "
@@ -428,6 +603,7 @@ int main(int argc, char** argv) {
         "underrun_events=%u overrun_events=%u marker_overrun=%u "
         "pcm_fnv=0x%016llX expected_fnv=0x%016llX control=%u "
         "pause_transitions=%u paused_frames=%u final_paused=%u "
+        "seek_base=%u post_seek_frames=%u seek_sequence=%u "
         "paused_stable=%u probe_wait=%08X producer_wait=%08X "
         "producer_failed=%ld\n",
         result, prebuffered ? 1u : 0u, stateFrames, producer.producedStates,
@@ -439,9 +615,10 @@ int main(int argc, char** argv) {
         report.markerOverruns,
         static_cast<unsigned long long>(report.pcmFnv),
         static_cast<unsigned long long>(expectedPrefix.value),
-        controlMode ? 1u : 0u, report.pauseTransitions, report.pausedFrames,
-        report.finalPausedState, pausedStable ? 1u : 0u, probeWait,
-        producerWait, producer.failed);
+        commandMode ? 1u : 0u, report.pauseTransitions, report.pausedFrames,
+        report.finalPausedState, seekBaseConsumed, postSeekFrames,
+        seekSequence, pausedStable ? 1u : 0u, probeWait, producerWait,
+        producer.failed);
 
     const bool hresultsOk =
         common.comHr == 0 && common.enumeratorHr == 0 &&
@@ -457,29 +634,55 @@ int main(int argc, char** argv) {
         common.bufferSize > 0 && common.eventCreated == 1 &&
         common.firstWait == 1 && common.eventWakeups > 0 &&
         common.frames > 0 && common.timeouts == 0 && common.workerExit == 0 &&
-        common.durationMs == (controlMode ? kControlDurationMs : kDurationMs);
+        common.durationMs ==
+            (controlMode ? kControlDurationMs :
+                (seekMode ? kSeekDurationMs : kDurationMs));
+    const bool consumedRangeOk = !seekMode
+        ? report.consumedFrames <= totalFrames
+        : seekBaseConsumed <= report.consumedFrames &&
+          seekBaseConsumed <= totalFrames &&
+          postSeekFrames <= expectedSeekFrames;
+    const uint32_t expectedPublishedModPos = seekMode
+        ? expectedModPos(
+            tickStarts, modposByTick, stateFrames,
+            tickStarts[kSeekTargetTick] +
+                (report.publishedPcmFrame >= seekBaseConsumed
+                    ? report.publishedPcmFrame - seekBaseConsumed : 0))
+        : expectedModPos(
+            tickStarts, modposByTick, stateFrames,
+            report.publishedPcmFrame);
     const bool transferOk =
         producer.failed == 0 && producer.producedStates > 0 &&
         producer.pushedFrames >= report.consumedFrames &&
         report.consumedFrames <= common.frames &&
-        report.consumedFrames <= totalFrames &&
+        consumedRangeOk &&
         report.underrunEvents == 0 && ring.underrunEvents == 0 &&
         report.markerOverruns == 0 && ring.markerOverruns == 0 &&
         report.snapshotUpdates > 0 &&
         report.publishedPcmFrame <= report.consumedFrames &&
         [&]() {
             Fnv64 expectedPrefix;
-            expectedPrefix.add(
-                expectedPcm.data(),
-                static_cast<size_t>(report.consumedFrames) *
-                    kOutputChannels * sizeof(int16_t));
+            if (seekMode) {
+                expectedPrefix.add(
+                    expectedPcm.data(), static_cast<size_t>(seekBaseConsumed) *
+                        kOutputChannels * sizeof(int16_t));
+                expectedPrefix.add(
+                    expectedSeekPcm.data(), static_cast<size_t>(postSeekFrames) *
+                        kOutputChannels * sizeof(int16_t));
+            } else {
+                expectedPrefix.add(
+                    expectedPcm.data(),
+                    static_cast<size_t>(report.consumedFrames) *
+                        kOutputChannels * sizeof(int16_t));
+            }
             return report.pcmFnv == expectedPrefix.value;
         }() &&
-        report.publishedModPos == expectedModPos(
-            tickStarts, modposByTick, stateFrames,
-            report.publishedPcmFrame);
+        (!seekMode || (seekPrebuffered &&
+            report.publishedPcmFrame >= seekBaseConsumed &&
+            report.publishedPcmFrame - seekBaseConsumed < expectedSeekFrames)) &&
+        report.publishedModPos == expectedPublishedModPos;
     const bool controlReportOk =
-        !controlMode ||
+        !commandMode ||
         (controlOk && report.pauseTransitions == 2 &&
          report.pausedFrames > 0 && report.finalPausedState == 0);
     if (!hresultsOk || !threadOk || !transferOk || !controlReportOk) {

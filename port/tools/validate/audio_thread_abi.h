@@ -62,6 +62,17 @@ struct AudioLiveControl {
     volatile uint32_t requestSequence;
     volatile uint32_t acknowledgedState;
     volatile uint32_t acknowledgedSequence;
+    // A seek publishes its target and sequence.  The producer acknowledges
+    // quiescence, the controller flushes the ring and publishes commit, and
+    // the producer then resumes from a fresh tracker/mixer state.
+    volatile uint32_t requestedSeekTick;
+    volatile uint32_t seekSequence;
+    volatile uint32_t producerSeekAckSequence;
+    volatile uint32_t seekCommitSequence;
+    volatile uint32_t seekRingBaseFrame;
+    // Published by the assembly worker at each ring pop so a controller can
+    // capture the exact logical PCM boundary while the worker is paused.
+    volatile uint32_t workerConsumedFrames;
 };
 
 struct AudioRingThreadArgs {
@@ -107,10 +118,16 @@ static_assert(offsetof(AudioPcmThreadReport, publishedPcmFrame) == 112);
 static_assert(offsetof(AudioPcmThreadReport, snapshotUpdates) == 116);
 static_assert(offsetof(AudioPcmThreadReport, sourceLoops) == 120);
 
-static_assert(sizeof(AudioLiveControl) == 16);
+static_assert(sizeof(AudioLiveControl) == 40);
 static_assert(offsetof(AudioLiveControl, requestSequence) == 4);
 static_assert(offsetof(AudioLiveControl, acknowledgedState) == 8);
 static_assert(offsetof(AudioLiveControl, acknowledgedSequence) == 12);
+static_assert(offsetof(AudioLiveControl, requestedSeekTick) == 16);
+static_assert(offsetof(AudioLiveControl, seekSequence) == 20);
+static_assert(offsetof(AudioLiveControl, producerSeekAckSequence) == 24);
+static_assert(offsetof(AudioLiveControl, seekCommitSequence) == 28);
+static_assert(offsetof(AudioLiveControl, seekRingBaseFrame) == 32);
+static_assert(offsetof(AudioLiveControl, workerConsumedFrames) == 36);
 
 static_assert(sizeof(AudioRingThreadArgs) == 24);
 static_assert(offsetof(AudioRingThreadArgs, durationMs) == 8);

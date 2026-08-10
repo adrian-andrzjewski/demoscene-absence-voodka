@@ -603,10 +603,12 @@ add_test(NAME audio.pcm_thread_probe
          COMMAND audio_pcm_thread_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
 
-# Phase 2M feasibility gate: a live NASM tracker/mixer producer feeds the
+# Phase 2O feasibility gate: a live NASM tracker/mixer producer feeds the
 # bounded PCM/ModPos ring while the assembly-owned WASAPI worker consumes it
-# under the real device clock.  Production audio remains unchanged until this
-# gate and its long-run/synchronization follow-ups pass.
+# under the real device clock.  The control modes additionally exercise
+# ordered pause/resume and a coordinated tracker/mixer seek with a ring flush.
+# Production audio remains unchanged until these gates and their long-run/
+# synchronization follow-ups pass.
 add_executable(audio_live_wasapi_probe
     tools/validate/audio_live_wasapi_probe.cpp)
 target_compile_definitions(audio_live_wasapi_probe PRIVATE
@@ -621,5 +623,8 @@ add_test(NAME audio.live_wasapi_probe
 add_test(NAME audio.live_wasapi_control
          COMMAND audio_live_wasapi_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod" --control)
+add_test(NAME audio.live_wasapi_seek
+         COMMAND audio_live_wasapi_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod" --seek)
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

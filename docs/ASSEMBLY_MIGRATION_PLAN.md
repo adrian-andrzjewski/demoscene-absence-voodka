@@ -488,8 +488,14 @@ comparison, long-run starvation test, and shutdown stress gate are complete.
 Phase 2N now passes ordered pause/resume control: the assembly worker
 acknowledges both commands, holds the ring read position stable for the pause,
 resumes without losing source frames, and retains the exact consumed PCM
-prefix across 10 repeats. Seek still requires a coordinated ring flush and
-tracker/mixer reposition, so production and libxmp usage remain unchanged.
+prefix across 10 repeats. Phase 2O now passes the coordinated seek/reposition
+gate across 10 direct repeats: the worker pauses at a render boundary, the
+producer acknowledges quiescence, PCM and marker cursors are flushed, a fresh
+assembly tracker and mixer history resume at tick 1,024, and the resulting
+pre-seek prefix plus post-seek suffix has the expected PCM FNV and ModPos
+timeline with zero underruns or marker overflows. Production and libxmp usage
+remain unchanged pending scene-driven full-demo A/V comparison, long-run
+starvation, repeated-seek stress, and shutdown stress.
 
 ---
 

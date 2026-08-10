@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2N passed; live production swap remains**
+Status: **Phase 2A through Phase 2O passed; live production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -627,7 +627,44 @@ clean probe and producer joins                    10/10
 ```
 
 This is a **GO** for the ordered pause/resume control and its no-consumption
-pause semantics. It remains a **NO-GO** for seek, production selection, and
-libxmp removal: seek requires a coordinated ring flush plus tracker/mixer
-reposition, and full-demo A/V synchronization and long-run stress are still
-unproven.
+pause semantics. At this point it was still a **NO-GO** for seek, production
+selection, and libxmp removal; Phase 2O records the subsequent seek gate.
+
+## Phase 2O result: coordinated live seek/reposition
+
+Phase 2O proves the first complete reposition transaction while retaining the
+same assembly-owned WASAPI worker and bounded SPSC ring:
+
+- `AudioLiveControl` now carries a requested target tick, producer
+  acknowledgement, commit sequence, logical post-seek ring base, and a live
+  worker-consumed-frame counter. The latter is published at each assembly ring
+  pop so the controller can capture the exact pre-seek PCM boundary after the
+  pause acknowledgement.
+- `audio_live_wasapi_probe --seek` pauses the worker at an audio boundary,
+  waits until the producer has stopped writing, flushes both PCM and marker
+  cursors, commits a fresh assembly tracker and zeroed mixer history at tick
+  1,024, refills the ring, and resumes the worker.
+- The gate hashes the consumed stream as two exact regions: the original
+  prefix before the seek and a freshly mixed native-assembly suffix beginning
+  at the requested tick. It also validates post-seek ModPos markers, worker
+  pause accounting, zero underruns/marker overflows, and clean joins.
+- CTest name: `audio.live_wasapi_seek`.
+
+The Release seek gate passed 10/10 direct repeats:
+
+```text
+seek target tick                                  1,024
+device frames                                     143,325 to 143,766
+post-seek PCM FNV                                 equals expected prefix+suffix
+post-seek ModPos                                  matches native tick timeline
+ring underrun / marker overflow                   0 / 0
+worker timeouts / producer failures               0 / 0
+pause transitions / final state                   2 / resumed
+clean probe and producer joins                    10/10
+```
+
+This is a **GO** for the bounded pause, flush, tracker/mixer reposition, and
+assembly-WASAPI resume transaction. It is still a **NO-GO** for production
+selection and libxmp removal: full-demo scene-driven seeks, soundtrack/A/V
+comparison, long-run starvation, repeated seek stress, and shutdown stress
+remain to be proven.

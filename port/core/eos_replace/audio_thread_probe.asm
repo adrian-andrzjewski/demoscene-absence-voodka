@@ -96,6 +96,12 @@ DEFAULT REL
 %define CONTROL_REQUEST_SEQUENCE          4
 %define CONTROL_ACK_STATE                 8
 %define CONTROL_ACK_SEQUENCE             12
+%define CONTROL_REQUESTED_SEEK_TICK      16
+%define CONTROL_SEEK_SEQUENCE            20
+%define CONTROL_PRODUCER_SEEK_ACK        24
+%define CONTROL_SEEK_COMMIT_SEQUENCE     28
+%define CONTROL_SEEK_RING_BASE           32
+%define CONTROL_WORKER_CONSUMED          36
 
 ; Extra fields after the common thread report for the live ring entry.
 %define RING_REPORT_PUBLISHED_MODPOS    104
@@ -551,6 +557,12 @@ audio_thread_probe_worker:
         mov     [rel thread_ring_fnv], rax
 .ring_hash_done:
         add     dword [rel thread_ring_consumed], ebx
+        mov     rax, [rel thread_control_ptr]
+        test    rax, rax
+        jz      .ring_consumed_published
+        mov     edx, dword [rel thread_ring_consumed]
+        mov     dword [rax + CONTROL_WORKER_CONSUMED], edx
+.ring_consumed_published:
 
         ; Markers are published only after their PCM prefix has entered the
         ; device buffer.  The queue is ordered by absolute source frame.
