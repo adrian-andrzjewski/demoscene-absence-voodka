@@ -111,7 +111,7 @@ bool quitRequested();        // ESC or a window-close is pending
 void resetSelectors();       // release the emulated selector table
 
 // ---- audio (libxmp MOD player) ----------------------------------------------
-void audioSetAssemblyMode(bool enabled); // opt-in Phase 2R integration path
+void audioSetAssemblyMode(bool enabled); // production default; false = libxmp oracle
 int  audioInit(const char* modFilePath, int sampleRate);
 void audioShutdown();
 int  audioPlay();

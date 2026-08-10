@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (51 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (52 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -76,7 +76,8 @@ VOODKA.exe --modpos N          start at ModPos N  ((order<<8)|row)
 VOODKA.exe --order N           start at order N
 VOODKA.exe --ms N              start N milliseconds into the module
 VOODKA.exe --music <file>      override the module path
-VOODKA.exe --asm-audio          opt-in dedicated x64 assembly tracker/player
+VOODKA.exe --asm-audio          explicit alias for the default assembly player
+VOODKA.exe --libxmp-audio       C++/libxmp reference path for oracle diagnostics
 VOODKA.exe --record <dir>      dump every frame (320x200 index + palette)
 VOODKA.exe --diag <dir>        GPU readback diagnostics
 VOODKA.exe --timeline <file>   per-frame QPC/ModPos/audio-clock witness
@@ -94,7 +95,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-51 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+52 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -171,6 +172,8 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
 | `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
 | `VOODKA --asm-audio` | Phase 2T full eight-part assembly producer service witness: scene progression, seek/timeline behavior, and clean WASAPI teardown |
+| `VOODKA --part 1` | Phase 2W production-default assembly-audio P1 integration and clean shutdown (CTest `audio.assembly_demo_p1`) |
+| `VOODKA --libxmp-audio --part 1 --auto-close-ms 2000` | Phase 2W explicit C++/libxmp reference-path initialization and teardown (CTest `audio.reference_demo_close`) |
 | `asm_audio_ring_thread_entry` | Phase 2U assembly-owned CreateThread entry for the live WASAPI worker (exercised by the production assembly-audio CTests) |
 | `asm_audio_service_storage_init` | Phase 2V assembly-owned MOD loading, fixed tracker/timeline storage, PCM ring buffers, producer scratch, and mixer history initialization |
 | `VOODKA --asm-audio --part 1 --auto-pause-ms 1000` | Phase 2S real Win32 Space pause/resume injection through the assembly audio service (CTest `audio.assembly_demo_pause`) |

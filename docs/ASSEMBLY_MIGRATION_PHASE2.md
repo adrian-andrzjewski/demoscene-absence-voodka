@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2V passed; default production swap remains**
+Status: **Phase 2A through Phase 2W passed; libxmp production removal remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -920,3 +920,32 @@ assembly player behind a reversible diagnostic/oracle option. It is also a
 remains a **NO-GO** for deleting libxmp or `audio.cpp` until the default-path
 switch has passed the same full-run visual/audio witness and the oracle has
 been retained in a reference-only validation target.
+
+## Phase 2W result: assembly player is the production default
+
+Phase 2W changes the application selection contract. A normal `VOODKA.exe`
+launch now selects the dedicated assembly player. `--asm-audio` remains a
+compatibility alias, while `--libxmp-audio` explicitly selects the C++/libxmp
+reference path for oracle comparisons and diagnostics. The production target
+still links libxmp in this phase because `audio.cpp` remains compiled as the
+reversible reference implementation; no dependency removal is claimed yet.
+
+The lifecycle CTests now exercise the no-flag default path, and a separate
+short test proves that the explicit reference path still initializes and tears
+down cleanly. The Phase 2W validation is:
+
+```text
+focused default/reference lifecycle CTest          5/5 passed; 58.49 s
+full Release CTest suite                            52/52 passed; 103.85 s
+full P1-P8 playback (no audio flag)                 exit 0; 252.1 s
+full scene sequence                                 P1, P2, P3, P5, P6, P7, P8
+full device stream                                  11,079,243 frames; underruns 0; 12,820 markers
+full final ModPos                                   0x2803
+timeline rows                                       17,592 rendered frames
+```
+
+This is a **GO** for removing `audio.cpp` and `xmp_static` from the shipped
+`VOODKA.exe` target behind a reference-only validation configuration. It is a
+**NO-GO** for deleting the vendored libxmp sources globally: the oracle and
+cross-check probes still require them until the final production import and
+PCM/timeline parity audit is complete.

@@ -908,7 +908,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 2V
+## Current implementation checkpoint: Phase 2W
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -916,12 +916,11 @@ timeline preparation, native Win32 module loading, pause/resume protocol,
 coordinated seek, repeated-seek stress, production-clock witnesses, and
 deterministic lifecycle/device-failure hooks are now implemented as reversible
 gates.
-Release validation includes the 51-test suite plus direct timeline runs.
-The opt-in `--asm-audio` path now uses the persistent service through the
-production `audioInit`, `audioPump`, seek, pause, and shutdown ABI, and the
-full eight-part run has passed against the libxmp timing oracle. The dedicated
-path no longer uses C++ vectors or C++ file I/O; the default executable still
-deliberately uses C++/libxmp. The next gate is a reversible default-selection
-switch, followed by a reference-only libxmp build and a final production import
-audit. Only after that switch passes the full visual/audio witness should
-libxmp be removed from the shipped target.
+Release validation includes the 52-test suite plus direct timeline runs.
+The default `VOODKA.exe` path now uses the persistent assembly service through
+the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
+explicit `--libxmp-audio` path remains available for the behavioral oracle.
+The dedicated path no longer uses C++ vectors or C++ file I/O. The next gate is
+to remove `audio.cpp` and `xmp_static` from the shipped target while retaining
+libxmp in a reference-only validation configuration, then perform the final
+production import and PCM/timeline parity audit.

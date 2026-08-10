@@ -125,7 +125,8 @@ void stopAutomation() {
 // ---- music module path resolution ------------------------------------------
 // Order: --music <path> override, then next to the exe (music\amnezja2.mod,
 // amnezja2.mod), then the dev-tree copy under VOODKA_REPO_ROOT. Missing file
-// is tolerated: audioInit falls back to a headless (silent) timeline.
+// is tolerated by the reference C++ path; the default assembly path reports
+// initialization failure so a release build cannot silently lose the soundtrack.
 static std::string resolveMusicPath(const char* overridePath) {
     if (overridePath && overridePath[0]) return overridePath;
     wchar_t exePath[MAX_PATH] = {};
@@ -218,7 +219,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     const char* musicOverride = nullptr;
     const char* timelinePath = nullptr;
     bool asmPresenter = false;
-    bool asmAudio = false;
+    // The dedicated x64 assembly player is now the production default. Keep
+    // an explicit libxmp escape hatch for oracle comparisons and diagnostics.
+    bool asmAudio = true;
+    bool referenceAudio = false;
     long autoPauseMs = -1;
     long autoCloseMs = -1;
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
@@ -240,7 +244,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         musicOverride = argDirOf(cmd, "music");
         timelinePath = argDirOf(cmd, "timeline");
         asmPresenter = cmd.find("--asm-present") != std::string::npos;
-        asmAudio = cmd.find("--asm-audio") != std::string::npos;
+        const bool explicitAsmAudio =
+            cmd.find("--asm-audio") != std::string::npos;
+        referenceAudio = !explicitAsmAudio &&
+            cmd.find("--libxmp-audio") != std::string::npos;
+        asmAudio = !referenceAudio;
         auto parseMs = [&](const char* flag) -> long {
             auto p = cmd.find(flag);
             if (p == std::string::npos) return -1;
@@ -260,7 +268,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
         if (timelinePath) vk::logPrint("[app] A/V timeline to '%s'\n", timelinePath);
         if (asmPresenter) vk::logPrint("[app] --asm-present selected\n");
-        if (asmAudio) vk::logPrint("[app] --asm-audio selected\n");
+        if (referenceAudio)
+            vk::logPrint("[app] --libxmp-audio reference path selected\n");
+        else
+            vk::logPrint("[app] dedicated assembly audio selected (default)\n");
         if (autoPauseMs >= 0)
             vk::logPrint("[app] auto-pause after %ld ms (resume after 1 s)\n",
                          autoPauseMs);

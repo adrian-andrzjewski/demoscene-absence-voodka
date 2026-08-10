@@ -589,8 +589,11 @@ add_test(NAME audio.thread_asm_probe COMMAND audio_thread_asm_probe)
 # Phase 2I feasibility gate: the host pre-renders the exact native assembly
 # tracker/mixer stream, then passes immutable PCM and tick/ModPos timing arrays
 # to the assembly worker. NASM performs the signed-16 stereo device copy and
-# publishes the post-copy timeline snapshot; production audio remains on the
-# existing C++/libxmp path until the live handoff is proven.
+# publishes the post-copy timeline snapshot; the probe still uses libxmp for
+# its own reference stream. The production executable now defaults to the
+# dedicated assembly player.
+# Keep this probe's libxmp dependency because it validates the reference PCM
+# and timeline contract independently of the production selection.
 add_executable(audio_pcm_thread_probe
     tools/validate/audio_pcm_thread_probe.cpp)
 target_compile_definitions(audio_pcm_thread_probe PRIVATE
@@ -633,20 +636,24 @@ add_test(NAME audio.live_wasapi_longrun
          COMMAND audio_live_wasapi_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod" --longrun)
 add_test(NAME audio.assembly_demo_p1
-         COMMAND VOODKA --asm-audio --part 1)
+         COMMAND VOODKA --part 1)
 set_tests_properties(audio.assembly_demo_p1 PROPERTIES TIMEOUT 90)
 add_test(NAME audio.assembly_demo_pause
-         COMMAND VOODKA --asm-audio --part 1 --auto-pause-ms 1000)
+         COMMAND VOODKA --part 1 --auto-pause-ms 1000)
 set_tests_properties(audio.assembly_demo_pause PROPERTIES TIMEOUT 90)
 add_test(NAME audio.assembly_demo_close
-         COMMAND VOODKA --asm-audio --part 1 --auto-close-ms 2000)
+         COMMAND VOODKA --part 1 --auto-close-ms 2000)
 set_tests_properties(audio.assembly_demo_close PROPERTIES TIMEOUT 30)
 add_test(NAME audio.assembly_audio_fail_device
-         COMMAND VOODKA --asm-audio --part 1)
+         COMMAND VOODKA --part 1)
 set_tests_properties(audio.assembly_audio_fail_device PROPERTIES
     TIMEOUT 30
     WILL_FAIL TRUE
     ENVIRONMENT "VOODKA_ASM_AUDIO_FAIL_DEVICE=1"
     PASS_REGULAR_EXPRESSION "forced device failure injection;assembly audio initialization failed")
+
+add_test(NAME audio.reference_demo_close
+         COMMAND VOODKA --libxmp-audio --part 1 --auto-close-ms 2000)
+set_tests_properties(audio.reference_demo_close PROPERTIES TIMEOUT 30)
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")
