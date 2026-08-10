@@ -653,7 +653,15 @@ set_tests_properties(audio.assembly_audio_fail_device PROPERTIES
     PASS_REGULAR_EXPRESSION "forced device failure injection;assembly audio initialization failed")
 
 add_test(NAME audio.reference_demo_close
-         COMMAND VOODKA --libxmp-audio --part 1 --auto-close-ms 2000)
+         COMMAND VOODKA_REFERENCE --libxmp-audio --part 1 --auto-close-ms 2000)
 set_tests_properties(audio.reference_demo_close PROPERTIES TIMEOUT 30)
+
+add_test(NAME audio.production_reference_rejected
+         COMMAND VOODKA --libxmp-audio --part 1)
+set_tests_properties(audio.production_reference_rejected PROPERTIES
+    TIMEOUT 30
+    WILL_FAIL TRUE
+    PASS_REGULAR_EXPRESSION
+        "libxmp reference path is unavailable in VOODKA.exe;reference audio initialization failed")
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

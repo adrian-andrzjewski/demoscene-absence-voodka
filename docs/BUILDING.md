@@ -8,7 +8,7 @@
 | Visual Studio 2022 (Build Tools suffice) | 2026 also accepted; `build.ps1` prefers 2022 |
 | CMake >= 3.24 | on PATH |
 | PowerShell 7+ | for `build.ps1` |
-| NASM + libxmp | **vendored** in `modules/` - nothing to install |
+| NASM + libxmp | **vendored** in `modules/` - nothing to install; libxmp is reference/tooling-only for the shipped demo |
 
 No package manager, no DOS toolchain, no external SDK.
 
@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (52 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (53 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -34,7 +34,8 @@ checkout is relocatable.
 ## Outputs (`port/bin/<Config>/`)
 
 ```
-VOODKA.exe          the demo (statically linked libxmp; no DLLs needed)
+VOODKA.exe          the demo (assembly audio; no libxmp dependency)
+VOODKA_REFERENCE.exe non-shipped C++/libxmp behavioral-oracle build
 VIRTUAL.exe         the standalone VR-engine test viewer (Esc quits; --check loads+exits)
 asset_viewer.exe   the V3D/V3M asset viewer (loads all 9 3D models from data/vodka.dat)
 asset_viewer_selftest.exe  parse-only validation (CTest v3d.viewer_parse)
@@ -77,7 +78,8 @@ VOODKA.exe --order N           start at order N
 VOODKA.exe --ms N              start N milliseconds into the module
 VOODKA.exe --music <file>      override the module path
 VOODKA.exe --asm-audio          explicit alias for the default assembly player
-VOODKA.exe --libxmp-audio       C++/libxmp reference path for oracle diagnostics
+VOODKA_REFERENCE.exe --libxmp-audio  non-shipped C++/libxmp oracle path
+VOODKA.exe --libxmp-audio       rejected: production has no libxmp path
 VOODKA.exe --record <dir>      dump every frame (320x200 index + palette)
 VOODKA.exe --diag <dir>        GPU readback diagnostics
 VOODKA.exe --timeline <file>   per-frame QPC/ModPos/audio-clock witness
@@ -95,7 +97,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-52 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+53 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -173,7 +175,10 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
 | `VOODKA --asm-audio` | Phase 2T full eight-part assembly producer service witness: scene progression, seek/timeline behavior, and clean WASAPI teardown |
 | `VOODKA --part 1` | Phase 2W production-default assembly-audio P1 integration and clean shutdown (CTest `audio.assembly_demo_p1`) |
-| `VOODKA --libxmp-audio --part 1 --auto-close-ms 2000` | Phase 2W explicit C++/libxmp reference-path initialization and teardown (CTest `audio.reference_demo_close`) |
+| `VOODKA_REFERENCE --libxmp-audio --part 1 --auto-close-ms 2000` | Phase 2X non-shipped C++/libxmp reference-path initialization and teardown (CTest `audio.reference_demo_close`) |
+| `VOODKA --libxmp-audio --part 1` | Phase 2X production dependency-boundary rejection (CTest `audio.production_reference_rejected`) |
+| `audio_dispatch.cpp` | Phase 2X production audio ABI dispatch into the dedicated assembly player |
+| `VOODKA_REFERENCE` | Phase 2X non-shipped host target retaining `audio.cpp` and `xmp_static` for differential validation |
 | `asm_audio_ring_thread_entry` | Phase 2U assembly-owned CreateThread entry for the live WASAPI worker (exercised by the production assembly-audio CTests) |
 | `asm_audio_service_storage_init` | Phase 2V assembly-owned MOD loading, fixed tracker/timeline storage, PCM ring buffers, producer scratch, and mixer history initialization |
 | `VOODKA --asm-audio --part 1 --auto-pause-ms 1000` | Phase 2S real Win32 Space pause/resume injection through the assembly audio service (CTest `audio.assembly_demo_pause`) |

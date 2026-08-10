@@ -375,8 +375,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     vk::logPrint("[app] music module: '%s'\n", musicPath.empty() ? "(none)" : musicPath.c_str());
     vk::audioSetAssemblyMode(asmAudio);
     const int audioOk = vk::audioInit(musicPath.c_str(), 44100);
-    if (asmAudio && !audioOk) {
-        vk::logPrint("[app] assembly audio initialization failed\n");
+    if ((asmAudio || referenceAudio) && !audioOk) {
+        vk::logPrint(referenceAudio
+                         ? "[app] reference audio initialization failed\n"
+                         : "[app] assembly audio initialization failed\n");
         vk::shutdownAll();
         return 1;
     }

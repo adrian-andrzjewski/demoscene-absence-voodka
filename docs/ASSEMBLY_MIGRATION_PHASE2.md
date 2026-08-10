@@ -1,11 +1,13 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2W passed; libxmp production removal remains**
+Status: **Phase 2A through Phase 2X passed; libxmp is reference-only for the shipped demo**
 Snapshot date: **2026-08-10**
 
-Phase 2 is the next feasibility gate after the D3D11 presenter. The production
-application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2L changes production playback.
+Phase 2 is the next feasibility gate after the D3D11 presenter. The shipped
+production application now uses the dedicated assembly player and no longer
+compiles `audio.cpp` or links `xmp_static`. The C++/libxmp implementation is
+retained in a separate non-shipped `VOODKA_REFERENCE.exe` target, together
+with the host-side probes that provide the behavioral oracle.
 
 ## Phase 2A scope
 
@@ -949,3 +951,40 @@ This is a **GO** for removing `audio.cpp` and `xmp_static` from the shipped
 **NO-GO** for deleting the vendored libxmp sources globally: the oracle and
 cross-check probes still require them until the final production import and
 PCM/timeline parity audit is complete.
+
+## Phase 2X result: libxmp removed from the shipped target
+
+Phase 2X makes the production/reference split structural rather than merely
+command-line selectable:
+
+- `VOODKA.exe` compiles `audio_dispatch.cpp`, which exposes the existing
+  application audio ABI and forwards it to the dedicated assembly service;
+- `VOODKA.exe` does not compile `audio.cpp` and does not link `xmp_static`;
+- `VOODKA_REFERENCE.exe` uses the same platform/runtime sources but adds
+  `audio.cpp` and `xmp_static` as the non-shipped C++/libxmp behavioral oracle;
+- `VOODKA --libxmp-audio` is rejected explicitly, preventing an accidental
+  return of the reference implementation to the production binary; and
+- the vendored libxmp sources remain available for `VOODKA_REFERENCE.exe` and
+  the independent parser, tracker, event, voice, tick, mixer, and PCM probes.
+
+The Phase 2X validation is:
+
+```text
+focused production/reference boundary CTests       3/3 passed; 4.93 s
+full Release CTest suite                            53/53 passed; 103.92 s
+production import/symbol audit                     no xmp/libxmp imports or symbols
+full P1-P8 playback (default production path)      exit 0; 252.1 s
+full scene sequence                                 P1, P2, P3, P5, P6, P7, P8
+full device stream                                  11,079,684 frames; underruns 0
+full marker stream                                  12,820 markers
+full final ModPos                                   0x2803
+reference executable                                VOODKA_REFERENCE.exe retains C++/libxmp
+```
+
+This is a **GO** for the production dependency-removal gate. It proves that
+the shipped executable can run the complete demo without libxmp while keeping
+the reference implementation available for differential validation. It is a
+**NO-GO** for deleting the vendored libxmp tree globally: the reference target
+and host probes still depend on it by design. It is also not a claim that the
+whole production executable is assembly-only; the Win32, D3D11, lifecycle, and
+audio orchestration layers remain the next migration work.
