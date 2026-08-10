@@ -443,7 +443,7 @@ stable 100% assembly demo has not been demonstrated without this gate.
 Current Phase 2 result (2026-08-10): **GO through the native effect-state,
 offline PCM mixer, stateful bounded mixer, persistent live tracker, concurrent
 bounded PCM/timeline ring, WASAPI/COM device, assembly-worker, and bounded PCM
-handoff gates; NO-GO to
+handoff and live ring-to-WASAPI gates; NO-GO to
 the live production swap or libxmp removal.** The
 host oracle passes and records a
 263.429-second, 11,617,219-frame 44.1 kHz stereo PCM baseline, 2,688 row
@@ -459,10 +459,7 @@ checked-in signed-8-bit mono soundtrack path, including loop-boundary
 interpolation, ramps, anti-click, one-shots, and E9 retriggers. Keep libxmp
 as the oracle. The assembly-owned WASAPI probe now passes exact 44.1 kHz
 stereo PCM negotiation, event delivery, render-buffer acquisition/release,
-stop/reset, and 20 repeated teardown runs. Do not connect it to production or
-remove libxmp until the assembly-owned worker also passes its join/teardown
-stress gate, the live ring feeds the device worker, and the side-by-side path
-survives full-demo A/V synchronization. The Phase 2H worker harness now
+stop/reset, and 20 repeated teardown runs. The Phase 2H worker harness now
 passes 10 repeated one-second lifecycles with real callback wakeups, 23,296 to
 25,856 serviced frames per run, zero timeouts, and clean Stop/Reset/join results.
 Phase 2I now passes 10 repeated bounded handoffs of the exact native PCM
@@ -481,8 +478,13 @@ chunks. Phase 2L now passes the concurrent bounded ring gate: the live producer
 and consumer transfer all 11,613,525 exact PCM frames and all 13,440 ModPos
 markers through a wrapping SPSC queue, with zero marker mismatches, zero
 producer or consumer failures, zero underrun/marker-overflow events, and 10/10
-repeated runs. The ring is not yet connected to the WASAPI worker, so
-production and libxmp usage remain unchanged.
+repeated runs. Phase 2M now passes the live ring-to-WASAPI gate: the assembly
+worker consumes 45,864-46,305 exact PCM-prefix frames under 99-100 real device
+wakeups, publishes 53 ModPos snapshots, matches an independent assembly PCM
+witness, and records zero consumer underruns, marker overflows, timeouts, or
+producer failures across 10 repeats. Production remains C++/libxmp until the
+command protocol, full-demo A/V comparison, long-run starvation test, and
+shutdown stress gate are complete.
 
 ---
 

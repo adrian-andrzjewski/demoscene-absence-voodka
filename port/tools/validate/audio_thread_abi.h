@@ -1,5 +1,7 @@
 #pragma once
 
+#include "audio_ring_abi.h"
+
 #include <cstddef>
 #include <cstdint>
 
@@ -52,6 +54,25 @@ struct AudioPcmThreadReport {
     uint32_t sourceLoops;
 };
 
+struct AudioRingThreadArgs {
+    AudioPcmRing* ring;
+    uint32_t durationMs;
+};
+
+#pragma pack(push, 1)
+struct AudioRingThreadReport {
+    AudioThreadAsmProbeReport common;
+    uint32_t publishedModPos;
+    uint32_t publishedPcmFrame;
+    uint32_t snapshotUpdates;
+    uint32_t consumedFrames;
+    uint32_t underrunEvents;
+    uint32_t overrunEvents;
+    uint32_t markerOverruns;
+    uint64_t pcmFnv;
+};
+#pragma pack(pop)
+
 static_assert(sizeof(AudioThreadAsmProbeReport) == 104);
 static_assert(offsetof(AudioThreadAsmProbeReport, firstWait) == 56);
 static_assert(offsetof(AudioThreadAsmProbeReport, paddingFrames) == 64);
@@ -72,8 +93,24 @@ static_assert(offsetof(AudioPcmThreadReport, publishedPcmFrame) == 112);
 static_assert(offsetof(AudioPcmThreadReport, snapshotUpdates) == 116);
 static_assert(offsetof(AudioPcmThreadReport, sourceLoops) == 120);
 
+static_assert(sizeof(AudioRingThreadArgs) == 16);
+static_assert(offsetof(AudioRingThreadArgs, durationMs) == 8);
+
+static_assert(sizeof(AudioRingThreadReport) == 140);
+static_assert(offsetof(AudioRingThreadReport, publishedModPos) == 104);
+static_assert(offsetof(AudioRingThreadReport, publishedPcmFrame) == 108);
+static_assert(offsetof(AudioRingThreadReport, snapshotUpdates) == 112);
+static_assert(offsetof(AudioRingThreadReport, consumedFrames) == 116);
+static_assert(offsetof(AudioRingThreadReport, underrunEvents) == 120);
+static_assert(offsetof(AudioRingThreadReport, overrunEvents) == 124);
+static_assert(offsetof(AudioRingThreadReport, markerOverruns) == 128);
+static_assert(offsetof(AudioRingThreadReport, pcmFnv) == 132);
+
 extern "C" uint32_t asm_audio_thread_probe(
     uint32_t durationMs, AudioThreadAsmProbeReport* report);
 
 extern "C" uint32_t asm_audio_pcm_thread_probe(
     const AudioPcmThreadArgs* args, AudioPcmThreadReport* report);
+
+extern "C" uint32_t asm_audio_ring_thread_probe(
+    const AudioRingThreadArgs* args, AudioRingThreadReport* report);

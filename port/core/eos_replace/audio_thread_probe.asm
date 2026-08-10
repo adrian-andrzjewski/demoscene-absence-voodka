@@ -86,6 +86,26 @@ DEFAULT REL
 %define PCM_REPORT_SOURCE_LOOPS          120
 %define PCM_REPORT_BYTES                 124
 
+; AudioRingThreadArgs offsets.
+%define RING_ARGS_RING                    0
+%define RING_ARGS_DURATION                8
+
+; Extra fields after the common thread report for the live ring entry.
+%define RING_REPORT_PUBLISHED_MODPOS    104
+%define RING_REPORT_PUBLISHED_FRAME     108
+%define RING_REPORT_SNAPSHOT_UPDATES    112
+%define RING_REPORT_CONSUMED_FRAMES     116
+%define RING_REPORT_UNDERRUN_EVENTS     120
+%define RING_REPORT_OVERRUN_EVENTS      124
+%define RING_REPORT_MARKER_OVERRUNS     128
+%define RING_REPORT_PCM_FNV_LO          132
+%define RING_REPORT_PCM_FNV_HI          136
+%define RING_REPORT_BYTES               140
+
+%define FNV64_OFFSET_LO                 0x84222325
+%define FNV64_OFFSET_HI                 0xCBF29CE4
+%define FNV64_PRIME                    1099511628211
+
 extern CoInitializeEx
 extern CoUninitialize
 extern CoCreateInstance
@@ -98,9 +118,12 @@ extern CloseHandle
 extern CreateThread
 extern SetThreadPriority
 extern Sleep
+extern asm_audio_ring_pop
+extern asm_audio_ring_pop_marker
 
 global asm_audio_thread_probe
 global asm_audio_pcm_thread_probe
+global asm_audio_ring_thread_probe
 
 section .bss
 align 8
@@ -128,6 +151,10 @@ thread_tick_count:       resd 1
 thread_pcm_cursor:       resd 1
 thread_published_tick:    resd 1
 thread_source_loops:      resd 1
+thread_ring_ptr:          resq 1
+thread_ring_consumed:     resd 1
+thread_ring_marker:       resq 1
+thread_ring_fnv:          resq 1
 
 section .data
 align 4
@@ -335,15 +362,16 @@ audio_thread_probe_worker:
         sub     eax, dword [r12 + REPORT_PADDING_FRAMES]
         jbe     .worker_wait
         cmp     dword [rel thread_pcm_mode], 0
-        jne     .pcm_chunk_limit
+        je      .thread_chunk_limit
+        cmp     eax, PCM_THREAD_MAX_FRAMES
+        jbe     .chunk_selected
+        mov     eax, PCM_THREAD_MAX_FRAMES
+        jmp     .chunk_selected
+.thread_chunk_limit:
         cmp     eax, THREAD_MAX_FRAMES
         jbe     .chunk_selected
         mov     eax, THREAD_MAX_FRAMES
         jmp     .chunk_selected
-.pcm_chunk_limit:
-        cmp     eax, PCM_THREAD_MAX_FRAMES
-        jbe     .chunk_selected
-        mov     eax, PCM_THREAD_MAX_FRAMES
 .chunk_selected:
         mov     r14d, eax
 
@@ -351,8 +379,8 @@ audio_thread_probe_worker:
         ; before the immutable stream wraps.  The one-second probe does not
         ; reach the wrap, but keeping the boundary explicit makes the ABI
         ; safe for later looping tests.
-        cmp     dword [rel thread_pcm_mode], 0
-        je      .pcm_chunk_ready
+        cmp     dword [rel thread_pcm_mode], 1
+        jne     .pcm_chunk_ready
         mov     eax, dword [rel thread_pcm_frames]
         sub     eax, dword [rel thread_pcm_cursor]
         test    eax, eax
@@ -377,6 +405,8 @@ audio_thread_probe_worker:
 
         cmp     dword [rel thread_pcm_mode], 0
         je      .release_silence
+        cmp     dword [rel thread_pcm_mode], 2
+        je      .copy_ring
 
         ; The negotiated format is interleaved signed 16-bit stereo: one
         ; output frame is one dword.  The copy is deliberately in assembly so
@@ -426,6 +456,71 @@ audio_thread_probe_worker:
         inc     dword [r12 + PCM_REPORT_SNAPSHOT_UPDATES]
 
         xor     r8d, r8d                    ; PCM data was written
+        jmp     .release_buffer
+
+.copy_ring:
+        ; The ring consumer owns the WASAPI destination while GetBuffer is
+        ; outstanding.  Pop exactly the device chunk; a short pop is padded
+        ; with zeros but is still released as mixed data because the prefix
+        ; contains real PCM.  The ring's underrun counter records the short
+        ; transfer for the gate.
+        mov     rcx, [rel thread_ring_ptr]
+        mov     rdx, [rel thread_buffer_data]
+        mov     r8d, r14d
+        call    asm_audio_ring_pop
+        mov     ebx, eax                    ; source frames copied
+
+        mov     rdi, [rel thread_buffer_data]
+        mov     eax, ebx
+        lea     rdi, [rdi + rax * 4]
+        mov     ecx, r14d
+        sub     ecx, ebx
+        jz      .ring_frames_ready
+        xor     eax, eax
+        cld
+        rep stosd
+.ring_frames_ready:
+        ; FNV-1a over exactly the source bytes copied into the device buffer.
+        ; This is a diagnostic witness for the live handoff, not a playback
+        ; dependency; a short pop hashes only its real PCM prefix.
+        test    ebx, ebx
+        jz      .ring_hash_done
+        mov     rsi, [rel thread_buffer_data]
+        mov     ecx, ebx
+        shl     ecx, 2
+        mov     rax, [rel thread_ring_fnv]
+        mov     rdx, FNV64_PRIME
+.ring_hash_loop:
+        movzx   edi, byte [rsi]
+        xor     rax, rdi
+        imul    rax, rdx
+        inc     rsi
+        dec     ecx
+        jnz     .ring_hash_loop
+        mov     [rel thread_ring_fnv], rax
+.ring_hash_done:
+        add     dword [rel thread_ring_consumed], ebx
+
+        ; Markers are published only after their PCM prefix has entered the
+        ; device buffer.  The queue is ordered by absolute source frame.
+.ring_marker_loop:
+        mov     rcx, [rel thread_ring_ptr]
+        mov     edx, dword [rel thread_ring_consumed]
+        lea     r8, [rel thread_ring_marker]
+        call    asm_audio_ring_pop_marker
+        test    eax, eax
+        jz      .ring_markers_done
+        mov     rax, [rel thread_ring_marker]
+        mov     dword [r12 + RING_REPORT_PUBLISHED_FRAME], eax
+        shr     rax, 32
+        mov     dword [r12 + RING_REPORT_PUBLISHED_MODPOS], eax
+        inc     dword [r12 + RING_REPORT_SNAPSHOT_UPDATES]
+        jmp     .ring_marker_loop
+.ring_markers_done:
+        xor     r8d, r8d
+        test    ebx, ebx
+        jnz     .release_buffer
+        mov     r8d, AUDCLNT_BUFFERFLAGS_SILENT
         jmp     .release_buffer
 
 .release_silence:
@@ -499,11 +594,31 @@ audio_thread_probe_worker:
         je      .worker_no_com
         call    CoUninitialize
 .worker_no_com:
-        cmp     dword [rel thread_pcm_mode], 0
+        cmp     dword [rel thread_pcm_mode], 1
         je      .worker_report_exit
+        cmp     dword [rel thread_pcm_mode], 2
+        jne     .worker_report_exit
+        mov     eax, dword [rel thread_ring_consumed]
+        mov     dword [r12 + RING_REPORT_CONSUMED_FRAMES], eax
+        mov     rcx, [rel thread_ring_ptr]
+        test    rcx, rcx
+        jz      .worker_report_exit
+        mov     eax, dword [rcx + 32]
+        mov     dword [r12 + RING_REPORT_UNDERRUN_EVENTS], eax
+        mov     eax, dword [rcx + 28]
+        mov     dword [r12 + RING_REPORT_OVERRUN_EVENTS], eax
+        mov     eax, dword [rcx + 60]
+        mov     dword [r12 + RING_REPORT_MARKER_OVERRUNS], eax
+        mov     rax, [rel thread_ring_fnv]
+        mov     dword [r12 + RING_REPORT_PCM_FNV_LO], eax
+        shr     rax, 32
+        mov     dword [r12 + RING_REPORT_PCM_FNV_HI], eax
+.worker_report_exit:
+        cmp     dword [rel thread_pcm_mode], 1
+        jne     .worker_report_done
         mov     eax, dword [rel thread_source_loops]
         mov     dword [r12 + PCM_REPORT_SOURCE_LOOPS], eax
-.worker_report_exit:
+.worker_report_done:
         mov     dword [r12 + REPORT_WORKER_EXIT], r13d
         mov     eax, r13d
         add     rsp, 0x88
@@ -521,6 +636,7 @@ audio_thread_probe_worker:
 ;                                 AudioThreadAsmProbeReport* report)
 asm_audio_thread_probe:
         xor     r8d, r8d                    ; no PCM handoff context
+        xor     r9d, r9d                    ; mode 0: silence
         jmp     audio_thread_probe_entry
 
 ; uint32_t asm_audio_pcm_thread_probe(const AudioPcmThreadArgs* args,
@@ -528,6 +644,15 @@ asm_audio_thread_probe:
 asm_audio_pcm_thread_probe:
         mov     r8, rcx                     ; retain args across the prologue
         mov     ecx, dword [r8 + ARGS_DURATION_MS]
+        mov     r9d, 1                       ; mode 1: immutable PCM
+        jmp     audio_thread_probe_entry
+
+; uint32_t asm_audio_ring_thread_probe(const AudioRingThreadArgs* args,
+;                                      AudioRingThreadReport* report)
+asm_audio_ring_thread_probe:
+        mov     r8, rcx                     ; retain args across the prologue
+        mov     ecx, dword [r8 + RING_ARGS_DURATION]
+        mov     r9d, 2                       ; mode 2: bounded live ring
         jmp     audio_thread_probe_entry
 
 audio_thread_probe_entry:
@@ -556,8 +681,15 @@ audio_thread_probe_entry:
         mov     dword [rel thread_pcm_cursor], 0
         mov     dword [rel thread_published_tick], 0
         mov     dword [rel thread_source_loops], 0
+        mov     qword [rel thread_ring_ptr], 0
+        mov     dword [rel thread_ring_consumed], 0
+        mov     qword [rel thread_ring_marker], 0
+        mov     rax, (FNV64_OFFSET_HI << 32) | FNV64_OFFSET_LO
+        mov     [rel thread_ring_fnv], rax
         test    r8, r8
         jz      .main_args_ready
+        cmp     r9d, 2
+        je      .main_ring_args
         mov     dword [rel thread_pcm_mode], 1
         mov     dword [rel thread_report_bytes], PCM_REPORT_BYTES
         mov     rax, [r8 + ARGS_PCM]
@@ -570,6 +702,12 @@ audio_thread_probe_entry:
         mov     [rel thread_modpos_by_tick], rax
         mov     eax, [r8 + ARGS_TICK_COUNT]
         mov     [rel thread_tick_count], eax
+        jmp     .main_args_ready
+.main_ring_args:
+        mov     dword [rel thread_pcm_mode], 2
+        mov     dword [rel thread_report_bytes], RING_REPORT_BYTES
+        mov     rax, [r8 + RING_ARGS_RING]
+        mov     [rel thread_ring_ptr], rax
 .main_args_ready:
 
         mov     rdi, r12
@@ -652,6 +790,10 @@ audio_thread_probe_entry:
         mov     dword [rel thread_pcm_cursor], 0
         mov     dword [rel thread_published_tick], 0
         mov     dword [rel thread_source_loops], 0
+        mov     qword [rel thread_ring_ptr], 0
+        mov     dword [rel thread_ring_consumed], 0
+        mov     qword [rel thread_ring_marker], 0
+        mov     qword [rel thread_ring_fnv], 0
         mov     dword [rel thread_pcm_mode], 0
         mov     dword [rel thread_report_bytes], 0
         mov     dword [rel thread_started], 0

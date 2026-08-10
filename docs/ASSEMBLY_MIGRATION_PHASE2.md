@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2L passed; live tracker-to-device swap remains**
+Status: **Phase 2A through Phase 2M passed; live production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -554,3 +554,44 @@ contract, including wrap-around, producer backpressure, marker ordering, and
 clean closure. It remains a **NO-GO** for the production switch: the ring is
 not yet the source for the assembly WASAPI worker, and pause/seek plus full-demo
 A/V synchronization remain unproven. Production remains C++/libxmp.
+
+## Phase 2M result: live ring into assembly WASAPI
+
+Phase 2M connects the previously independent live ring and assembly worker in
+a host-only feasibility target:
+
+- `audio_thread_probe.asm` now has a ring mode. The worker calls the assembly
+  ring pop/marker APIs while a WASAPI render buffer is owned, publishes the
+  consumed source-frame position and latest `(order << 8) | row` marker, and
+  records ring errors plus an assembly-side FNV-1a witness of the bytes copied
+  into the device buffer.
+- [`audio_live_wasapi_probe.cpp`](../port/tools/validate/audio_live_wasapi_probe.cpp)
+  runs the persistent assembly tracker and continuous mixer in a producer
+  thread, prebuffers the ring, then starts the assembly-owned COM/WASAPI worker
+  under the real device clock. The producer is stopped and joined before ring
+  closure.
+- CTest name: `audio.live_wasapi_probe`.
+
+The Release gate reports, across 10 direct repeats:
+
+```text
+device frames                               45,864 to 46,305
+render wakeups                               99 to 100
+consumed ring frames                         equal to device frames
+consumed PCM FNV                             equals independent expected prefix
+ModPos snapshots                             53
+ring underrun events                         0
+marker overflow events                       0
+producer failures                             0
+worker timeouts                               0
+Stop/Reset/join                              clean
+```
+
+The variable ring overrun counter records bounded producer backpressure
+attempts (typically about 127-128 with the one-millisecond retry policy); the
+producer retries every short push and the transfer witness remains exact.
+This is a **GO** for the live assembly tracker/mixer-to-assembly-WASAPI data
+path and its one-second teardown boundary. It is still a **NO-GO** for the
+production switch or libxmp removal: the current application has no assembly
+audio command protocol, pause/seek equivalence, full-demo A/V comparison, or
+long-run starvation and shutdown stress result.
