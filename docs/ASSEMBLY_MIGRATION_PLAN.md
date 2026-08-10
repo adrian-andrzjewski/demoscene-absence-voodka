@@ -11,10 +11,11 @@ The target is:
 - Existing C++ asset viewers, packers, validators, and `VIRTUAL.exe` may remain unchanged.
 - Windows, D3D11, WASAPI, and GPU-driver code remain external system dependencies.
 
-The current production boundary is defined by `port/platform/CMakeLists.txt`. The
-current target contains the Windows integration layer and links `xmp_static`.
-The migration must preserve the existing NASM core and replace the platform
-boundary incrementally.
+The current production boundary is defined by `port/platform/CMakeLists.txt`.
+The shipped target has already removed `xmp_static` and the C++/libxmp player;
+its D3D11/COM calls are now owned by the NASM presenter behind a narrow C++
+dispatch. The migration must preserve the existing NASM core and replace the
+remaining platform boundary incrementally.
 
 The shortest credible answer to whether this is viable is not to port the easy
 code first. The first feasibility gates are:
@@ -256,8 +257,10 @@ spend time converting input, logging, or allocators before this gate passes.
 
 Current result (2026-08-09): **GO**. The standalone and integrated assembly
 presenter gates passed, including byte-identical P1/P2/P4/P7/P8 captures and a
-17,611-frame full P1-P8 run. The C++ presenter remains compiled and selectable
-as the fallback until the later audio and platform gates are complete.
+17,611-frame full P1-P8 run. Phase 1C has since moved the C++ presenter into
+the non-shipped `VOODKA_REFERENCE.exe` oracle; the shipped `VOODKA.exe` now
+uses the NASM presenter by default and retains only a C++ recording/diagnostic
+dispatch around it.
 
 ---
 
@@ -908,14 +911,15 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 2X
+## Current implementation checkpoint: Phase 3 entry (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
 timeline preparation, native Win32 module loading, pause/resume protocol,
 coordinated seek, repeated-seek stress, production-clock witnesses, and
 deterministic lifecycle/device-failure hooks are now implemented as reversible
-gates.
+gates. The shipped target also uses the NASM D3D11/COM presenter by default;
+the complete C++ presenter is retained only in `VOODKA_REFERENCE.exe`.
 Release validation includes the 53-test suite plus direct timeline runs.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
@@ -924,4 +928,5 @@ contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
 libxmp for differential validation. The next gate is the production import,
 PCM, timeline, and full-playback parity audit, followed by removal of the
-remaining C++ production-platform orchestration in risk order.
+remaining C++ production-platform orchestration in risk order, beginning with
+the Phase 3 Win32 window/thread/exception substrate.

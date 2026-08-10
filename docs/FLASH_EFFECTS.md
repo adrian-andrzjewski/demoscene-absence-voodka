@@ -260,7 +260,9 @@ particular for P8's one-register `brum` helper.
 
 `port/platform/bridge.cpp` exposes `vk_set_palette`, `vk_get_palette`, and
 `vk_present_frame` to NASM. `vk_set_palette` stores raw 6-bit values in the
-platform palette. `port/platform/d3d11_present.cpp` then:
+platform palette. The production `port/core/eos_replace/d3d11_asm_present.asm`
+then (with `port/platform/d3d11_dispatch.cpp` retaining the host-side
+recording/diagnostic ABI):
 
 1. uploads the 320x200 indexed framebuffer to an `R8_UNORM` texture;
 2. converts each 0..63 DAC component to 8-bit using

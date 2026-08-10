@@ -172,6 +172,10 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --seek` | Phase 2O pause, producer quiescence, PCM/marker ring flush, tracker/mixer reposition, post-seek refill, and A/V timeline validation (CTest `audio.live_wasapi_seek`) |
 | `audio_live_wasapi_probe --stress` | Phase 2P three-seek live stress across one producer/ring/WASAPI worker, segment PCM/timeline validation, and clean teardown (CTest `audio.live_wasapi_stress`) |
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
+| `d3d11_asm_present_probe` | Phase 1B standalone NASM D3D11/COM presenter, GPU readback, Present, and Release gate (CTest `d3d11.asm_present_probe`) |
+| `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
+| `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
+| `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |
 | `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
 | `VOODKA --asm-audio` | Phase 2T full eight-part assembly producer service witness: scene progression, seek/timeline behavior, and clean WASAPI teardown |
 | `VOODKA --part 1` | Phase 2W production-default assembly-audio P1 integration and clean shutdown (CTest `audio.assembly_demo_p1`) |

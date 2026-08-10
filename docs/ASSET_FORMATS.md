@@ -582,7 +582,7 @@ all-black with exit 0, frame-verified.
 - All demo palette math stays in **6-bit space** exactly like the original
   (`setPalette` stores `v & 63`; fades/clamps behave identically).
 - At upload, each channel maps to 8-bit by **`round(v·255/63)`, computed
-  exactly as `(v·255 + 31) / 63`** (`d3d11_present.cpp`). This is the linear
+  exactly as `(v·255 + 31) / 63`** (`d3d11_asm_present.asm`). This is the linear
   mapping the VGA DAC's analog output implements (v/63 of full scale), and it
   matches `frames2img.cpp`, so recordings and on-screen output agree
   pixel-for-pixel. (The port previously truncated `v·255/63`, losing ≤1 LSB

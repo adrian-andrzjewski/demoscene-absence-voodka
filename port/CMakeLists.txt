@@ -610,8 +610,8 @@ add_test(NAME audio.pcm_thread_probe
 # bounded PCM/ModPos ring while the assembly-owned WASAPI worker consumes it
 # under the real device clock.  The control modes additionally exercise
 # ordered pause/resume and a coordinated tracker/mixer seek with a ring flush.
-# Production audio remains unchanged until these gates and their long-run/
-# synchronization follow-ups pass.
+# The production executable now uses the dedicated assembly audio service;
+# these probes remain independent oracle and long-run synchronization gates.
 add_executable(audio_live_wasapi_probe
     tools/validate/audio_live_wasapi_probe.cpp)
 target_compile_definitions(audio_live_wasapi_probe PRIVATE

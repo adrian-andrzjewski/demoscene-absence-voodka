@@ -218,7 +218,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     const char* diagDir = nullptr;
     const char* musicOverride = nullptr;
     const char* timelinePath = nullptr;
+    // The shipped target contains only the assembly presenter.  The separate
+    // reference executable keeps the C++ presenter as its default oracle.
+#if defined(VOODKA_REFERENCE_BUILD)
     bool asmPresenter = false;
+#else
+    bool asmPresenter = true;
+#endif
     // The dedicated x64 assembly player is now the production default. Keep
     // an explicit libxmp escape hatch for oracle comparisons and diagnostics.
     bool asmAudio = true;
@@ -243,7 +249,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         diagDir = argDirOf(cmd, "diag");
         musicOverride = argDirOf(cmd, "music");
         timelinePath = argDirOf(cmd, "timeline");
-        asmPresenter = cmd.find("--asm-present") != std::string::npos;
+        const bool explicitAsmPresenter =
+            cmd.find("--asm-present") != std::string::npos;
+#if defined(VOODKA_REFERENCE_BUILD)
+        asmPresenter = explicitAsmPresenter;
+#else
+        (void)explicitAsmPresenter; // --asm-present remains a compatibility alias.
+#endif
         const bool explicitAsmAudio =
             cmd.find("--asm-audio") != std::string::npos;
         referenceAudio = !explicitAsmAudio &&
@@ -267,7 +279,16 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
         if (timelinePath) vk::logPrint("[app] A/V timeline to '%s'\n", timelinePath);
-        if (asmPresenter) vk::logPrint("[app] --asm-present selected\n");
+        if (asmPresenter)
+            vk::logPrint("[app] native x64 assembly presenter selected%s\n",
+#if defined(VOODKA_REFERENCE_BUILD)
+                         explicitAsmPresenter ? " (--asm-present)" : ""
+#else
+                         " (production default)"
+#endif
+            );
+        else
+            vk::logPrint("[app] C++ reference presenter selected\n");
         if (referenceAudio)
             vk::logPrint("[app] --libxmp-audio reference path selected\n");
         else

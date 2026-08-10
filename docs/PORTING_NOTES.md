@@ -11,7 +11,7 @@ paths, water/bump data, MOD, presentation conversion) see
 ```
 +----------------------------------------------------------+
 |  port/platform (C++17, Win32)                            |
-|   app.cpp  window/CLI/crash filter   d3d11_present.cpp   |
+|   app.cpp  window/CLI/crash filter   d3d11_dispatch.cpp |
 |   audio.cpp (libxmp+WASAPI)          timer.cpp (QPC 70Hz)|
 |   arena.cpp (64MB arena + archive)   input/pause/progress|
 |   bridge.cpp  <-- the ONLY C symbols NASM may call (vk_*)|
@@ -161,10 +161,13 @@ pointer advancement.**
 - Parts render 320x200x256 into the backbuffer; `Ekran`/`ShowPicture`
   (`core/inc/video.inc`) copies backbuffer -> framebuffer and calls
   `vk_present_frame`.
-- `d3d11_present.cpp` uploads the 64,000-byte index frame to an R8 texture
-  and the 768-byte palette to a 256x1 texture; a point-sampled fullscreen
-  quad maps indices through the palette - pixel-identical to VGA DAC
-  behavior, 4x integer upscale into a 1280x800 window.
+- `d3d11_asm_present.asm` uploads the 64,000-byte index frame to an R8
+  texture and the 768-byte palette to a 256x1 texture; a point-sampled
+  fullscreen quad maps indices through the palette - pixel-identical to VGA
+  DAC behavior, 4x integer upscale into a 1280x800 window. The shipped
+  `d3d11_dispatch.cpp` exposes the platform ABI and owns only recording and
+  diagnostic file I/O; the full `d3d11_present.cpp` implementation is retained
+  in `VOODKA_REFERENCE.exe` for differential validation.
 - **Sampler pitfall (audit 2026-08-05):** the point sampler must be created
   with every `D3D11_SAMPLER_DESC` field set. The original code only set
   `Filter`/`AddressU/V`, leaving `AddressW=0` (not a valid address mode) in

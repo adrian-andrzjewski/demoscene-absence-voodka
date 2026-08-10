@@ -6,7 +6,6 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
     log.cpp
     input.cpp
     timer.cpp
-    d3d11_present.cpp
     audio_asm.cpp
     progress.cpp
     timeline.cpp
@@ -16,11 +15,13 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 
 set(VOODKA_PLATFORM_SOURCES
     ${VOODKA_PLATFORM_COMMON_SOURCES}
+    d3d11_dispatch.cpp
     audio_dispatch.cpp
 )
 
 set(VOODKA_REFERENCE_SOURCES
     ${VOODKA_PLATFORM_COMMON_SOURCES}
+    d3d11_present.cpp
     audio.cpp
 )
 
@@ -68,6 +69,7 @@ configure_voodka_platform_target(VOODKA)
 # VOODKA so libxmp cannot enter the production dependency graph.
 add_executable(VOODKA_REFERENCE WIN32 ${VOODKA_REFERENCE_SOURCES})
 configure_voodka_platform_target(VOODKA_REFERENCE)
+target_compile_definitions(VOODKA_REFERENCE PRIVATE VOODKA_REFERENCE_BUILD=1)
 target_link_libraries(VOODKA_REFERENCE PRIVATE xmp_static)
 
 # ---- VIRTUAL viewer (standalone VR-engine test shell) -----------------------

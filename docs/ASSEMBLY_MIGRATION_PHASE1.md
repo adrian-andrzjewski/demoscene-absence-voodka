@@ -1,14 +1,14 @@
 # Phase 1 progress: D3D11/COM assembly feasibility gate
 
-Status: **Phase 1B passed for the standalone and production presenter paths;
-G1 is passed for the rendering subsystem.**
+Status: **Phase 1B and Phase 1C passed; G1 is passed and the shipped target
+now uses assembly-owned D3D11/COM presentation.**
 
 The assembly-only application is not claimed yet. Window management, input,
 timing, audio, logging, lifecycle, and the remaining C++ platform code are
-still present. The C++ presenter also remains compiled as the default
-behavioral oracle and fallback.
+still present. The complete C++ presenter remains compiled only in the
+non-shipped `VOODKA_REFERENCE.exe` behavioral oracle.
 
-Snapshot date: **2026-08-09**
+Snapshot date: **2026-08-10**
 
 ## Gate structure
 
@@ -18,8 +18,9 @@ production path:
 1. **Phase 1A:** direct NASM calls into D3D11, DXGI, and COM vtables.
 2. **Phase 1B:** a complete NASM-owned indexed/palette presenter with GPU
    readback and Present.
-3. **Production integration:** the existing application can select the NASM
-   presenter with `--asm-present`, while the C++ path remains the default.
+3. **Phase 1C production ownership:** `VOODKA.exe` defaults to the NASM
+   presenter and no longer compiles the C++ D3D11 implementation; the
+   reference executable retains the C++ path and `--asm-present` comparison.
 
 The C++ side still creates the HWND, pumps messages, owns diagnostic files, and
 selects the presenter. It does not create or manipulate a D3D11 object when
@@ -169,9 +170,49 @@ fully assembly-owned process, since those remain C++/libxmp platform code.
 x64 assembly can reliably interoperate with the current D3D11/COM renderer,
 preserve the indexed/palette visual output, and carry a full demo playback.
 
-**NO-GO for deleting the C++ presenter or claiming 100% assembly.** Keep the
-C++ presenter as the default fallback until later builds no longer need it,
-and do not remove the C++ window/lifecycle/audio path until their own gates
-pass. The next highest-risk gate is the dedicated assembly tracker player and
-WASAPI path; converting easy utility code before that would not answer the
-project's assembly-only feasibility question.
+**NO-GO for claiming 100% assembly.** The C++ presenter is now reference-only
+for the shipped target, but the production dispatch still contains host-side
+recording and diagnostic file I/O. Window management, input, timing, audio,
+logging, lifecycle, and the remaining C++ platform code still require their
+own gates.
+
+## Phase 1C result: assembly presenter is the shipped default
+
+Phase 1C makes the D3D11 ownership split structural:
+
+- `VOODKA.exe` compiles `d3d11_dispatch.cpp`, which calls only the NASM
+  presenter ABI and retains host-side recording/diagnostic file handling;
+- `VOODKA.exe` does not compile `d3d11_present.cpp`;
+- `VOODKA_REFERENCE.exe` retains `d3d11_present.cpp` as the C++ visual oracle;
+- a normal production launch selects the assembly presenter without a flag;
+  `--asm-present` remains a compatibility alias; and
+- the NASM presenter remains responsible for D3D11/COM creation, vtable calls,
+  texture uploads, shader/resource binding, readback, Present, and Release.
+
+The Phase 1C validation is:
+
+```text
+focused presenter/production/reference CTests      3/3 passed; 28.98 s
+full Release CTest suite                            53/53 passed; 104.19 s
+full P1-P8 playback (no flags)                     exit 0; 252.7 s
+full scene sequence                                 P1, P2, P3, P5, P6, P7, P8
+rendered timeline                                  17,590 frames (+ header)
+full device stream                                  11,078,802 frames; underruns 0
+full marker stream                                  12,819 markers
+full final ModPos                                   0x2803
+independent P8 production run                      exit 0; 30 s lifecycle close
+production D3D imports                              d3d11.dll / D3D11CreateDeviceAndSwapChain only
+reference D3D imports                               d3d11.dll + d3dcompiler_47.dll / D3DCompile
+production VOODKA.exe                              409,088 bytes
+reference VOODKA_REFERENCE.exe                    989,696 bytes
+```
+
+The production dispatch diagnostic files retained the Phase 1 baseline byte
+counts and SHA-256 values for source framebuffer, palette, and GPU readback;
+the four-frame captures remain byte-identical to the C++ reference records.
+
+This is a **GO** for removing the C++ D3D11/COM implementation from the
+shipped dependency graph. It preserves the C++ presenter as a differential
+oracle and keeps the assembly presenter behind a tested, reversible ABI. It
+is not a GO for removing the remaining C++ application/lifecycle layer or for
+claiming that the executable is already 100% assembly.
