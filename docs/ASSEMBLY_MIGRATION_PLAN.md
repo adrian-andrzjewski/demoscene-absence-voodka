@@ -458,8 +458,12 @@ interpolation, ramps, anti-click, one-shots, and E9 retriggers. Keep libxmp
 as the oracle. The assembly-owned WASAPI probe now passes exact 44.1 kHz
 stereo PCM negotiation, event delivery, render-buffer acquisition/release,
 stop/reset, and 20 repeated teardown runs. Do not connect it to production or
-remove libxmp until the threaded path survives the side-by-side device gate
-and full-demo A/V synchronization.
+remove libxmp until the assembly-owned worker also passes its join/teardown
+stress gate, the tracker mixer is connected, and the side-by-side path
+survives full-demo A/V synchronization. The Phase 2H worker harness now
+passes 10 repeated one-second lifecycles with real callback wakeups, 23,296 to
+25,856 serviced frames per run, zero timeouts, and clean Stop/Reset/join results; it
+intentionally writes silence and is not yet the production player.
 
 ---
 

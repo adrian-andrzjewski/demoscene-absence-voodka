@@ -530,4 +530,15 @@ target_link_libraries(audio_wasapi_asm_probe PRIVATE
     voodka_core ole32 kernel32)
 add_test(NAME audio.wasapi_asm_probe COMMAND audio_wasapi_asm_probe)
 
+# Phase 2H feasibility gate: the NASM worker owns its COM apartment, WASAPI
+# interfaces, callback event, render loop, stop signal, and teardown. It writes
+# silence until the tracker mixer is connected behind the production switch.
+add_executable(audio_thread_asm_probe
+    tools/validate/audio_thread_asm_probe.cpp)
+target_compile_definitions(audio_thread_asm_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_thread_asm_probe PRIVATE
+    voodka_core ole32 kernel32)
+add_test(NAME audio.thread_asm_probe COMMAND audio_thread_asm_probe)
+
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

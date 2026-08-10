@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2G passed; threaded production swap remains**
+Status: **Phase 2A through Phase 2H passed; tracker-to-device swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2G changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2H changes production playback.
 
 ## Phase 2A scope
 
@@ -328,17 +328,49 @@ ownership, PCM-to-device streaming, pause/seek behavior, long-run underrun
 margin, and full-demo A/V synchronization remain unproven. Production
 `VOODKA.exe` remains on the C++/libxmp path.
 
+## Phase 2H result: assembly-owned audio-thread substrate
+
+Phase 2H proves the worker lifetime and event-driven render loop independently
+of tracker state:
+
+- [`audio_thread_probe.asm`](../port/core/eos_replace/audio_thread_probe.asm)
+  creates the worker, initializes COM inside that worker, activates the exact
+  PCM WASAPI stream, waits on both stop and audio events, services real render
+  wakeups with silent buffers, stops/resets the client, releases COM objects,
+  and returns only after cleanup.
+- [`audio_thread_asm_probe.cpp`](../port/tools/validate/audio_thread_asm_probe.cpp)
+  validates the fixed-width report; it owns no thread, COM apartment, or
+  WASAPI interface.
+- CTest name: `audio.thread_asm_probe`.
+
+The one-second worker gate reports:
+
+```text
+worker priority                                      above normal
+WASAPI event wakeups                                 91
+frames serviced                                      23296
+timeouts                                             0
+Stop / Reset / worker exit                           S_OK / S_OK / 0
+repeat lifecycle runs                                10/10 passed
+```
+
+The harness intentionally writes silence. This is a **GO** for the assembly
+thread, COM-apartment, event wait, join, and teardown substrate, but a **NO-GO**
+for connecting the tracker mixer or replacing production audio. Tracker state
+ownership, published ModPos snapshots, PCM-to-device equivalence, pause/seek,
+long-run underrun margin, and full-demo A/V synchronization remain ahead.
+
 ## Next implementation slices
 
-1. Add an assembly-owned render thread around the proven PCM mixer, with an
-   explicit published ModPos snapshot and idempotent stop/join protocol.
-2. Run it side-by-side with the C++ path behind `--asm-audio`, then compare
-   device timing, PCM counters, scene boundaries, and shutdown behavior.
+1. Connect the proven assembly tracker/mixer state to this worker through a
+   fixed published snapshot and bounded PCM ring/buffer contract.
+2. Run the connected path side-by-side with the C++ path behind `--asm-audio`,
+   then compare device timing, PCM counters, scene boundaries, and shutdown.
 
-## Phase 2G go/no-go
+## Phase 2H go/no-go
 
-**GO through the native WASAPI/COM device boundary.** The native mixer and
-direct assembly vtable calls work against the current endpoint, including
-event-driven client setup, buffer ownership, and teardown.
+**GO through the assembly-owned audio-thread substrate.** The worker owns its
+COM apartment and WASAPI resources, services real callback wakeups, and joins
+after ordered stop/reset/release cleanup.
 **NO-GO to libxmp removal or a production assembly-audio switch yet:** the
-audio thread and full-demo synchronization remain unproven.
+tracker mixer has not been connected to the worker or full-demo timeline.
