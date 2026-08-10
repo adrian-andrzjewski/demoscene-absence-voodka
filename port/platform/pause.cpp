@@ -36,6 +36,9 @@ void pauseToggle() {
         logPrint("[pause] RESUMED ModPos=0x%x elapsed=%.2fs toggle=%ld\n",
                  getModPos(), audioElapsedSec(), n);
     }
+    // The assembly worker does not observe the C++ pause flag asynchronously;
+    // send the state transition immediately, before waitVbl parks the demo.
+    audioPump();
 }
 
 } // namespace vk

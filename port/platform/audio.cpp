@@ -32,6 +32,19 @@
 
 namespace vk {
 
+int  audioAsmInit(const char* modPath, int sampleRate);
+void audioAsmShutdown();
+int  audioAsmPlay();
+int  audioAsmStop();
+uint32_t audioAsmModPos();
+uint32_t audioAsmModLength();
+double audioAsmElapsedSec();
+void audioAsmPump();
+uint32_t audioAsmSeekRows(uint32_t modpos);
+uint32_t audioAsmSeekMs(int ms);
+uint32_t audioAsmSeekOrder(int order);
+int audioAsmSelfCheck(int seconds);
+
 namespace {
 constexpr int kSampleRate = 44100;
 constexpr int kChannels   = 2;
@@ -61,6 +74,7 @@ std::vector<short>  g_tmp;                // float-path scratch (render thread)
 volatile long g_servedFrames = 0;  // frames handed to WASAPI successfully
 volatile long g_underruns = 0;     // device drained while playing (dropouts)
 volatile long g_fillErrors = 0;    // GetBuffer / xmp_play_buffer failures
+bool g_asmAudioRequested = false;
 
 // monotonic played-time bookkeeping (main-thread only: audioPump/seek/self-check)
 long   g_loops = 0;       // whole passes completed since (re)start
@@ -68,7 +82,12 @@ double g_playedBase = 0;  // seconds accumulated across loops
 double g_playedNow = 0;   // last known monotonic played-seconds
 }
 
+void audioSetAssemblyMode(bool enabled) {
+    g_asmAudioRequested = enabled;
+}
+
 uint32_t getModLength() {
+    if (g_asmAudioRequested) return audioAsmModLength();
     if (!g_xmp) return 0;
     xmp_module_info mi;
     EnterCriticalSection(&g_xmpCs);
@@ -201,18 +220,21 @@ static bool seekRowsInternal(uint32_t rows) {
 }
 
 uint32_t audioSeekRows(uint32_t mp) {
+    if (g_asmAudioRequested) return audioAsmSeekRows(mp);
     if (!g_xmp) return 0;
     if (!seekRowsInternal(modPosToRows(mp))) return 0;
     return getModPos();                 // reached ModPos (original encoding)
 }
 
 uint32_t audioSeekOrder(int order) {
+    if (g_asmAudioRequested) return audioAsmSeekOrder(order);
     if (!g_xmp) return 0;
     if (!seekRowsInternal(modPosToRows((uint32_t)((long)order << 8)))) return 0;
     return getModPos();                 // order start, row 0
 }
 
 uint32_t audioSeekMs(int ms) {
+    if (g_asmAudioRequested) return audioAsmSeekMs(ms);
     if (!g_xmp) return 0;
     xmp_frame_info fi;
     EnterCriticalSection(&g_xmpCs);
@@ -338,6 +360,10 @@ static DWORD WINAPI renderThread(LPVOID) {
 // Pump / position
 // ---------------------------------------------------------------------------
 void audioPump() {
+    if (g_asmAudioRequested) {
+        audioAsmPump();
+        return;
+    }
     if (!g_xmp) return;
     if (!InterlockedCompareExchange(&g_playing, 1, 0)) return;
 
@@ -392,6 +418,7 @@ void audioPump() {
 }
 
 uint32_t getModPos() {
+    if (g_asmAudioRequested) return audioAsmModPos();
     long base = _InterlockedOr(&g_posBase, 0);
     long o = _InterlockedOr(&g_order, 0), r = _InterlockedOr(&g_row, 0);
     // original-encoding ModPos: (orderIndex << 8) | row, monotonic across loops
@@ -406,7 +433,10 @@ static double getPlayedSeconds() {
     return g_playedNow;
 }
 
-double audioElapsedSec() { return getPlayedSeconds(); }
+double audioElapsedSec() {
+    if (g_asmAudioRequested) return audioAsmElapsedSec();
+    return getPlayedSeconds();
+}
 
 // ---------------------------------------------------------------------------
 // Init / shutdown
@@ -511,6 +541,7 @@ static bool setupWasapi() {
 }
 
 int audioInit(const char* modPath, int) {
+    if (g_asmAudioRequested) return audioAsmInit(modPath, kSampleRate);
     if (!modPath) return 0;
     if (g_xmp) return 1;
     InitializeCriticalSection(&g_xmpCs);
@@ -561,6 +592,10 @@ int audioInit(const char* modPath, int) {
 }
 
 void audioShutdown() {
+    if (g_asmAudioRequested) {
+        audioAsmShutdown();
+        return;
+    }
     InterlockedExchange(&g_playing, 0);
     if (g_stop) SetEvent(g_stop);
     if (g_thread) {
@@ -605,8 +640,14 @@ void audioShutdown() {
     g_playedNow = 0;
 }
 
-int audioPlay() { InterlockedExchange(&g_playing, 1); return 1; }
-int audioStop() { InterlockedExchange(&g_playing, 0); return 1; }
+int audioPlay() {
+    if (g_asmAudioRequested) return audioAsmPlay();
+    InterlockedExchange(&g_playing, 1); return 1;
+}
+int audioStop() {
+    if (g_asmAudioRequested) return audioAsmStop();
+    InterlockedExchange(&g_playing, 0); return 1;
+}
 
 // ---------------------------------------------------------------------------
 // Self-check (--audiocheck): exercise init/load/playback for `seconds`,
@@ -614,6 +655,7 @@ int audioStop() { InterlockedExchange(&g_playing, 0); return 1; }
 // and return 0 (pass) / nonzero (fail).
 // ---------------------------------------------------------------------------
 int audioSelfCheck(int seconds) {
+    if (g_asmAudioRequested) return audioAsmSelfCheck(seconds);
     if (seconds <= 0) seconds = 20;
     if (!g_xmp) { logPrint("[audio] self-check: FAIL, no module loaded\n"); return 1; }
 

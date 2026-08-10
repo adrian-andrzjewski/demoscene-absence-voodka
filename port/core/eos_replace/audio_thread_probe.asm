@@ -219,6 +219,7 @@ audio_thread_control_update:
         je      .control_done
         mfence
         mov     ecx, dword [rax + CONTROL_REQUESTED_STATE]
+        mov     r8d, ecx                    ; bit 1 is an external stop
         and     ecx, 1
         mov     dword [rel thread_control_state], ecx
         mov     dword [rax + CONTROL_ACK_STATE], ecx
@@ -226,6 +227,12 @@ audio_thread_control_update:
         mov     dword [rax + CONTROL_ACK_SEQUENCE], edx
         mov     dword [rel thread_control_sequence], edx
         inc     dword [r12 + RING_REPORT_PAUSE_TRANSITIONS]
+        test    r8d, 2
+        jz      .control_done
+        mov     rcx, [rel thread_stop_event]
+        test    rcx, rcx
+        jz      .control_done
+        call    SetEvent
 .control_done:
         ret
 
@@ -825,11 +832,18 @@ audio_thread_probe_entry:
         call    SetThreadPriority
         mov     dword [r12 + REPORT_THREAD_PRIORITY], eax
 
+        ; A zero duration is the production-service mode.  Its controller
+        ; thread waits until the shared control word requests stop (bit 1),
+        ; while the historical probe modes retain their bounded Sleep path.
+        test    esi, esi
+        jz      .main_runtime_wait
         mov     ecx, esi
         call    Sleep
 
         mov     rcx, [rel thread_stop_event]
         call    SetEvent
+
+.main_runtime_wait:
 
         mov     rcx, [rel thread_handle]
         mov     edx, 0xFFFFFFFF              ; INFINITE

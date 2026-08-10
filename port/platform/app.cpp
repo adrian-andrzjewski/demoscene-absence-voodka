@@ -139,6 +139,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     const char* musicOverride = nullptr;
     const char* timelinePath = nullptr;
     bool asmPresenter = false;
+    bool asmAudio = false;
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
         std::string f = "--" + std::string(flag);
         auto p = cmd.find(f);
@@ -158,11 +159,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         musicOverride = argDirOf(cmd, "music");
         timelinePath = argDirOf(cmd, "timeline");
         asmPresenter = cmd.find("--asm-present") != std::string::npos;
+        asmAudio = cmd.find("--asm-audio") != std::string::npos;
         if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
         if (timelinePath) vk::logPrint("[app] A/V timeline to '%s'\n", timelinePath);
         if (asmPresenter) vk::logPrint("[app] --asm-present selected\n");
+        if (asmAudio) vk::logPrint("[app] --asm-audio selected\n");
     }
 
     // ---- register window ------------------------------------------------
@@ -259,7 +262,13 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     vk::recInit(recDir);
     std::string musicPath = resolveMusicPath(musicOverride);
     vk::logPrint("[app] music module: '%s'\n", musicPath.empty() ? "(none)" : musicPath.c_str());
-    vk::audioInit(musicPath.c_str(), 44100);
+    vk::audioSetAssemblyMode(asmAudio);
+    const int audioOk = vk::audioInit(musicPath.c_str(), 44100);
+    if (asmAudio && !audioOk) {
+        vk::logPrint("[app] assembly audio initialization failed\n");
+        vk::shutdownAll();
+        return 1;
+    }
     if (vk::quitRequested()) vk::shutdownAndExit();
     vk::setAssemblyPresenter(asmPresenter);
     if (!vk::initPresent(hwnd, kWinW, kWinH)) {

@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2Q passed; live production swap remains**
+Status: **Phase 2A through Phase 2R passed; default production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -744,3 +744,45 @@ assembly audio in `VOODKA.exe`: the assembly worker still needs a persistent
 start/stop service ABI, the producer must be moved behind the production
 audio interface, and the full eight-part run must be compared with aligned
 frame/ModPos/audio evidence before libxmp can be removed.
+
+## Phase 2R result: opt-in production assembly audio
+
+Phase 2R moves the dedicated player behind the real application audio ABI
+without changing the default libxmp path:
+
+- `audio_thread_probe.asm` now supports an indefinite service lifetime. A
+  zero-duration runtime waits for a shared stop command, while the existing
+  bounded probe modes retain their original behavior.
+- `audio_asm.cpp` owns the transitional host orchestration: module bytes,
+  assembly tracker/mixer producer, ring storage, Win32 thread handles, and
+  pause/seek commands. The PCM mixer, timeline markers, ring, WASAPI COM
+  interfaces, worker lifetime, and stop path remain native assembly.
+- `VOODKA.exe --asm-audio` selects this service. The normal executable still
+  selects C++/libxmp unless the flag is present, so the oracle remains
+  available for every comparison.
+- CTest `audio.assembly_demo_p1` exercises the real demo entry path with
+  assembly audio and a complete P1/P2 boundary teardown.
+
+The Release integration evidence is:
+
+```text
+assembly P1 entry                             exit 0, 1,160,271 device frames
+assembly P5 entry                             exit 0, 2,249,100 device frames
+assembly full P1-P8                            exit 0, 252.3 s
+assembly full timeline                         17,584 frames, 12,820 markers
+assembly full underruns                         0
+assembly full scene sequence                    P1, P2, P3, P5, P6, P7, P8
+libxmp full P1-P8                               exit 0, 252.2 s
+libxmp full timeline                            17,582 frames
+scene-boundary timing delta                     <= 0.3 s in the sampled run
+```
+
+The full run is a **GO** for assembly audio as an opt-in production path:
+the actual demo renders, follows the soundtrack-driven ModPos timeline,
+survives later-scene entry, and tears down the producer and assembly worker
+cleanly. It is not yet a **GO** for removing libxmp or declaring the final
+executable assembly-only. The orchestration shim is still C++, the default
+path is still libxmp, and device-level PCM capture has not yet been compared
+against the libxmp live stream over the full run. The next gate is to make the
+assembly service's production ABI complete and prove audio/presentation
+fidelity under pause, close, device failure, and repeated full-run stress.

@@ -632,5 +632,8 @@ add_test(NAME audio.live_wasapi_stress
 add_test(NAME audio.live_wasapi_longrun
          COMMAND audio_live_wasapi_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod" --longrun)
+add_test(NAME audio.assembly_demo_p1
+         COMMAND VOODKA --asm-audio --part 1)
+set_tests_properties(audio.assembly_demo_p1 PROPERTIES TIMEOUT 90)
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

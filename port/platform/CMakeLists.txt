@@ -8,6 +8,7 @@ set(VOODKA_PLATFORM_SOURCES
     timer.cpp
     d3d11_present.cpp
     audio.cpp
+    audio_asm.cpp
     progress.cpp
     timeline.cpp
     pause.cpp
@@ -17,6 +18,7 @@ set(VOODKA_PLATFORM_SOURCES
 add_executable(VOODKA WIN32 ${VOODKA_PLATFORM_SOURCES})
 
 target_include_directories(VOODKA PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(VOODKA PRIVATE "${CMAKE_SOURCE_DIR}/tools/validate")
 target_link_libraries(VOODKA PRIVATE xmp_static voodka_core)
 
 if(MSVC)

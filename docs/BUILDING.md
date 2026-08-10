@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (47 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (48 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -76,6 +76,7 @@ VOODKA.exe --modpos N          start at ModPos N  ((order<<8)|row)
 VOODKA.exe --order N           start at order N
 VOODKA.exe --ms N              start N milliseconds into the module
 VOODKA.exe --music <file>      override the module path
+VOODKA.exe --asm-audio          opt-in dedicated x64 assembly tracker/player
 VOODKA.exe --record <dir>      dump every frame (320x200 index + palette)
 VOODKA.exe --diag <dir>        GPU readback diagnostics
 VOODKA.exe --timeline <file>   per-frame QPC/ModPos/audio-clock witness
@@ -93,7 +94,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-47 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+48 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -168,6 +169,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --seek` | Phase 2O pause, producer quiescence, PCM/marker ring flush, tracker/mixer reposition, post-seek refill, and A/V timeline validation (CTest `audio.live_wasapi_seek`) |
 | `audio_live_wasapi_probe --stress` | Phase 2P three-seek live stress across one producer/ring/WASAPI worker, segment PCM/timeline validation, and clean teardown (CTest `audio.live_wasapi_stress`) |
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
+| `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
 
 ## Troubleshooting
 
