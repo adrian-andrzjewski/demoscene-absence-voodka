@@ -37,7 +37,41 @@ static_assert(offsetof(AudioTickState, sampleStep) == 28);
 static_assert(offsetof(AudioTickState, tickFrames) == 36);
 static_assert(offsetof(AudioTickState, mixerVolume) == 40);
 
+// Persistent state owned by the assembly tracker entry points. The internal
+// 80-byte channel records are intentionally opaque to the host validator; the
+// fixed prefix is retained here so ABI drift is caught at compile time.
+#pragma pack(push, 1)
+struct AudioLiveTrackerContext {
+    const uint8_t* module;
+    uint32_t moduleSize;
+    uint32_t orderCount;
+    uint32_t order;
+    uint32_t row;
+    uint32_t tick;
+    uint32_t speed;
+    uint32_t bpm;
+    uint32_t finished;
+    uint64_t frames;
+    uint8_t reserved[16];
+    uint8_t internalState[14 * 80];
+};
+#pragma pack(pop)
+
+static_assert(offsetof(AudioLiveTrackerContext, moduleSize) == 8);
+static_assert(offsetof(AudioLiveTrackerContext, order) == 16);
+static_assert(offsetof(AudioLiveTrackerContext, tick) == 24);
+static_assert(offsetof(AudioLiveTrackerContext, frames) == 40);
+static_assert(offsetof(AudioLiveTrackerContext, internalState) == 64);
+static_assert(sizeof(AudioLiveTrackerContext) == 1184);
+
 extern "C" uint32_t asm_audio_trace_tick_states(const uint8_t* data,
                                                   uint32_t size,
                                                   AudioTickState* out,
                                                   uint32_t frameCapacity);
+
+extern "C" uint32_t asm_audio_live_init(const uint8_t* data,
+                                          uint32_t size,
+                                          AudioLiveTrackerContext* context);
+
+extern "C" uint32_t asm_audio_live_next(AudioLiveTrackerContext* context,
+                                          AudioTickState* out);

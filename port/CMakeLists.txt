@@ -510,6 +510,20 @@ add_test(NAME audio.mod_stream
          COMMAND audio_mod_stream_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
 
+# Phase 2K feasibility gate: initialize one persistent NASM tracker context,
+# emit one tick at a time, compare every internal state byte with the offline
+# oracle, and pass those live states through the continuous mixer.
+add_executable(audio_live_tracker_probe
+    tools/validate/audio_live_tracker_probe.cpp)
+target_compile_definitions(audio_live_tracker_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_live_tracker_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/validate")
+target_link_libraries(audio_live_tracker_probe PRIVATE voodka_core)
+add_test(NAME audio.live_tracker
+         COMMAND audio_live_tracker_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
+
 # ---- V3D asset viewer (standalone validation tool) ---------------------------
 add_subdirectory(tools/asset_viewer)
 

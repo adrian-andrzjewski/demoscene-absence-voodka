@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2J passed; live tracker-to-device swap remains**
+Status: **Phase 2A through Phase 2K passed; live tracker-to-device swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2J changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2K changes production playback.
 
 ## Phase 2A scope
 
@@ -414,15 +414,13 @@ The production application remains on C++/libxmp.
 
 ## Next implementation slices
 
-1. Refactor the offline tracker into a persistent assembly context holding
-   order/row/tick, speed/BPM, and the 14-channel effect/voice states.
-2. Feed those live states into the continuous mixer and a bounded ring while
-   preserving the Phase 2I timeline snapshot ABI.
-3. Add a side-by-side `--asm-audio` path, then compare device timing, PCM
-   counters, scene boundaries, pause/seek behavior, and shutdown against the
-   C++/libxmp path.
-4. Only after full-demo and long-run gates pass, remove libxmp from the
-   production target; retain it in host-only oracle tools until release signoff.
+1. Feed the proven live tracker states into a bounded producer/consumer ring
+   while preserving the Phase 2I timeline snapshot ABI.
+2. Connect that ring to the assembly WASAPI worker behind `--asm-audio`, then
+   compare device timing, PCM counters, scene boundaries, pause/seek behavior,
+   and shutdown against the C++/libxmp path.
+3. Run full-demo and long-run gates, then remove libxmp from the production
+   target; retain it in host-only oracle tools until release signoff.
 
 ## Phase 2I go/no-go
 
@@ -476,3 +474,46 @@ caller-owned anti-click/ramp history carried between calls.
 **NO-GO to a live assembly player or libxmp removal yet:** the tracker itself
 still runs as an offline whole-stream trace and the WASAPI worker is not fed by
 a live producer/ring.
+
+## Phase 2K result: persistent live tracker context
+
+Phase 2K turns the native effect/state machine into a resumable assembly API:
+
+- [`audio_effects.asm`](../port/core/eos_replace/audio_effects.asm) exports
+  `asm_audio_live_init` and `asm_audio_live_next`. Initialization validates the
+  module and stores the 14 internal 80-byte channel states in a caller-owned
+  context. Each `next` call resumes at the saved order, row, tick, speed, and
+  BPM, emits exactly one `AudioTickState` frame, then advances the context.
+- [`audio_tick_abi.h`](../port/tools/validate/audio_tick_abi.h) fixes the
+  1,184-byte context layout and the live entry-point ABI.
+- [`audio_live_tracker_probe.cpp`](../port/tools/validate/audio_live_tracker_probe.cpp)
+  compares every byte of all 13,440 live frames against the offline oracle,
+  verifies the completion sentinel, and runs the live states through the
+  continuous mixer.
+- CTest name: `audio.live_tracker`.
+
+The gate reports:
+
+```text
+live tracker ticks                             13,440
+state-byte mismatches                          0
+completion sentinel                            correct
+continuous mixer chunks                       78
+PCM frames                                    11,613,525
+PCM FNV-1a                                    18C7451650A7C772
+```
+
+This is a **GO** for persistent assembly tracker state and one-tick emission
+equivalence. It remains a **NO-GO** for production audio: there is no bounded
+SPSC ring, producer backpressure policy, pause/seek command protocol, or
+assembly worker integration behind `--asm-audio` yet. Production remains
+C++/libxmp.
+
+## Phase 2K go/no-go
+
+**GO through the persistent live tracker context.** The assembly state machine
+can run incrementally for the complete module and preserve exact state and PCM
+behavior across continuous mixer chunks.
+**NO-GO to live WASAPI playback or libxmp removal yet:** the next feasibility
+gate is the concurrent producer/ring contract and its shutdown, underrun, and
+pause/seek behavior.

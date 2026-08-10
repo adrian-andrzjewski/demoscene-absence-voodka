@@ -67,6 +67,22 @@ DEFAULT REL
 %define OUT_MIXER_VOLUME                 40
 %define OUT_BYTES                        41
 
+; AudioLiveTrackerContext. The state block stores the same internal 80-byte
+; channel records used by the offline oracle; public callers only use the
+; fixed prefix and the 14-channel output API.
+%define CTX_MODULE                       0
+%define CTX_MODULE_SIZE                  8
+%define CTX_ORDER_COUNT                 12
+%define CTX_ORDER                       16
+%define CTX_ROW                         20
+%define CTX_TICK                        24
+%define CTX_SPEED                       28
+%define CTX_BPM                         32
+%define CTX_FINISHED                    36
+%define CTX_FRAMES                      40
+%define CTX_STATE                       64
+%define CTX_BYTES                       (CTX_STATE + MOD_CHANNELS * STATE_BYTES)
+
 %define LOCAL_SPEED                      -2056
 %define LOCAL_FRAMES                     -2060
 %define LOCAL_CAPACITY                   -2064
@@ -83,8 +99,12 @@ DEFAULT REL
 %define LOCAL_LOOP_START                 -2124
 %define LOCAL_LOOP_LENGTH                -2128
 %define LOCAL_LOOP_END                   -2132
+%define LOCAL_MODE                       -2144
+%define LOCAL_CONTEXT                    -2152
 
 global asm_audio_trace_tick_states
+global asm_audio_live_init
+global asm_audio_live_next
 extern asm_audio_decode_event
 
 section .text
@@ -94,6 +114,30 @@ section .text
 ;                                      AudioTickState* out,
 ;                                      uint32_t frameCapacity)
 asm_audio_trace_tick_states:
+        xor     r10d, r10d                 ; no live context
+        xor     r11d, r11d                 ; offline mode
+        jmp     audio_effects_entry
+
+; uint32_t asm_audio_live_init(const uint8_t* data, uint32_t size,
+;                              AudioLiveTrackerContext* context)
+asm_audio_live_init:
+        mov     r10, r8                    ; context
+        mov     r11d, 1                    ; initialize mode
+        xor     r8d, r8d                    ; no output frame
+        xor     r9d, r9d                    ; no output capacity
+        jmp     audio_effects_entry
+
+; uint32_t asm_audio_live_next(AudioLiveTrackerContext* context,
+;                              AudioTickState* out)
+asm_audio_live_next:
+        mov     r10, rcx                   ; context
+        mov     r8, rdx                    ; output before loading size
+        mov     rcx, [r10 + CTX_MODULE]
+        mov     edx, [r10 + CTX_MODULE_SIZE]
+        mov     r9d, 1                     ; one tracker tick
+        mov     r11d, 2                    ; resume mode
+
+audio_effects_entry:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -103,18 +147,31 @@ asm_audio_trace_tick_states:
         push    r13
         push    r14
         push    r15
-        sub     rsp, 2080
+        sub     rsp, 2096
 
         mov     r12, rcx                 ; module bytes
         mov     r13, r8                  ; output states
         mov     r14d, edx                ; module size during validation
+        mov     dword [rbp + LOCAL_MODE], r11d
+        mov     qword [rbp + LOCAL_CONTEXT], r10
         mov     dword [rbp + LOCAL_CAPACITY], r9d
         test    r12, r12
         jz      .bad
+        cmp     dword [rbp + LOCAL_MODE], 1
+        je      .output_checked
         test    r13, r13
         jz      .bad
+        cmp     dword [rbp + LOCAL_MODE], 0
+        jne     .live_output_mode
         test    r9d, r9d
         jz      .bad
+        jmp     .output_checked
+.live_output_mode:
+        cmp     dword [rbp + LOCAL_MODE], 2
+        jne     .bad
+        cmp     r9d, 1
+        jne     .bad
+.output_checked:
         cmp     r14d, MOD_HEADER_BYTES
         jb      .bad
 
@@ -147,6 +204,55 @@ asm_audio_trace_tick_states:
         cmp     r14d, eax
         jb      .bad
         mov     dword [rbp + LOCAL_ORDER], r15d
+
+        cmp     dword [rbp + LOCAL_MODE], 0
+        je      .state_reset
+        mov     rax, [rbp + LOCAL_CONTEXT]
+        test    rax, rax
+        jz      .bad
+        cmp     dword [rbp + LOCAL_MODE], 1
+        je      .live_init_context
+        cmp     dword [rax + CTX_FINISHED], 0
+        jne     .bad
+
+        ; Resume from the caller-owned persistent channel state.  The
+        ; current order/row/tick and timing values are restored below; a
+        ; nonzero tick skips row-event decoding and enters the tick loop.
+        mov     r15, rax
+        lea     rdi, [rbp - 2048]
+        lea     rsi, [rax + CTX_STATE]
+        mov     ecx, (MOD_CHANNELS * STATE_BYTES) / 4
+        cld
+        rep     movsd
+        mov     ebx, dword [r15 + CTX_ORDER]
+        mov     r14d, dword [r15 + CTX_ROW]
+        mov     eax, dword [r15 + CTX_SPEED]
+        mov     dword [rbp + LOCAL_SPEED], eax
+        mov     eax, dword [r15 + CTX_BPM]
+        mov     dword [rbp + LOCAL_BPM], eax
+        mov     rax, [rbp + LOCAL_CONTEXT]
+        mov     eax, dword [rax + CTX_TICK]
+        mov     dword [rbp + LOCAL_TICK], eax
+        mov     dword [rbp + LOCAL_FRAMES], 0
+        mov     rsi, r13
+        test    eax, eax
+        jz      .order_loop
+        jmp     .tick_loop
+
+.live_init_context:
+        ; The module is validated once at init and retained by the context.
+        mov     [rax + CTX_MODULE], r12
+        mov     dword [rax + CTX_MODULE_SIZE], r14d
+        mov     dword [rax + CTX_ORDER_COUNT], r15d
+        mov     dword [rax + CTX_ORDER], 0
+        mov     dword [rax + CTX_ROW], 0
+        mov     dword [rax + CTX_TICK], 0
+        mov     dword [rax + CTX_SPEED], 6
+        mov     dword [rax + CTX_BPM], 125
+        mov     dword [rax + CTX_FINISHED], 0
+        mov     qword [rax + CTX_FRAMES], 0
+
+.state_reset:
 
         ; Reset the 14 channel states.  libxmp exposes the loader's default
         ; panning pattern directly as [0,255,255,0] repeated.
@@ -185,6 +291,26 @@ asm_audio_trace_tick_states:
         xor     ebx, ebx                 ; order index
         xor     r14d, r14d               ; row index
         mov     rsi, r13                 ; output frame cursor
+        cmp     dword [rbp + LOCAL_MODE], 1
+        je      .live_init_save
+        cmp     dword [rbp + LOCAL_MODE], 0
+        je      .order_loop
+
+.live_dispatch:
+        mov     eax, dword [rbp + LOCAL_TICK]
+        test    eax, eax
+        jz      .order_loop
+        jmp     .tick_loop
+
+.live_init_save:
+        mov     rax, [rbp + LOCAL_CONTEXT]
+        lea     rdi, [rax + CTX_STATE]
+        lea     rsi, [rbp - 2048]
+        mov     ecx, (MOD_CHANNELS * STATE_BYTES) / 4
+        cld
+        rep     movsd
+        mov     eax, 0                    ; init status: success
+        jmp     .return
 
 .order_loop:
         movzx   eax, byte [r12 + MOD_ORDER_TABLE + rbx]
@@ -832,6 +958,8 @@ asm_audio_trace_tick_states:
         add     rsi, MOD_CHANNELS * OUT_BYTES
         inc     dword [rbp + LOCAL_FRAMES]
         inc     dword [rbp + LOCAL_TICK]
+        cmp     dword [rbp + LOCAL_MODE], 2
+        je      .live_tick_advance
         mov     eax, dword [rbp + LOCAL_TICK]
         cmp     eax, dword [rbp + LOCAL_SPEED]
         jb      .tick_loop
@@ -847,10 +975,48 @@ asm_audio_trace_tick_states:
         mov     eax, dword [rbp + LOCAL_FRAMES]
         jmp     .return
 
+.live_tick_advance:
+        ; A live call emits exactly one tracker tick.  Advance the logical
+        ; order/row/tick cursor only after all fourteen channel snapshots and
+        ; sample positions have been written.
+        mov     eax, dword [rbp + LOCAL_TICK]
+        cmp     eax, dword [rbp + LOCAL_SPEED]
+        jb      .live_store_context
+        xor     eax, eax
+        mov     dword [rbp + LOCAL_TICK], eax
+        inc     r14d
+        cmp     r14d, MOD_ROWS
+        jb      .live_store_context
+        xor     r14d, r14d
+        inc     ebx
+        cmp     ebx, dword [rbp + LOCAL_ORDER]
+        jb      .live_store_context
+        mov     rax, [rbp + LOCAL_CONTEXT]
+        mov     dword [rax + CTX_FINISHED], 1
+
+.live_store_context:
+        mov     r15, [rbp + LOCAL_CONTEXT]
+        mov     dword [r15 + CTX_ORDER], ebx
+        mov     dword [r15 + CTX_ROW], r14d
+        mov     eax, dword [rbp + LOCAL_TICK]
+        mov     dword [r15 + CTX_TICK], eax
+        mov     eax, dword [rbp + LOCAL_SPEED]
+        mov     dword [r15 + CTX_SPEED], eax
+        mov     eax, dword [rbp + LOCAL_BPM]
+        mov     dword [r15 + CTX_BPM], eax
+        inc     dword [r15 + CTX_FRAMES]
+        lea     rdi, [r15 + CTX_STATE]
+        lea     rsi, [rbp - 2048]
+        mov     ecx, (MOD_CHANNELS * STATE_BYTES) / 4
+        cld
+        rep     movsd
+        mov     eax, 1                    ; one tick emitted
+        jmp     .return
+
 .bad:
         xor     eax, eax
 .return:
-        add     rsp, 2080
+        add     rsp, 2096
         pop     r15
         pop     r14
         pop     r13
@@ -860,6 +1026,15 @@ asm_audio_trace_tick_states:
         pop     rbx
         pop     rbp
         ret
+
+global default_pan
+global base_periods
+global sine_wave
+global bend_scale
+global period_scale
+global vib_scale
+global half
+global bend_scale_int
 
 section .rdata align=8
 
