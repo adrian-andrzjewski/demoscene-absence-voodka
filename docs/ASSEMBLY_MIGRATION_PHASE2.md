@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2E passed; assembly mixer and device path not yet started**
+Status: **Phase 2A through Phase 2F passed offline; device path and production swap remain**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2D changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2F changes production playback.
 
 ## Phase 2A scope
 
@@ -215,6 +215,49 @@ This is a **GO** for the native offline effect/tick-state boundary. It is not
 yet a GO for PCM equivalence, loop interpolation, audio threading, WASAPI, or
 removing libxmp from the production target.
 
+## Phase 2F result: native assembly PCM mixer gate
+
+Phase 2F adds the module-specific software mixer in native x64 assembly and
+compares its complete direct-tick PCM stream against the libxmp oracle:
+
+- [`audio_pcm.asm`](../port/core/eos_replace/audio_pcm.asm) mixes the checked-in
+  signed 8-bit mono MOD samples with forward loops, linear interpolation,
+  stereo pan levels, integer downmix, volume ramps, anti-click discharge,
+  one-shot guards, and `E9x` retrigger revival.
+- [`audio_mix_abi.h`](../port/tools/validate/audio_mix_abi.h) defines the
+  packed mixer entry point.
+- [`audio_mod_mixer_probe.cpp`](../port/tools/validate/audio_mod_mixer_probe.cpp)
+  renders the complete libxmp tick stream, runs the native mixer, and compares
+  every signed-16 stereo sample.
+- CTest name: `audio.mod_pcm`.
+
+The gate passes with no temporary instrumentation or libxmp source changes:
+
+```text
+replay states                 13440
+output frames             11613525
+stereo samples             23227050
+sample mismatches                 0
+PCM FNV-1a       18C7451650A7C772
+```
+
+The final boundary fix uses the maintained double-precision source position
+to decide when a loop has crossed its end, while retaining libxmp-compatible
+fixed-point interpolation. This matters at a one-sample loop transition where
+an integer-only boundary test produces a different PCM value. The packed tick
+snapshot also carries a private mixer-volume byte so a retriggered voice can
+remain bit-exact without changing the public channel-info volume contract.
+
+This is a **GO** for the offline native tracker-plus-mixer boundary. The
+production `VOODKA.exe` still uses the existing C++/libxmp audio path, so this
+is not yet a GO for WASAPI integration, audio-thread lifecycle, or removing
+libxmp. The Phase 2A `audio.oracle` report remains the separate
+`xmp_play_buffer` capture baseline (`11617219` frames,
+`1BE9D4F5B3744B32`); Phase 2F deliberately validates the direct
+`xmp_play_frame` tick contract used by the assembly state ABI
+(`11613525` frames, `18C7451650A7C772`). These capture contracts must be
+reconciled before claiming device-level equivalence.
+
 ## Initial contract boundary
 
 The eventual assembly player must expose the equivalent of:
@@ -254,17 +297,16 @@ then be reviewed and deliberately updated.
 
 ## Next implementation slices
 
-1. Add exact sample loop execution, interpolation, and a software mixer
-   offline, initially without WASAPI; compare complete PCM and row-transition
-   hashes against the oracle.
-2. Add a separate NASM WASAPI/COM probe, then connect the proven mixer to an
-   event-driven render thread behind an `--asm-audio` switch.
+1. Add a separate NASM WASAPI/COM probe and an assembly audio-thread harness;
+   keep the proven mixer behind a side-by-side production switch.
+2. Connect the proven mixer to an event-driven render thread behind an
+   `--asm-audio` switch.
 
-## Phase 2E go/no-go
+## Phase 2F go/no-go
 
-**GO through native per-tick effect state.** The oracle, NASM parser, timing
-engine, event decoder, row voice identity engine, and effect/tick engine agree
-on the complete checked-in module timeline.
+**GO through the offline native PCM mixer.** The oracle, NASM parser, timing
+engine, event decoder, row voice identity engine, effect/tick engine, and
+module-specific mixer agree on the complete direct-tick stream.
 **NO-GO to WASAPI, libxmp removal, or a production assembly-audio switch yet:**
-sample loops, PCM interpolation/mixing, the audio thread, device integration,
-and full-demo synchronization remain unproven.
+the audio thread, device integration, and full-demo synchronization remain
+unproven.

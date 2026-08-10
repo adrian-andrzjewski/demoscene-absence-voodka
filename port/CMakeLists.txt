@@ -485,6 +485,16 @@ add_test(NAME audio.mod_ticks
          COMMAND audio_mod_tick_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
 
+add_executable(audio_mod_mixer_probe
+    tools/validate/audio_mod_mixer_probe.cpp)
+target_compile_definitions(audio_mod_mixer_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_mod_mixer_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/validate")
+target_link_libraries(audio_mod_mixer_probe PRIVATE xmp_static voodka_core)
+add_test(NAME audio.mod_pcm
+         COMMAND audio_mod_mixer_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
+
 # ---- V3D asset viewer (standalone validation tool) ---------------------------
 add_subdirectory(tools/asset_viewer)
 

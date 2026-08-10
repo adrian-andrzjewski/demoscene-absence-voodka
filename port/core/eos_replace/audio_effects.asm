@@ -39,8 +39,12 @@ DEFAULT REL
 %define STATE_ARP_X                      64
 %define STATE_ARP_Y                      65
 %define STATE_ARP_COUNT                  66
+%define STATE_RETRIG_PERIOD              67
 %define STATE_ACTIVE                     68
 %define STATE_SAMPLE_POS                 72
+%define STATE_RESTART                    69
+%define RESTART_EDGE                     1
+%define RESTART_MIX_VOLUME               0x80
 
 %define FLAG_PITCH                       1
 %define FLAG_TONE                        2
@@ -55,9 +59,13 @@ DEFAULT REL
 %define OUT_SAMPLE                       8
 %define OUT_VOLUME                       9
 %define OUT_PAN                          10
+%define OUT_RESTART                      11
 %define OUT_EVENT                        12
 %define OUT_SAMPLE_POSITION              20
-%define OUT_BYTES                        28
+%define OUT_SAMPLE_STEP                  28
+%define OUT_TICK_FRAMES                  36
+%define OUT_MIXER_VOLUME                 40
+%define OUT_BYTES                        41
 
 %define LOCAL_SPEED                      -2056
 %define LOCAL_FRAMES                     -2060
@@ -70,6 +78,7 @@ DEFAULT REL
 %define LOCAL_EXPONENT                   -2096
 %define LOCAL_LOG                        -2104
 %define LOCAL_BPM                        -2112
+%define LOCAL_STEP                       -2104
 %define LOCAL_SAMPLE_LENGTH              -2120
 %define LOCAL_LOOP_START                 -2124
 %define LOCAL_LOOP_LENGTH                -2128
@@ -163,7 +172,7 @@ asm_audio_trace_tick_states:
         mov     dword [rdi + STATE_FLAGS], 0
         mov     dword [rdi + STATE_FREQ_SLIDE], 0
         mov     dword [rdi + STATE_ARP_X], 0
-        mov     dword [rdi + STATE_ACTIVE], 0
+        mov     byte [rdi + STATE_ACTIVE], 0
         mov     qword [rdi + STATE_SAMPLE_POS], 0
         add     rdi, STATE_BYTES
         inc     ecx
@@ -195,6 +204,8 @@ asm_audio_trace_tick_states:
         lea     rdi, [rbp - 2048]
         add     rdi, rax
         mov     dword [rdi + STATE_FLAGS], 0
+        mov     byte [rdi + STATE_RESTART], 0
+        mov     byte [rdi + STATE_RETRIG_PERIOD], 0
         inc     ecx
         cmp     ecx, MOD_CHANNELS
         jb      .clear_flags
@@ -253,7 +264,8 @@ asm_audio_trace_tick_states:
         mov     byte [rdi + STATE_NOTE], al
         mov     al, byte [rdi + STATE_INSTRUMENT]
         mov     byte [rdi + STATE_SAMPLE], al
-        mov     dword [rdi + STATE_ACTIVE], 1
+        mov     byte [rdi + STATE_ACTIVE], 1
+        mov     byte [rdi + STATE_RESTART], RESTART_EDGE
         mov     qword [rdi + STATE_SAMPLE_POS], 0
         mov     dword [rdi + STATE_VIB_PHASE], 0
         movzx   eax, byte [rdi + STATE_NOTE]
@@ -398,6 +410,9 @@ asm_audio_trace_tick_states:
         jmp     .effect_done
 .effect_set_volume:
         mov     byte [rdi + STATE_VOLUME], cl
+        test    cl, cl
+        jnz     .effect_done
+        mov     byte [rdi + STATE_RESTART], RESTART_EDGE
         jmp     .effect_done
 .effect_extended:
         mov     edx, ecx
@@ -407,6 +422,11 @@ asm_audio_trace_tick_states:
         je      .extended_fine_up
         cmp     edx, 0x0b
         je      .extended_fine_down
+        cmp     edx, 0x09
+        je      .extended_retrig
+        jmp     .effect_done
+.extended_retrig:
+        mov     byte [rdi + STATE_RETRIG_PERIOD], cl
         jmp     .effect_done
 .extended_fine_up:
         movzx   eax, byte [rdi + STATE_VOLUME]
@@ -419,11 +439,17 @@ asm_audio_trace_tick_states:
         jmp     .effect_done
 .extended_fine_down:
         movzx   eax, byte [rdi + STATE_VOLUME]
+        mov     edx, eax
         sub     eax, ecx
         jge     .fine_down_store
         xor     eax, eax
 .fine_down_store:
         mov     byte [rdi + STATE_VOLUME], al
+        test    eax, eax
+        jnz     .effect_done
+        test    edx, edx
+        jz      .effect_done
+        mov     byte [rdi + STATE_RESTART], RESTART_EDGE
         jmp     .effect_done
 .effect_speed:
         test    ecx, ecx
@@ -464,7 +490,8 @@ asm_audio_trace_tick_states:
         test    eax, FLAG_VOLUME
         jz      .tick_no_volume
 .tick_apply_volume:
-        movzx   ecx, byte [rdi + STATE_VOLUME]
+        movzx   edx, byte [rdi + STATE_VOLUME]
+        mov     ecx, edx
         add     ecx, dword [rdi + STATE_VOLUME_SLIDE]
         test    ecx, ecx
         jge     .volume_nonnegative
@@ -475,6 +502,14 @@ asm_audio_trace_tick_states:
         mov     ecx, 64
 .volume_clamped:
         mov     byte [rdi + STATE_VOLUME], cl
+        ; libxmp's mixer_setvol(0) arms the anti-click discharge.  The
+        ; tracker snapshot has no separate mixer flag, so carry that edge in
+        ; the same one-shot restart field used by note/position changes.
+        test    ecx, ecx
+        jnz     .tick_no_volume
+        test    edx, edx
+        jz      .tick_no_volume
+        mov     byte [rdi + STATE_RESTART], RESTART_EDGE
 .tick_no_volume:
         test    eax, FLAG_PITCH
         jz      .tick_no_pitch
@@ -515,6 +550,36 @@ asm_audio_trace_tick_states:
         and     dword [rdi + STATE_FLAGS], ~FLAG_TONE
 .tick_update_done:
 
+        ; E9x retriggers the current voice every x tracker ticks.  libxmp
+        ; resets both the source position and anti-click state at the
+        ; retrigger boundary; expose the same edge to the native mixer.
+        movzx   eax, byte [rdi + STATE_RETRIG_PERIOD]
+        test    eax, eax
+        jz      .tick_retrig_done
+        cmp     dword [rbp + LOCAL_TICK], 0
+        je      .tick_retrig_done
+        mov     ecx, eax
+        mov     eax, dword [rbp + LOCAL_TICK]
+        xor     edx, edx
+        div     ecx
+        test    edx, edx
+        jnz     .tick_retrig_done
+        mov     qword [rdi + STATE_SAMPLE_POS], 0
+        movzx   edx, byte [rdi + STATE_ACTIVE]
+        mov     byte [rdi + STATE_ACTIVE], 1
+        mov     byte [rdi + STATE_RESTART], RESTART_EDGE
+        ; A retrigger of an already-live voice keeps the public channel
+        ; volume.  Only resurrect a voice that libxmp has already marked
+        ; finished with the private mixer-volume marker; that is the case
+        ; where the mixer must restart the sample while channel_info still
+        ; reports volume zero for this tick.
+        test    edx, edx
+        jnz     .tick_retrig_done
+        cmp     byte [rdi + STATE_VOLUME], 0
+        je      .tick_retrig_done
+        or      byte [rdi + STATE_RESTART], RESTART_MIX_VOLUME
+.tick_retrig_done:
+
         ; Destination record for this channel in the current frame.
         mov     eax, dword [rbp + LOCAL_CHANNEL]
         imul    eax, OUT_BYTES
@@ -528,6 +593,8 @@ asm_audio_trace_tick_states:
         mov     byte [rdx + OUT_SAMPLE], 0
         mov     byte [rdx + OUT_VOLUME], 0
         mov     byte [rdx + OUT_PAN], 0
+        mov     byte [rdx + OUT_RESTART], 0
+        mov     byte [rdx + OUT_MIXER_VOLUME], 0
         mov     word [rdx + OUT_PITCHBEND], 0
         mov     dword [rdx + OUT_PERIOD], 0
         movzx   eax, byte [rdi + STATE_NOTE]
@@ -540,12 +607,21 @@ asm_audio_trace_tick_states:
         je      .snapshot_inactive
         movzx   eax, byte [rdi + STATE_VOLUME]
         mov     byte [rdx + OUT_VOLUME], al
-        cmp     dword [rdi + STATE_ACTIVE], 0
+        cmp     byte [rdi + STATE_ACTIVE], 0
+        je      .snapshot_mixer_volume_done
+        mov     byte [rdx + OUT_MIXER_VOLUME], al
+.snapshot_mixer_volume_done:
+        test    byte [rdi + STATE_RESTART], RESTART_MIX_VOLUME
+        jnz     .snapshot_volume_hidden
+        cmp     byte [rdi + STATE_ACTIVE], 0
         jne     .snapshot_volume_active
+.snapshot_volume_hidden:
         mov     byte [rdx + OUT_VOLUME], 0
 .snapshot_volume_active:
         mov     eax, dword [rdi + STATE_PAN]
         mov     byte [rdx + OUT_PAN], al
+        mov     eax, dword [rdi + STATE_RESTART]
+        mov     byte [rdx + OUT_RESTART], al
 
         ; period_plus = channel period + FT2 vibrato contribution.
         movsd   xmm0, [rdi + STATE_PERIOD]
@@ -633,11 +709,39 @@ asm_audio_trace_tick_states:
         mulsd   xmm0, [rel period_scale]
         cvttsd2si eax, xmm0
         mov     dword [rdx + OUT_PERIOD], eax
+        mov     eax, 428
+        cvtsi2sd xmm0, eax
+        mov     eax, 8287
+        cvtsi2sd xmm1, eax
+        mulsd   xmm0, xmm1
+        mov     eax, 44100
+        cvtsi2sd xmm1, eax
+        divsd   xmm0, xmm1
+        divsd   xmm0, [rbp + LOCAL_PERIOD_PLUS]
+        movsd   [rbp + LOCAL_STEP], xmm0
+        movsd   [rdx + OUT_SAMPLE_STEP], xmm0
+        mov     r10, rdx
+        mov     eax, 110250
+        xor     edx, edx
+        div     dword [rbp + LOCAL_BPM]
+        mov     dword [r10 + OUT_TICK_FRAMES], eax
         jmp     .snapshot_lfo
 
 .snapshot_inactive:
         mov     dword [rdx + OUT_PERIOD], 0
+        xorpd   xmm0, xmm0
+        movsd   [rbp + LOCAL_STEP], xmm0
+        movsd   [rdx + OUT_SAMPLE_STEP], xmm0
+        mov     r10, rdx
+        mov     eax, 110250
+        xor     edx, edx
+        div     dword [rbp + LOCAL_BPM]
+        mov     dword [r10 + OUT_TICK_FRAMES], eax
 .snapshot_lfo:
+        ; Restart is an edge, not a persistent voice property.  The mixer
+        ; consumes it for this snapshot to reset anti-click history; clear it
+        ; before the next tracker tick so the ramp can persist.
+        and     byte [rdi + STATE_RESTART], RESTART_MIX_VOLUME
         ; FT2 does not advance vibrato on the first tick of a row.  Advance
         ; after rendering ticks 1..N with the current phase.
         cmp     dword [rbp + LOCAL_TICK], 0
@@ -665,24 +769,14 @@ asm_audio_trace_tick_states:
         ; libxmp's channel-info sample-end flag.  PCM interpolation remains a
         ; later gate; this state is only used to make one-shot volume go to
         ; zero on the same tick as the oracle.
-        cmp     dword [rdi + STATE_ACTIVE], 0
+        cmp     byte [rdi + STATE_ACTIVE], 0
         je      .tick_sample_done
         mov     eax, 110250              ; 44100 * 2500 / 1000
         xor     edx, edx
         div     dword [rbp + LOCAL_BPM]
         cvtsi2sd xmm0, eax                ; frames per tracker tick
-        mov     eax, 428
-        cvtsi2sd xmm1, eax
-        ; The vendored libxmp MOD path keeps the classic PAL C4 replay rate
-        ; for this 14CH module: C4_PAL_RATE = 8287.
-        mov     eax, 8287
-        cvtsi2sd xmm2, eax
-        mulsd   xmm1, xmm2
-        mov     eax, 44100
-        cvtsi2sd xmm2, eax
-        divsd   xmm1, xmm2                ; C4 * c5spd / output rate
+        movsd   xmm1, [rbp + LOCAL_STEP]
         mulsd   xmm1, xmm0
-        divsd   xmm1, [rbp + LOCAL_PERIOD_PLUS]
         addsd   xmm1, [rdi + STATE_SAMPLE_POS]
 
         movzx   eax, byte [rdi + STATE_SAMPLE]
@@ -725,7 +819,7 @@ asm_audio_trace_tick_states:
         cvtsi2sd xmm0, dword [rbp + LOCAL_SAMPLE_LENGTH]
         comisd  xmm1, xmm0
         jb      .tick_sample_store
-        mov     dword [rdi + STATE_ACTIVE], 0
+        mov     byte [rdi + STATE_ACTIVE], 0
         movsd   xmm1, xmm0
 .tick_sample_store:
         movsd   [rdi + STATE_SAMPLE_POS], xmm1

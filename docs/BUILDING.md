@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (35 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (36 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -48,6 +48,7 @@ audio_mod_trace_probe.exe  NASM-vs-libxmp tracker timing cross-check
 audio_mod_event_probe.exe  NASM-vs-libxmp packed event cross-check
 audio_mod_voice_probe.exe  NASM-vs-libxmp row voice identity cross-check
 audio_mod_tick_probe.exe   NASM-vs-libxmp per-tick effect/state cross-check
+audio_mod_mixer_probe.exe  native assembly PCM mixer vs libxmp tick-stream cross-check
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -80,7 +81,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-35 tests: 19 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+36 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -100,6 +101,9 @@ libxmp replay trace. `audio.mod_events` compares all packed MOD events, and
 states against libxmp.
 `audio.mod_ticks` compares every per-tick period, pitch bend, voice, volume,
 pan, event, and logical sample-position state against libxmp.
+`audio.mod_pcm` compares every direct-tick signed-16 stereo sample from the
+native x64 assembly mixer against libxmp; the complete checked-in stream is
+11,613,525 frames with FNV-1a `18C7451650A7C772`.
 Python-based tests skip cleanly if no interpreter is found.
 
 ## Tools (`port/tools/`)
