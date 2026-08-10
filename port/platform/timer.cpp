@@ -82,6 +82,7 @@ void waitVbl() {
     // The disable-latency + Sleep(0) spin target is ~70.07 Hz.
     int64_t period = usToCount(g_nominalPeriodUs);
     for (;;) {
+        maybeShutdownAndExit();
         int64_t now = qpcNow();
         int64_t delta = g_nextTickCount + period - now;
         if (delta <= 0) break;
@@ -91,7 +92,8 @@ void waitVbl() {
             if (ms > 1) Sleep(ms - 1);
         } else {
             // busy-wait for the remainder for precision
-            while (qpcNow() < g_nextTickCount + period) { }
+            while (qpcNow() < g_nextTickCount + period)
+                maybeShutdownAndExit();
             break;
         }
     }

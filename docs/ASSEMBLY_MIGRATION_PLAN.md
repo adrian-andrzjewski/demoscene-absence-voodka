@@ -1,0 +1,846 @@
+# VOODKA Assembly-Only Windows Migration Plan
+
+## Objective and boundary
+
+The target is:
+
+- `VOODKA.exe`: NASM x64 production code only.
+- No C or C++ object files linked into the demo.
+- No `libxmp` dependency in the production executable.
+- A dedicated NASM tracker player for `music/amnezja2.mod`.
+- Existing C++ asset viewers, packers, validators, and `VIRTUAL.exe` may remain unchanged.
+- Windows, D3D11, WASAPI, and GPU-driver code remain external system dependencies.
+
+The current production boundary is defined by `port/platform/CMakeLists.txt`. The
+current target contains the Windows integration layer and links `xmp_static`.
+The migration must preserve the existing NASM core and replace the platform
+boundary incrementally.
+
+The shortest credible answer to whether this is viable is not to port the easy
+code first. The first feasibility gates are:
+
+1. Assembly can reliably drive D3D11 and COM.
+2. A dedicated assembly player can reproduce the soundtrack timeline and acceptable audio output.
+3. A pure assembly Windows process can create, run, thread, diagnose, and shut down reliably.
+
+If any of these gates fails, stop before converting the straightforward utility
+code.
+
+## Incremental build strategy
+
+Every replacement should temporarily have three layers:
+
+```text
+current C++ implementation
+        |
+        v
+C++ adapter with the same external behavior
+        |
+        v
+candidate NASM implementation
+```
+
+Use distinct symbols during migration to avoid collisions:
+
+```text
+cpp_present_init
+asm_present_init
+vk_present_init        ; stable production-facing name later
+```
+
+The application must remain buildable and runnable after every phase. The C++
+implementation is removed only after the NASM replacement passes the same
+tests and runtime checks.
+
+The C++ tools and tests remain outside the production target. They are useful
+as behavioral oracles and must not be confused with code linked into
+`VOODKA.exe`.
+
+---
+
+## Phase 0 — Baseline, contracts, and failure instrumentation
+
+### Scope
+
+Establish the evidence and ABI contracts needed to compare every assembly
+replacement against the current implementation.
+
+Affected components:
+
+- `port/platform/app.cpp`
+- `port/platform/audio.cpp`
+- `port/platform/d3d11_present.cpp`
+- `port/platform/bridge.cpp`
+- the current NASM core
+- `modules/libxmp`
+
+### Required assembly contract
+
+Create a shared NASM ABI include defining:
+
+- MS x64 register and stack macros.
+- 32-byte shadow-space handling.
+- 16-byte call-site alignment.
+- Nonvolatile-register save/restore macros.
+- COM virtual-call helpers.
+- HRESULT checks.
+- Windows handle conventions.
+- 32-bit arena-offset conventions.
+- Pointer-sized Windows structure fields.
+
+Document every production-facing entry point, including:
+
+```text
+asm_present_init
+asm_present_frame
+asm_present_shutdown
+
+asm_audio_init
+asm_audio_shutdown
+asm_audio_play
+asm_audio_stop
+asm_audio_get_modpos
+asm_audio_seek_modpos
+asm_audio_seek_ms
+asm_audio_seek_order
+asm_audio_snapshot
+```
+
+### Baseline validation
+
+Record the current behavior before changing the production target:
+
+- Full eight-part run and exit code.
+- 320x200 indexed framebuffer and palette recordings.
+- GPU readback captures.
+- ModPos trace at every frame.
+- Current libxmp PCM output.
+- Audio self-check results.
+- Pause/resume behavior.
+- `--part`, `--modpos`, `--ms`, and `--order` behavior.
+- Window-close behavior in every part.
+- Headless/no-audio behavior.
+- Release executable size and link map.
+
+### Go/no-go milestone G0
+
+Proceed only when:
+
+- The current C++ build is reproducible.
+- A complete reference run is available.
+- Frame, palette, PCM, and ModPos comparison tools exist.
+- The C++ implementation can be restored immediately if a candidate fails.
+
+---
+
+## Phase 1 — D3D11 and COM assembly feasibility gate
+
+This is the first production-feasibility gate.
+
+### Scope
+
+Replace the presenter core with NASM while initially keeping C++ responsible
+for window creation and high-level diagnostics:
+
+- D3D11 device and swapchain creation.
+- Render-target acquisition.
+- Indexed framebuffer texture.
+- Palette texture.
+- Shader resource views.
+- Vertex buffer and input layout.
+- Vertex and pixel shaders.
+- Sampler and rasterizer state.
+- Per-frame texture uploads.
+- Fullscreen draw and `Present`.
+- Resource release.
+
+Affected component:
+
+- `port/platform/d3d11_present.cpp`
+
+### Assembly interfaces
+
+```text
+asm_present_init(hwnd, width, height) -> success
+asm_present_set_palette(rgb_6bit_ptr)
+asm_present_draw(arena_base, framebuffer_offset) -> status
+asm_present_readback(rgba8_out, capacity) -> status
+asm_present_present() -> HRESULT
+asm_present_shutdown()
+```
+
+Resource pointers should be held in NASM globals:
+
+```text
+g_d3d_device
+g_d3d_context
+g_swapchain
+g_index_texture
+g_palette_texture
+g_index_srv
+g_palette_srv
+g_vertex_buffer
+g_input_layout
+g_vertex_shader
+g_pixel_shader
+g_sampler
+g_rasterizer
+g_rtv
+```
+
+### Design decisions
+
+Precompile the two shaders with a host-side tool and embed the bytecode as
+binary data. This removes runtime `D3DCompile` from the first assembly
+implementation while retaining identical shader behavior.
+
+COM calls must be made explicitly through interface vtables. Every call must:
+
+- Put the interface pointer in `rcx`.
+- Put the first three arguments in `rdx`, `r8`, and `r9`.
+- Place additional arguments above the shadow space.
+- Maintain `rsp % 16 == 0` at the call instruction.
+- Check the HRESULT.
+- Release every acquired interface on failure and shutdown.
+
+### Major risks
+
+- Incorrect COM vtable offsets.
+- Incorrect D3D11 structure layout.
+- Stack misalignment.
+- Incorrect `D3D11_MAPPED_SUBRESOURCE.RowPitch` handling.
+- Incorrect sampler or rasterizer state.
+- Resource leaks during partial initialization failure.
+- GPU readback synchronization errors.
+- Accidental bilinear filtering or incorrect palette conversion.
+
+### Dependencies
+
+- Current C++ presenter.
+- Existing self-test pattern.
+- Existing `--record` and GPU diagnostic paths.
+- Host-side shader compilation.
+- Windows SDK import libraries.
+
+The candidate is selectable with `VOODKA.exe --asm-present`; the C++ path is
+still the default oracle and fallback. The C++ adapter may own HWND creation,
+message pumping, diagnostic files, and selection policy, but in assembly mode
+all D3D11 resource creation, vtable calls, uploads, draws, readback, Present,
+and Release calls belong to NASM.
+
+### Validation
+
+1. Present the known 8-color quadrant pattern through the standalone NASM
+   presenter and compare GPU readback against expected RGBA pixels.
+2. Compare indexed framebuffer, palette, and GPU diagnostic captures against
+   the C++ reference byte-for-byte.
+3. Run the first four diagnostic frames from P1, P2, P4, P7, and P8 through
+   both presenter implementations.
+4. Confirm exact 4x nearest-neighbour scaling and row-pitch handling.
+5. Exercise repeated initialization, partial-failure cleanup, and shutdown
+   paths through the standalone probe.
+6. Run the complete demo with `--asm-present`, current C++ window/input/timing,
+   and current audio, ending with normal shutdown.
+
+### Go/no-go milestone G1
+
+Go only if:
+
+- The assembly presenter passes the self-test and GPU readback.
+- No resource leaks or device-removal faults occur.
+- Real scene frames match the C++ presenter.
+- The assembly presenter remains stable for a complete demo run.
+
+No-go if D3D11 cannot be made reliable with explicit assembly COM calls. Do not
+spend time converting input, logging, or allocators before this gate passes.
+
+Current result (2026-08-09): **GO**. The standalone and integrated assembly
+presenter gates passed, including byte-identical P1/P2/P4/P7/P8 captures and a
+17,611-frame full P1-P8 run. The C++ presenter remains compiled and selectable
+as the fallback until the later audio and platform gates are complete.
+
+---
+
+## Phase 2 — Dedicated assembly tracker player and WASAPI gate
+
+This is the largest and most uncertain phase.
+
+### Scope
+
+Remove libxmp from the runtime path and implement:
+
+- `amnezja2.mod` parsing.
+- 14-channel tracker state.
+- Order, pattern, row, and tick execution.
+- Sample playback and loops.
+- Volume and panning.
+- Every effect actually used by this module.
+- Tracker tempo and tick timing.
+- PCM mixing.
+- ModPos tracking.
+- Seeking.
+- Pause/resume.
+- WASAPI output.
+- Audio-thread lifecycle.
+- Underrun detection.
+- Headless fallback.
+
+Affected components:
+
+- `port/platform/audio.cpp`
+- Audio wrappers in `port/platform/bridge.cpp`
+- Audio declarations in `port/platform/platform_abi.h`
+- The `xmp_static` production dependency.
+
+### Preliminary host-side module analysis
+
+Use a host-side analyzer before implementing the player. The analyzer may
+remain C++ and may temporarily use libxmp, but it must produce an exact
+module-specific inventory:
+
+- Module format variant.
+- Order table.
+- Pattern count and lengths.
+- Instrument and sample layout.
+- Sample loop points.
+- Volume ranges.
+- Channel usage.
+- Effect command frequencies.
+- Effect parameter ranges.
+- Tempo/BPM changes.
+- Pattern jumps, breaks, and delays.
+- Loop behavior.
+- Actual row/tick timing.
+- Output sample-rate assumptions.
+
+The goal is a player for this soundtrack, not a generic replacement for every
+format supported by libxmp.
+
+### Assembly interfaces
+
+```text
+asm_audio_init(mod_path, sample_rate) -> success
+asm_audio_shutdown()
+asm_audio_play()
+asm_audio_stop()
+asm_audio_get_modpos() -> uint32
+asm_audio_get_elapsed_us() -> uint64
+asm_audio_seek_modpos(modpos) -> uint32
+asm_audio_seek_ms(ms) -> uint32
+asm_audio_seek_order(order) -> uint32
+asm_audio_snapshot(snapshot_ptr)
+asm_audio_selfcheck(seconds) -> result
+```
+
+The audio thread owns live tracker state. The main thread reads a published
+snapshot:
+
+```text
+audio thread:
+    advance tracker
+    mix PCM
+    publish order, row, loop base, and frame count
+
+demo thread:
+    read snapshot
+    use ModPos for scene logic
+```
+
+This avoids querying mutable player state concurrently from multiple threads.
+
+### WASAPI assembly layer
+
+Implement:
+
+- `CoInitializeEx`.
+- `CoCreateInstance`.
+- Default render endpoint selection.
+- `IAudioClient` activation.
+- `IAudioClient::Initialize`.
+- Event handle creation.
+- `IAudioClient::SetEventHandle`.
+- `IAudioRenderClient::GetBuffer`.
+- `IAudioRenderClient::ReleaseBuffer`.
+- `WaitForMultipleObjects`.
+- `CreateThread`.
+- Thread priority.
+- Stop event handling.
+- COM and resource release.
+
+Initially support the current 44.1 kHz stereo 16-bit path. Add the float-output
+fallback only after the integer path is stable.
+
+### Major risks
+
+- Unknown tracker effects or nonstandard FastTracker behavior.
+- Incorrect tick and row timing.
+- Mixer rounding or interpolation differences.
+- Sample loop edge behavior.
+- Channel panning or volume differences.
+- Races between the audio thread and ModPos readers.
+- Seek landing on the wrong row.
+- Deadlocks during shutdown.
+- WASAPI underruns.
+- Pause/resume drift.
+- Audio quality regression despite correct scene timing.
+
+The original DIAMOND player is binary-only and tied to EOS/Sound Blaster
+behavior. It is not a reusable x64 implementation target.
+
+### Dependencies
+
+- Module analyzer.
+- Current libxmp output as a development oracle.
+- Current audio self-check.
+- WASAPI probe and COM ABI work.
+- Existing ModPos and scene-boundary expectations.
+
+libxmp may remain temporarily in a reference-only validation configuration. It
+must not be linked into the candidate `VOODKA.exe`.
+
+### Validation
+
+#### Player-level
+
+- Decode the complete module without crashing.
+- Compare order, row, and tick transitions against the oracle.
+- Compare rendered PCM over the complete soundtrack.
+- Compare representative channels and effect-heavy sections.
+- Verify sample loop boundaries.
+- Verify module looping.
+
+#### Platform-level
+
+- Run for at least 20 minutes with zero underruns.
+- Pause and resume repeatedly.
+- Seek to every part boundary.
+- Seek into effect-heavy rows.
+- Close the window during playback.
+- Test unavailable or rejected audio devices.
+- Test headless mode.
+- Confirm no audio thread or COM object survives shutdown.
+
+#### Demo-level
+
+- Complete eight-part run.
+- ModPos trace comparison.
+- Frame-record comparison at all scene boundaries.
+- Confirm no visual drift caused by audio-clock changes.
+
+### Go/no-go milestone G2
+
+Go only if:
+
+- The player supports every feature used by the module.
+- ModPos and scene transitions match the baseline.
+- Audio is equivalent in quality and timing.
+- No underruns, deadlocks, or shutdown leaks occur.
+- Full-demo playback completes successfully.
+
+No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
+stable 100% assembly demo has not been demonstrated without this gate.
+
+---
+
+## Phase 3 — Pure Windows x64 runtime and thread substrate
+
+### Scope
+
+Implement assembly probes for:
+
+- Custom process entry point.
+- Command-line acquisition.
+- `GetModuleHandle`.
+- Window class registration.
+- Window creation.
+- `WndProc`.
+- Message pumping.
+- `CreateThread`.
+- Events.
+- `WaitForMultipleObjects`.
+- `Interlocked*` operations.
+- Critical sections or SRW locks.
+- `SetUnhandledExceptionFilter`.
+- `ExitProcess`.
+- x64 unwind metadata.
+
+Affected components:
+
+- `port/platform/app.cpp`
+- `port/platform/input.cpp`
+- `port/platform/timer.cpp`
+- `port/platform/pause.cpp`
+- Parts of `port/platform/log.cpp`
+- Audio thread support in `audio.cpp`
+
+### Assembly interfaces
+
+```text
+asm_process_start()
+asm_window_create()
+asm_window_proc(hwnd, message, wparam, lparam)
+asm_message_pump()
+asm_thread_start()
+asm_thread_stop()
+asm_exception_filter(exception_pointers)
+asm_process_exit(code)
+```
+
+### Major risks
+
+- Incorrect `WPARAM`/`LPARAM` pointer handling.
+- Window callback stack corruption.
+- Missing x64 unwind metadata.
+- Invalid crash-handler register offsets.
+- Incorrect event or thread ownership.
+- Deadlock during window-close cleanup.
+- Incorrect memory ordering around pause and audio state.
+- CRT dependencies accidentally pulled in by formatting or string routines.
+
+### Validation
+
+- Assembly-only window probe starts and closes repeatedly.
+- Keyboard messages arrive with correct scancodes.
+- A worker thread starts, signals, waits, and shuts down.
+- Window close during active D3D and audio execution terminates cleanly.
+- Deliberate test exceptions reach the crash filter with correct RIP/RSP/register data.
+- The probe does not require CRT startup objects.
+
+### Go/no-go milestone G3
+
+Go only if:
+
+- A pure assembly Win32 process can create and destroy a window reliably.
+- Thread and event shutdown is deterministic.
+- Crash reporting and stack unwinding are usable.
+- The process can exit from inside the assembly demo loop without leaving threads or COM objects.
+
+---
+
+## Phase 4 — Replace the C ABI bridge and EOS platform boundary
+
+### Scope
+
+Replace `bridge.cpp` with assembly implementations of the symbols already
+consumed by the NASM core.
+
+Affected components:
+
+- `port/platform/bridge.cpp`
+- `port/platform/platform_abi.h`
+- `port/platform/demo_entry.h`
+- `port/core/eos_replace/eos_dispatch.asm`
+- Temporary C++ presenter and audio adapters
+
+Implement:
+
+- Arena access.
+- Arena allocation and freeing.
+- Selector allocation and lookup.
+- `wait_vbl`.
+- ModPos access.
+- File loading.
+- Palette set/get/range operations.
+- Framebuffer access.
+- Audio calls.
+- Entry-part selection.
+- Key-map copy.
+- Logging bridge.
+- P4 triangle rasterizer.
+
+### Assembly interfaces
+
+Preserve the existing NASM-facing names where possible:
+
+```text
+vk_arena_get
+vk_arena_alloc
+vk_arena_free
+vk_selector_alloc
+vk_selector_free
+vk_selector_base
+vk_wait_vbl
+vk_get_modpos
+vk_load_internal_file
+vk_set_palette
+vk_get_palette
+vk_set_palette_range
+vk_present_frame
+vk_audio_play
+vk_audio_stop
+vk_audio_seek_rows
+vk_audio_seek_ms
+vk_audio_seek_order
+vk_key_map_copy
+vk_log_printf
+vk_p4_draw_triangle
+```
+
+### P4 rasterizer
+
+Port the current `vk_p4_draw_triangle` independently and compare it against
+the C++ implementation using randomized triangles, edge cases, UV wrapping,
+clipping, and degenerate geometry.
+
+The main risks are:
+
+- `ceil` and `floor` behavior.
+- Signed coordinate conversion.
+- Double-to-integer conversion.
+- Texture-index wrapping.
+- Left/right edge selection.
+- Exact fill coverage.
+
+### Go/no-go milestone G4
+
+Go only if:
+
+- Every NASM-core call resolves to assembly or an approved external Windows import.
+- EOS service behavior remains unchanged.
+- P4 output matches the C++ reference.
+- Existing NASM-vs-C++ bridge tests pass.
+- The complete demo runs using the assembly bridge.
+
+---
+
+## Phase 5 — Assembly memory, asset loading, and data ownership
+
+### Scope
+
+Replace:
+
+- `port/platform/arena.cpp`
+- Archive-loading portions of `app.cpp`.
+- C++ `std::vector` archive storage.
+- Path and file staging logic.
+
+Implement in assembly:
+
+- 64 MB `VirtualAlloc` arena.
+- 16-byte bump allocation.
+- Fixed framebuffer/backbuffer offsets.
+- Archive-file search.
+- `CreateFileW`.
+- `GetFileSizeEx`.
+- `ReadFile`.
+- `CloseHandle`.
+- Archive copy into the arena.
+- `voodka.dat` name resolution.
+- Bounds and overflow checks.
+
+The inner archive indexing is already handled by the NASM core and should not
+be redesigned.
+
+### Major risks
+
+- 64-bit file-size truncation.
+- UTF-16 path handling.
+- Malformed archive lengths.
+- Arena exhaustion.
+- Accidental changes to allocation offsets.
+- Changed zero-initialization behavior.
+
+### Validation
+
+- Arena allocation offsets match the C++ implementation.
+- All 76 archive entries decode identically.
+- Staged output runs without the development tree.
+- Missing and malformed files fail cleanly.
+- Full-demo arena addresses and asset contents remain compatible.
+
+### Go/no-go milestone G5
+
+Go only if all assets load from the self-contained runtime directory and the
+complete demo remains frame-equivalent.
+
+---
+
+## Phase 6 — Assembly utility services
+
+Only after the difficult runtime gates pass, convert the low-risk services.
+
+### Scope
+
+Replace:
+
+- `port/platform/input.cpp`
+- `port/platform/timer.cpp`
+- `port/platform/log.cpp`
+- `port/platform/progress.cpp`
+- `port/platform/pause.cpp`
+- Simple portions of `port/platform/app.cpp`
+
+Implement:
+
+- 128-entry scancode table.
+- Message-to-scancode mapping.
+- QPC timing.
+- Sleep and spin pacing.
+- Scene-table lookup.
+- Elapsed-time formatting.
+- File logging.
+- Fixed-size formatting routines.
+- Pause state and interlocked toggle count.
+
+### Major risks
+
+- Timing drift.
+- Incorrect `wait_vbl` delta semantics.
+- Log formatter buffer overruns.
+- Changed pause behavior.
+- Key auto-repeat differences.
+- Incorrect scene-title transitions.
+
+### Validation
+
+- Compare frame pacing over complete runs.
+- Compare ModPos/frame timing.
+- Test key repeat and window activation.
+- Pause and resume in every part.
+- Log from both main and audio threads.
+- Run without a debugger attached.
+
+### Go/no-go milestone G6
+
+Go only if timing, pause, input, and diagnostics remain behaviorally identical
+and no CRT functions are required.
+
+---
+
+## Phase 7 — Remove the C++ production application
+
+### Scope
+
+Replace the remaining application shell:
+
+- `app.cpp`
+- Remaining presenter adapters.
+- Remaining audio adapters.
+- Remaining bridge code.
+
+The production target should contain only:
+
+```text
+NASM core
+NASM Windows/platform layer
+NASM dedicated audio player
+embedded/generated binary data
+Windows import libraries
+precompiled shader bytecode
+```
+
+The repository may still build:
+
+```text
+asset_viewer
+VIRTUAL
+vodka_pack
+world_pack
+sin_tables
+validators
+```
+
+### Build changes
+
+- Remove C++ sources from the `VOODKA` target.
+- Remove `xmp_static` from the `VOODKA` link.
+- Remove libxmp from the default production dependency graph.
+- Keep libxmp only in a temporary reference configuration until G2 passes.
+- Use a custom assembly entry point.
+- Explicitly control `/SUBSYSTEM`, `/ENTRY`, and default-library behavior.
+- Audit for accidental CRT imports.
+- Generate a linker map for every Release build.
+
+### Final structural checks
+
+- No `.cpp` or `.c` object appears in the `VOODKA` link map.
+- No `xmp_*` symbols.
+- No C++ mangled symbols.
+- No unexpected CRT, exception, or C++ runtime imports.
+- No unresolved assembly ABI stubs.
+- All production data paths are intentional.
+
+### Go/no-go milestone G7
+
+Go only if the assembly-only production target builds, starts, plays, renders,
+seeks, pauses, and shuts down without any C or C++ implementation object.
+
+---
+
+## Phase 8 — Final fidelity and maintainability qualification
+
+### Functional validation
+
+- Full eight-part playback.
+- Normal audio.
+- Headless audio mode.
+- Every supported seek mode.
+- Pause and resume.
+- Window close during each scene.
+- Multiple monitor and DPI configurations.
+- Repeated launch and shutdown.
+- Audio-device failure.
+- D3D initialization failure.
+- Missing or corrupt archive.
+- Long-duration run.
+
+### Fidelity validation
+
+- Phase-aligned framebuffer comparison.
+- Palette byte comparison.
+- GPU readback comparison.
+- P4 rasterizer randomized comparison.
+- ModPos trace comparison.
+- Full PCM comparison where possible.
+- Perceptual and spectral audio comparison where exact PCM differs.
+- Scene-boundary timing comparison.
+- No additional dropped frames or audio underruns.
+
+### Maintainability requirements
+
+Assembly-only is maintainable only if the project retains:
+
+- One documented ABI include.
+- Generated Windows and D3D constants.
+- Explicit ownership tables.
+- Resource-release paths.
+- Unwind metadata.
+- C++ reference tests.
+- Host-side asset and module analysis tools.
+- Link-map and import audits.
+- Frame and audio regression artifacts.
+
+The helper tools and validators should remain. They are not part of the
+production executable and are important evidence that future assembly changes
+preserve behavior.
+
+### Go/no-go milestone G8
+
+The project qualifies as a stable assembly Windows demo only if:
+
+- `VOODKA.exe` contains no C or C++ production objects.
+- libxmp is absent from the production build.
+- D3D11 and WASAPI paths are stable.
+- The dedicated tracker player passes audio and ModPos validation.
+- Full playback remains visually and temporally equivalent.
+- Shutdown and crash behavior are reliable.
+- The assembly code has documented ABI, ownership, and validation contracts.
+
+## Feasibility checkpoint and schedule
+
+The shortest credible route to answering the central question is:
+
+1. Phase 0: baseline and contracts.
+2. Phase 1: D3D11/COM assembly vertical slice.
+3. Phase 2: dedicated assembly audio vertical slice.
+4. Phase 3: pure Win32/thread/SEH probe.
+
+Those gates may require several months. If they pass, the remaining migration
+is difficult but credible. A complete migration of `VOODKA.exe` is roughly an
+8–14 person-month effort for one experienced developer, with the dedicated
+audio player representing approximately one-third to one-half of the work.
+
+If G1, G2, or G3 fails, retain the hybrid assembly-core/C++-platform build.
+There is little value in converting allocators, logging, or input if the
+production executable cannot reliably present frames, play the soundtrack, and
+operate as a native assembly Windows process.

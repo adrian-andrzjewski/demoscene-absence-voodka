@@ -33,6 +33,7 @@ namespace vk {
 // ---- arena memory ----------------------------------------------------------
 uint8_t* arena();                     // base of the demo arena
 bool     platformInit();              // allocate arena + layout overlay regions
+void     platformShutdown();          // release the arena and archive
 uint32_t arenaAlloc(uint32_t bytes);  // allocate zeroed block -> offset (linear)
 void     arenaFree(uint32_t offset);  // no-op free (mark released)
 // packaged data archive (vodka.dat): Load_internal_file equivalent.
@@ -48,6 +49,8 @@ enum { kPaletteBytes = 768 };
 extern const uint32_t kFramebufferOffset;   // arena offset of presented frame
 extern const uint32_t kBackbufferOffset;    // arena offset of offscreen buffer
 bool initPresent(void* hwnd, int w, int h); // create D3D11 swapchain + resources
+void shutdownPresent();                       // release all D3D11 resources
+void setAssemblyPresenter(bool enabled);     // select the Phase 1 NASM presenter
 void setPalette(const uint8_t r[256], const uint8_t g[256], const uint8_t b[256]);
 void currentPalette(uint8_t out[768]);  // copy current 6->8 stored palette
 void presentFrame();                      // palette+frame -> D3D11 -> present
@@ -84,6 +87,8 @@ void pauseToggle();         // toggle pause (WndProc Space key-down edge)
 
 // ---- input -----------------------------------------------------------------
 // PC scancode -> pressed (1)/released(0), mirrors EOS Key_Map.
+bool inputInit(void* hwnd);       // start the global ESC watcher
+void inputShutdown();             // stop and join the watcher
 int  isKeyDown(int scancode);
 void updateInput();           // pump Win32 messages; call each frame
 void keyDown(uint8_t sc);     // Win32 WndProc hook
@@ -99,7 +104,8 @@ bool escapeQueued();
 // WM_QUIT message. It is recorded here; the per-frame choke points
 // (waitVbl / presentFrame) observe it and run a full deterministic teardown.
 void requestQuit();          // mark a quit request (earliest source wins)
-bool quitRequested();        // a WM_QUIT / window-close is pending
+bool quitRequested();        // ESC or a window-close is pending
+void resetSelectors();       // release the emulated selector table
 
 // ---- audio (libxmp MOD player) ----------------------------------------------
 int  audioInit(const char* modFilePath, int sampleRate);
@@ -138,12 +144,14 @@ int  audioSelfCheck(int seconds);
 void logInit();                        // open debugger + voodka.log (once)
 void logPrint(const char* fmt, ...);      // printf-style to debugger+file
 void logFlush();
+void logShutdown();                    // flush, close file, delete lock
 
 // ---- shutdown / exit ---------------------------------------------------------
 // Deterministic wind-down, identical to the end-of-demo path in app.cpp:
-// recording + readback outputs closed, the audio render thread stopped/joined
-// and WASAPI released, log flushed. shutdownAndExit() additionally terminates
-// the process so nothing outlives the closed window.
+// input/audio workers stopped and joined, recording/readback outputs closed,
+// D3D11/selector/arena state released, the window destroyed, and the log
+// closed. shutdownAndExit() additionally terminates the process so nothing
+// outlives the closed window or assembly demo stack.
 void shutdownAll();          // release all subsystems (safe on normal exit)
 void shutdownAndExit();      // shutdownAll() then terminate the process
 

@@ -239,7 +239,9 @@ Controls:
 
 - **Space** pauses or resumes the demo, including its retrace-paced timeline
   and audio.
-- **Esc** quits, following the original's scene-dependent input convention.
+- **Esc** exits immediately from every scene, effect, loading phase, and
+  playback position. It stops audio/rendering, joins worker threads, releases
+  platform resources, closes the window, and terminates the process.
 - The window is intentionally topmost; normal Alt+Tab switching remains
   available.
 
@@ -344,8 +346,9 @@ be the same hardware:
 - The regenerated sine table uses the mathematically equivalent port table
   where the original source table is absent; the measured deviation is small
   and documented.
-- Space-to-pause is a small port addition. Esc and the scene's input behavior
-  otherwise follow the original PC scancode contract.
+- Space-to-pause is a small port addition. ESC is intentionally a global
+  platform quit override so it remains reliable while the assembly core is
+  loading or rendering a scene that does not consume keyboard input.
 
 The archive, world records, mesh decoders, palettes, camera data, rasterizer
 math, effects, synchronized flashes, and final presentation stages are covered

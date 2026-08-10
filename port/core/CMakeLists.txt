@@ -2,6 +2,8 @@
 
 set(VOODKA_CORE_ASM
     eos_replace/eos_dispatch.asm
+    eos_replace/d3d11_asm_probe.asm
+    eos_replace/d3d11_asm_present.asm
     eos_replace/boot.asm
     eos_replace/toonel.asm
     inc/globals.asm
@@ -42,6 +44,7 @@ set_source_files_properties(parts/p4.asm PROPERTIES
 
 # NASM include paths
 target_include_directories(voodka_core PUBLIC
+    "${VOODKA_GENERATED_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/eos_replace"
     "${CMAKE_CURRENT_SOURCE_DIR}/inc"
     "${CMAKE_CURRENT_SOURCE_DIR}/parts"
@@ -51,3 +54,4 @@ target_include_directories(voodka_core PUBLIC
 
 # sine tables are generated at configure->build time before assembling
 add_dependencies(voodka_core voodka_sin)
+add_dependencies(voodka_core voodka_shaders)

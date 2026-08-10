@@ -189,3 +189,9 @@ void vk_key_map_copy(uint8_t* dst) {
 }
 
 } // extern "C"
+
+namespace vk {
+void resetSelectors() {
+    std::memset(sel_base_table, 0, sizeof sel_base_table);
+}
+} // namespace vk

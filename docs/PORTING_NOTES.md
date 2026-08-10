@@ -203,13 +203,19 @@ pointer advancement.**
   (`kPartStartModPos` in `app.cpp`) are calibration-tuned - see
   `docs/KNOWN_DIFFERENCES.md`.
 
-## Lifecycle / window close (the quit path)
+## Lifecycle / global quit (the quit path)
 
 - `DemoStart32` (**and every part loop inside it**) runs on the main thread
-  and never checks a quit flag - the original demo only ever exited when the
-  timeline ran out. A titlebar-X close therefore must not just destroy the
-  window (`WM_DESTROY -> PostQuitMessage`); something still on the main
-  thread has to notice and run the teardown.
+  and the original demo only ever exited when the timeline ran out. ESC is
+  therefore handled by the platform layer, not by scene-specific `Key_Map`
+  consumers. A titlebar-X close likewise must not just destroy the window
+  (`WM_DESTROY -> PostQuitMessage`); something still on the main thread has to
+  notice and run the teardown.
+- `input.cpp` starts a small Win32 watchdog before archive/module/scene
+  loading. It watches `VK_ESCAPE` with `GetAsyncKeyState` and sets the same
+  atomic quit request as `WndProc`, so ESC is not dependent on the per-frame
+  message pump. `waitVbl` checks the request during its pacing spin and
+  `presentFrame` checks it before touching D3D11 state.
 - The chain: `WM_CLOSE` (explicit in `app.cpp`'s `WndProc`) -> `DestroyWindow`
   -> `WM_DESTROY` -> `PostQuitMessage(0)` -> **`WM_QUIT`** lands in
   `updateInput()` (called from `waitVbl` and `presentFrame` every frame).
@@ -217,12 +223,13 @@ pointer advancement.**
   dispatching - `WM_QUIT` has no window.
 - The per-frame choke points (`waitVbl` in `timer.cpp` - including its
   pause-park loop - and `presentFrame`) call `vk::shutdownAndExit()` when a
-  quit is pending: `recClose` -> `diagReadbackShutdown` -> `audioShutdown`
-  (stops the WASAPI thread, joins it, releases libxmp/COM) -> `logFlush` ->
-  `ExitProcess(0)`. `ExitProcess` is deliberate: the demo core is still on
-  the stack (assembly frames have no unwind info), so a normal return cannot
-  reach `WinMain`'s tail. `WinMain`'s tail path is the same `vk::shutdownAll()`
-  minus the exit, so both routes run one shared teardown sequence.
+  quit is pending. The idempotent sequence stops/join the input and WASAPI
+  workers, closes recording/readback files, releases D3D11 resources, clears
+  selector state, frees the arena/archive, destroys the window, flushes and
+  closes the log, then calls `ExitProcess(0)`. `ExitProcess` is deliberate:
+  the demo core is still on the stack (assembly frames have no unwind info),
+  so a normal return cannot reach `WinMain`'s tail. The normal tail uses the
+  same `vk::shutdownAll()` sequence without the process exit.
 
 ## Build hygiene
 

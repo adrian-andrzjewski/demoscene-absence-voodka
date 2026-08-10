@@ -38,6 +38,8 @@ constexpr int kChannels   = 2;
 constexpr UINT32 kBufMs   = 60;      // WASAPI buffer length (headroom vs dropouts)
 
 xmp_context g_xmp = nullptr;
+bool        g_xmpCsInitialized = false;
+bool        g_comInitialized = false;
 HANDLE      g_thread = nullptr;
 HANDLE      g_stop = nullptr;        // set to stop the render thread
 HANDLE      g_event = nullptr;       // buffer-ready event (event-driven WASAPI)
@@ -510,15 +512,22 @@ static bool setupWasapi() {
 
 int audioInit(const char* modPath, int) {
     if (!modPath) return 0;
+    if (g_xmp) return 1;
     InitializeCriticalSection(&g_xmpCs);
+    g_xmpCsInitialized = true;
 
     g_xmp = xmp_create_context();
-    if (!g_xmp) { DeleteCriticalSection(&g_xmpCs); return 0; }
+    if (!g_xmp) {
+        DeleteCriticalSection(&g_xmpCs);
+        g_xmpCsInitialized = false;
+        return 0;
+    }
 
     if (!loadModule(modPath)) {
         xmp_free_context(g_xmp);
         g_xmp = nullptr;
         DeleteCriticalSection(&g_xmpCs);
+        g_xmpCsInitialized = false;
         return 0;
     }
     computeRowsPerLoop();
@@ -528,13 +537,15 @@ int audioInit(const char* modPath, int) {
     if (skipDevice) {
         logPrint("[audio] audio disabled (VOODKA_NOAUDIO); headless silent mode\n");
     } else {
-        CoInitializeEx(nullptr, COINIT_MULTITHREADED);
-        if (setupWasapi()) {
+        HRESULT co = CoInitializeEx(nullptr, COINIT_MULTITHREADED);
+        g_comInitialized = SUCCEEDED(co);
+        if (g_comInitialized && setupWasapi()) {
             g_stop = CreateEventA(nullptr, TRUE, FALSE, nullptr);
             g_event = CreateEventA(nullptr, FALSE, FALSE, nullptr);
             if (g_stop && g_event && SUCCEEDED(g_ac->SetEventHandle(g_event))) {
                 g_thread = CreateThread(nullptr, 0, renderThread, nullptr, 0, nullptr);
-                SetThreadPriority(g_thread, THREAD_PRIORITY_ABOVE_NORMAL);
+                if (g_thread)
+                    SetThreadPriority(g_thread, THREAD_PRIORITY_ABOVE_NORMAL);
             } else {
                 logPrint("[audio] could not create render thread; falling back to headless\n");
                 g_thread = nullptr;
@@ -552,8 +563,15 @@ int audioInit(const char* modPath, int) {
 void audioShutdown() {
     InterlockedExchange(&g_playing, 0);
     if (g_stop) SetEvent(g_stop);
-    if (g_thread) WaitForSingleObject(g_thread, 3000);
-    if (g_xmp) {
+    if (g_thread) {
+        // The process must not outlive the render thread. The stop event is
+        // observed by the event-driven loop, so an unbounded join is both
+        // deterministic and safer than closing live WASAPI/libxmp state.
+        WaitForSingleObject(g_thread, INFINITE);
+        CloseHandle(g_thread);
+        g_thread = nullptr;
+    }
+    if (g_xmp && g_xmpCsInitialized) {
         EnterCriticalSection(&g_xmpCs);
         xmp_end_player(g_xmp);
         xmp_release_module(g_xmp);
@@ -563,10 +581,20 @@ void audioShutdown() {
     }
     if (g_arc) g_arc->Release();
     if (g_ac)  g_ac->Release();
+    g_arc = nullptr;
+    g_ac = nullptr;
     if (g_event) CloseHandle(g_event);
     if (g_stop) CloseHandle(g_stop);
-    DeleteCriticalSection(&g_xmpCs);
-    CoUninitialize();
+    g_event = nullptr;
+    g_stop = nullptr;
+    if (g_xmpCsInitialized) {
+        DeleteCriticalSection(&g_xmpCs);
+        g_xmpCsInitialized = false;
+    }
+    if (g_comInitialized) {
+        CoUninitialize();
+        g_comInitialized = false;
+    }
     InterlockedExchange(&g_posBase, 0);
     InterlockedExchange(&g_prevOrder, -1);
     InterlockedExchange(&g_order, 0);
@@ -610,8 +638,8 @@ int audioSelfCheck(int seconds) {
         // letting the process linger; WinMain's tail shuts audio down after.
         updateInput();
         if (quitRequested()) {
-            logPrint("[audio] self-check aborted (window closed)\n");
-            return 0;
+            logPrint("[audio] self-check aborted (ESC/window close)\n");
+            shutdownAndExit();   // does not return
         }
         audioPump();
         if (g_stop && WaitForSingleObject(g_stop, 10) == WAIT_OBJECT_0) break;

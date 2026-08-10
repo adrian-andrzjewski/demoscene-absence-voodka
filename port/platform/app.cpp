@@ -38,6 +38,9 @@ constexpr const wchar_t* kWinClass = L"VOODKA";
 // (nearest-neighbour, no filtering), so each source texel is a clean 4x4 block.
 constexpr int kWinW = 1280;
 constexpr int kWinH = 800;
+HWND g_hwnd = nullptr;
+HINSTANCE g_hInst = nullptr;
+volatile LONG g_shutdownStarted = 0;
 }
 
 // ---- music module path resolution ------------------------------------------
@@ -106,12 +109,14 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
         // also destroys, but spelling it out keeps the intent clear): the
         // window goes away immediately and WM_DESTROY -> PostQuitMessage
         // posts the WM_QUIT that the demo loop turns into a full shutdown.
+        vk::requestQuit();
         DestroyWindow(h);
         return 0;
     case WM_DESTROY:
         // PostQuitMessage(0) posts WM_QUIT to the thread's queue. updateInput()
         // (per frame) picks it up and flags the pending quit; waitVbl /
         // presentFrame then run the teardown and terminate the process.
+        vk::requestQuit();
         PostQuitMessage(0);
         return 0;
     }
@@ -119,6 +124,7 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 }
 
 int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
+    g_hInst = hInst;
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
 
@@ -131,6 +137,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     const char* recDir = nullptr;
     const char* diagDir = nullptr;
     const char* musicOverride = nullptr;
+    bool asmPresenter = false;
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
         std::string f = "--" + std::string(flag);
         auto p = cmd.find(f);
@@ -148,9 +155,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         recDir = argDirOf(cmd, "record");
         diagDir = argDirOf(cmd, "diag");
         musicOverride = argDirOf(cmd, "music");
+        asmPresenter = cmd.find("--asm-present") != std::string::npos;
         if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
+        if (asmPresenter) vk::logPrint("[app] --asm-present selected\n");
     }
 
     // ---- register window ------------------------------------------------
@@ -162,6 +171,7 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     wc.hbrBackground = (HBRUSH)GetStockObject(BLACK_BRUSH);
     if (!RegisterClassW(&wc)) {
         vk::logPrint("[app] RegisterClassW failed\n");
+        vk::shutdownAll();
         return 1;
     }
     RECT rc{0, 0, kWinW, kWinH};
@@ -210,8 +220,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
                                 nullptr, nullptr, hInst, nullptr);
     if (!hwnd) {
         vk::logPrint("[app] CreateWindowW failed\n");
+        vk::shutdownAll();
         return 1;
     }
+    g_hwnd = hwnd;
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
     // Cement the z-order and hand the window input focus so it comes up on top
@@ -223,21 +235,36 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     SetFocus(hwnd);
     vk::progressInit(hwnd);
 
+    // Start before any archive/module/scene loading. The assembly core can
+    // spend time in those paths without dispatching the window queue, so ESC
+    // must not depend on a particular effect reaching its next frame.
+    if (!vk::inputInit(hwnd)) {
+        vk::logPrint("[app] input watcher init failed\n");
+        vk::shutdownAll();
+        return 1;
+    }
+
     // ---- init subsystems ---------------------------------------------------
     if (!vk::platformInit()) {
         vk::logPrint("[app] arena init failed\n");
+        vk::shutdownAll();
         return 1;
     }
+    if (vk::quitRequested()) vk::shutdownAndExit();
     vk::timerInit();
     vk::recInit(recDir);
     std::string musicPath = resolveMusicPath(musicOverride);
     vk::logPrint("[app] music module: '%s'\n", musicPath.empty() ? "(none)" : musicPath.c_str());
     vk::audioInit(musicPath.c_str(), 44100);
+    if (vk::quitRequested()) vk::shutdownAndExit();
+    vk::setAssemblyPresenter(asmPresenter);
     if (!vk::initPresent(hwnd, kWinW, kWinH)) {
         vk::logPrint("[app] D3D11 init failed\n");
+        vk::shutdownAll();
         return 1;
     }
     vk::diagReadbackInit(diagDir);
+    if (vk::quitRequested()) vk::shutdownAndExit();
 
     // ---- entry-point seeking -----------------------------------------------
     // The demo may begin from a scene in the middle of the timeline; the music
@@ -334,16 +361,32 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
 namespace vk {
 
 // Full deterministic wind-down; the single teardown sequence shared by the
-// normal end-of-demo path (above) and the window-close exit path. Order:
-// 1. recording + readback output files closed (nothing half-written),
-// 2. audio thread stopped + joined  and WASAPI released (sound halts,
-//    no background audio thread survives),
-// 3. log flushed to disk.
+// normal end-of-demo path and the ESC/window-close exit path. It is idempotent
+// because startup failures and the normal tail can both reach it.
 void shutdownAll() {
+    if (InterlockedExchange(&g_shutdownStarted, 1) != 0)
+        return;
+
+    vk::logPrint("[app] shutting down all subsystems\n");
+    vk::inputShutdown();
+    vk::audioShutdown();
     vk::recClose();
     vk::diagReadbackShutdown();
-    vk::audioShutdown();
+    vk::shutdownPresent();
+    vk::resetSelectors();
+    vk::platformShutdown();
+
+    if (g_hwnd) {
+        HWND h = g_hwnd;
+        g_hwnd = nullptr;
+        if (IsWindow(h)) DestroyWindow(h);
+    }
+    if (g_hInst) {
+        UnregisterClassW(kWinClass, g_hInst);
+        g_hInst = nullptr;
+    }
     vk::logFlush();
+    vk::logShutdown();
 }
 
 // Window closed mid-demo: called from the per-frame choke points (waitVbl /
@@ -351,7 +394,7 @@ void shutdownAll() {
 // teardown as the end-of-demo path, then terminates the process so no demo
 // loop, audio thread or other background activity outlives the closed window.
 void shutdownAndExit() {
-    vk::logPrint("[app] window closed - shutting down\n");
+    vk::logPrint("[app] quit requested (ESC/window close) - shutting down\n");
     vk::shutdownAll();
     ExitProcess(0);
 }

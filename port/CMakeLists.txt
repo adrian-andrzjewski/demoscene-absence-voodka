@@ -49,13 +49,34 @@ add_executable(tabl2nasm  tools/vodka_pack/tabl2nasm.cpp)
 add_executable(frames2img  tools/validate/frames2img.cpp)
 add_executable(sin_tables tools/vodka_pack/sin_tables.cpp)
 add_executable(world_pack tools/world_pack/world_pack.cpp)
+add_executable(d3d11_shader_compile tools/validate/d3d11_shader_compile.cpp)
 if(MSVC)
     target_compile_options(vodka_pack PRIVATE /W4)
     target_compile_options(tabl2nasm  PRIVATE /W4)
     target_compile_options(frames2img PRIVATE /W4)
     target_compile_options(sin_tables PRIVATE /W4)
     target_compile_options(world_pack PRIVATE /W4)
+    target_compile_options(d3d11_shader_compile PRIVATE /W4)
 endif()
+target_link_libraries(d3d11_shader_compile PRIVATE d3dcompiler)
+
+set(VOODKA_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
+set(VOODKA_D3D11_VS_CSO "${VOODKA_GENERATED_DIR}/voodka_present_vs.cso")
+set(VOODKA_D3D11_PS_CSO "${VOODKA_GENERATED_DIR}/voodka_present_ps.cso")
+file(MAKE_DIRECTORY "${VOODKA_GENERATED_DIR}")
+configure_file(
+    "${CMAKE_SOURCE_DIR}/core/eos_replace/d3d11_shader_paths.inc.in"
+    "${VOODKA_GENERATED_DIR}/d3d11_shader_paths.inc" @ONLY)
+add_custom_command(
+    OUTPUT "${VOODKA_D3D11_VS_CSO}" "${VOODKA_D3D11_PS_CSO}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${VOODKA_GENERATED_DIR}"
+    COMMAND $<TARGET_FILE:d3d11_shader_compile>
+            "${VOODKA_D3D11_VS_CSO}" "${VOODKA_D3D11_PS_CSO}"
+    DEPENDS d3d11_shader_compile
+    COMMENT "Compiling embedded D3D11 presenter shaders"
+    VERBATIM)
+add_custom_target(voodka_shaders DEPENDS
+    "${VOODKA_D3D11_VS_CSO}" "${VOODKA_D3D11_PS_CSO}")
 
 add_custom_command(
     OUTPUT "${VOODKA_DAT}"
@@ -415,5 +436,22 @@ add_subdirectory(tools/asset_viewer)
 # ---- platform layer + assembly core (phases >0) -----------------------------
 add_subdirectory(core)
 add_subdirectory(platform)
+
+# Phase 1 feasibility gate: the host creates only a hidden HWND and COM
+# apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
+# Release sequence are implemented directly in NASM.
+add_executable(d3d11_asm_probe tools/validate/d3d11_asm_probe.cpp)
+target_compile_definitions(d3d11_asm_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(d3d11_asm_probe PRIVATE
+    voodka_core d3d11 dxgi ole32 user32 gdi32
+)
+add_test(NAME d3d11.asm_probe COMMAND d3d11_asm_probe)
+
+add_executable(d3d11_asm_present_probe tools/validate/d3d11_asm_present_probe.cpp)
+target_compile_definitions(d3d11_asm_present_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(d3d11_asm_present_probe PRIVATE
+    voodka_core d3d11 dxgi ole32 user32 gdi32
+)
+add_test(NAME d3d11.asm_present_probe COMMAND d3d11_asm_present_probe)
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

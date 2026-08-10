@@ -13,6 +13,7 @@
 #include <cstdio>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #pragma comment(lib, "d3d11.lib")
 #pragma comment(lib, "d3dcompiler.lib")
@@ -38,6 +39,14 @@ D3D11_VIEWPORT          g_vp{};
 
 // platform-side copy of the 256-entry palette (fades update it constantly)
 uint8_t g_pal[768] = {};
+bool g_asmPresenter = false;
+
+extern "C" uint32_t asm_present_init(void* hwnd, uint32_t width, uint32_t height);
+extern "C" void asm_present_set_palette(const uint8_t* rgb6);
+extern "C" uint32_t asm_present_draw(const uint8_t* arenaBase, uint32_t framebufferOffset);
+extern "C" uint32_t asm_present_readback(uint8_t* out, uint32_t capacity);
+extern "C" int32_t asm_present_present(void);
+extern "C" void asm_present_shutdown(void);
 }
 
 static const char kVS[] =
@@ -58,12 +67,32 @@ static const char kPS[] =
 
 struct Vertex { float x, y, u, v; };
 
+void shutdownPresent();
+
+void setAssemblyPresenter(bool enabled) {
+    // This is intentionally a pre-init selection.  Switching ownership while
+    // live would leave two independent COM resource sets active.
+    g_asmPresenter = enabled;
+    logPrint("[d3d] presenter=%s\n", enabled ? "native x64 assembly" : "C++ reference");
+}
+
 bool initPresent(void* hwnd, int winW, int winH) {
     logPrint("[d3d] initPresent(%p,%d,%d)\n", hwnd, winW, winH);
+
     g_vp.Width = (FLOAT)winW;
     g_vp.Height = (FLOAT)winH;
     g_vp.MinDepth = 0.0f;
     g_vp.MaxDepth = 1.0f;
+
+    if (g_asmPresenter) {
+        uint32_t result = asm_present_init(hwnd, (uint32_t)winW, (uint32_t)winH);
+        if (result != 0) {
+            logPrint("[d3d] assembly presenter init failed (%u)\n", result);
+            return false;
+        }
+        logPrint("[d3d] assembly presenter ready\n");
+        return true;
+    }
 
     DXGI_SWAP_CHAIN_DESC sd{};
     sd.BufferCount = 2;
@@ -80,7 +109,11 @@ bool initPresent(void* hwnd, int winW, int winH) {
     HRESULT hr = D3D11CreateDeviceAndSwapChain(
         nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0,
         &lvl, 1, D3D11_SDK_VERSION, &sd, &g_swap, &g_dev, nullptr, &g_ctx);
-    if (FAILED(hr)) { logPrint("[d3d] CreateDeviceAndSwapChain failed %08x\n", (unsigned)hr); return false; }
+    if (FAILED(hr)) {
+        logPrint("[d3d] CreateDeviceAndSwapChain failed %08x\n", (unsigned)hr);
+        shutdownPresent();
+        return false;
+    }
     logPrint("[d3d] device+swapchain OK\n");
 
     // ---- R8 index texture 320x200 --------------------------------------
@@ -92,14 +125,26 @@ bool initPresent(void* hwnd, int winW, int winH) {
     td.Usage = D3D11_USAGE_DYNAMIC;
     td.BindFlags = D3D11_BIND_SHADER_RESOURCE;
     td.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-    if (FAILED(g_dev->CreateTexture2D(&td, nullptr, &g_indexTex))) return false;
-    if (FAILED(g_dev->CreateShaderResourceView(g_indexTex, nullptr, &g_indexSrv))) return false;
+    if (FAILED(g_dev->CreateTexture2D(&td, nullptr, &g_indexTex))) {
+        shutdownPresent();
+        return false;
+    }
+    if (FAILED(g_dev->CreateShaderResourceView(g_indexTex, nullptr, &g_indexSrv))) {
+        shutdownPresent();
+        return false;
+    }
 
     // ---- palette texture 256x1 RGBA ------------------------------------
     td.Width = 256; td.Height = 1;
     td.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-    if (FAILED(g_dev->CreateTexture2D(&td, nullptr, &g_palTex))) return false;
-    if (FAILED(g_dev->CreateShaderResourceView(g_palTex, nullptr, &g_palSrv))) return false;
+    if (FAILED(g_dev->CreateTexture2D(&td, nullptr, &g_palTex))) {
+        shutdownPresent();
+        return false;
+    }
+    if (FAILED(g_dev->CreateShaderResourceView(g_palTex, nullptr, &g_palSrv))) {
+        shutdownPresent();
+        return false;
+    }
 
     // ---- shaders ---------------------------------------------------------
     ID3DBlob *vsb = nullptr, *psb = nullptr;
@@ -109,6 +154,9 @@ bool initPresent(void* hwnd, int winW, int winH) {
                              "ps_4_0", 0, 0, &psb, nullptr);
     if (FAILED(hvs) || FAILED(hps)) {
         logPrint("[d3d] shader compile failed vs=%08x ps=%08x\n", (unsigned)hvs, (unsigned)hps);
+        if (vsb) vsb->Release();
+        if (psb) psb->Release();
+        shutdownPresent();
         return false;
     }
     g_dev->CreateVertexShader(vsb->GetBufferPointer(), vsb->GetBufferSize(), nullptr, &g_vs);
@@ -119,6 +167,8 @@ bool initPresent(void* hwnd, int winW, int winH) {
         {"TEX", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 8, D3D11_INPUT_PER_VERTEX_DATA, 0},
     };
     g_dev->CreateInputLayout(elems, 2, vsb->GetBufferPointer(), vsb->GetBufferSize(), &g_il);
+    vsb->Release();
+    psb->Release();
 
     Vertex verts[6] = {
         {-1,-1,0,1}, { 1,-1,1,1}, {-1, 1,0,0},
@@ -130,7 +180,10 @@ bool initPresent(void* hwnd, int winW, int winH) {
     bd.BindFlags = D3D11_BIND_VERTEX_BUFFER;
     D3D11_SUBRESOURCE_DATA srd{};
     srd.pSysMem = verts;
-    if (FAILED(g_dev->CreateBuffer(&bd, &srd, &g_vb))) return false;
+    if (FAILED(g_dev->CreateBuffer(&bd, &srd, &g_vb))) {
+        shutdownPresent();
+        return false;
+    }
 
     D3D11_SAMPLER_DESC smd{};
     // Set EVERY field: the zero-init'ed desc leaves AddressW (mode 0 is not a
@@ -168,6 +221,7 @@ bool initPresent(void* hwnd, int winW, int winH) {
     ID3D11Texture2D* back = nullptr;
     if (FAILED(g_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back))) {
         logPrint("[d3d] GetBuffer for RTV failed\n");
+        shutdownPresent();
         return false;
     }
     g_dev->CreateRenderTargetView(back, nullptr, &g_rtv);
@@ -184,6 +238,7 @@ void setPalette(const uint8_t r[256], const uint8_t g[256], const uint8_t b[256]
         g_pal[i * 3 + 1] = g[i] & 63;
         g_pal[i * 3 + 2] = b[i] & 63;
     }
+    if (g_asmPresenter) asm_present_set_palette(g_pal);
 }
 
 void currentPalette(uint8_t out[768]) {
@@ -239,6 +294,14 @@ void diagReadbackInit(const char* dir) {
     g_diagIn   = fopen((base + "\\frame_gpu.raw").c_str(), "wb");
     g_diagSrc  = fopen((base + "\\frame_src.raw").c_str(), "wb");
     g_diagPal  = fopen((base + "\\frame_pal.raw").c_str(), "wb");
+    // The assembly presenter owns its staging texture.  The C++ side still
+    // owns the diagnostic files and asks the assembly side for a tight copy.
+    if (g_asmPresenter) {
+        if (g_diagIn && g_diagSrc && g_diagPal)
+            logPrint("[d3d] assembly readback diagnostics on -> %s\n", dir);
+        return;
+    }
+
     // staging texture matching the swapchain (R8G8B8A8)
     auto td = [](UINT w, UINT h) {
         D3D11_TEXTURE2D_DESC d{}; d.Width = w; d.Height = h;
@@ -259,17 +322,39 @@ void diagReadbackShutdown() {
     if (g_diagSrc) fclose(g_diagSrc);
     if (g_diagPal) fclose(g_diagPal);
     if (g_diagStaging) g_diagStaging->Release();
+    g_diagIn = nullptr;
+    g_diagSrc = nullptr;
+    g_diagPal = nullptr;
+    g_diagStaging = nullptr;
     g_diagInit = false;
+    g_diagCaptured = 0;
+    g_diagCount = 0;
 }
 bool diagReadbackEnabled() { return g_diagInit; }
 
 static void diagCapture(const uint8_t* srcFrame) {
-    if (!g_diagInit || !g_diagStaging || g_diagCaptured >= 4) return;
+    if (!g_diagInit || g_diagCaptured >= 4) return;
     g_diagCaptured++;
     // dump source framebuffer + palette
     fwrite(srcFrame, 1, kFramebufferBytes, g_diagSrc);
     fwrite(g_pal, 1, kPaletteBytes, g_diagPal);
     fflush(g_diagSrc); fflush(g_diagPal);
+
+    if (g_asmPresenter) {
+        const uint32_t w = (uint32_t)g_vp.Width;
+        const uint32_t h = (uint32_t)g_vp.Height;
+        std::vector<uint8_t> pixels((size_t)w * h * 4);
+        if (asm_present_readback(pixels.data(), (uint32_t)pixels.size()) == 0) {
+            fwrite(pixels.data(), 1, pixels.size(), g_diagIn);
+        } else {
+            logPrint("[d3d] assembly readback failed on diagnostic frame %d\n",
+                     g_diagCaptured);
+        }
+        fflush(g_diagIn);
+        return;
+    }
+
+    if (!g_diagStaging) return;
     // read back the presented swapchain back buffer
     ID3D11Texture2D* back = nullptr;
     if (SUCCEEDED(g_swap->GetBuffer(0, __uuidof(ID3D11Texture2D), (void**)&back))) {
@@ -303,7 +388,12 @@ static void recPush(const uint8_t* frame) {
 }
 
 void presentFrame() {
-    if (!g_ctx) return;
+    // Check before touching D3D state: ESC can be raised by the watchdog
+    // while the assembly is between presentation calls.
+    vk::updateInput();
+    if (vk::quitRequested())
+        vk::shutdownAndExit();   // does not return
+    if (!g_ctx && !g_asmPresenter) return;
     static long cnt = 0;
     if ((cnt++ & 0x3fff) == 0) logPrint("[d3d] presentFrame #%ld\n", cnt);
     // Pump Win32 messages so the window stays responsive and input (keyboard)
@@ -311,11 +401,27 @@ void presentFrame() {
     // is the single per-frame opportunity to service the message queue. If a
     // window-close (WM_QUIT) was observed, tear down and exit before touching
     // any D3D11 state this frame.
-    vk::updateInput();
-    if (vk::quitRequested())
-        vk::shutdownAndExit();   // does not return
     const uint8_t* frame = arena() + kFramebufferOffset;
     recPush(frame);
+
+    if (g_asmPresenter) {
+        // Self-test writes g_pal directly, while normal frames reach this
+        // point through vk_set_palette.  Re-submit the small palette every
+        // frame so both paths have identical ownership semantics.
+        asm_present_set_palette(g_pal);
+        uint32_t drawResult = asm_present_draw(arena(), kFramebufferOffset);
+        if (drawResult != 0) {
+            logPrint("[d3d] assembly presenter draw failed (%u)\n", drawResult);
+            return;
+        }
+        diagCapture(frame);
+        int32_t presentResult = asm_present_present();
+        if (presentResult != 0 && presentResult != (int32_t)0x087A0001) {
+            logPrint("[d3d] assembly Present failed (%08x)\n",
+                     (unsigned)presentResult);
+        }
+        return;
+    }
 
     // upload index texture from the arena framebuffer
     D3D11_MAPPED_SUBRESOURCE m{};
@@ -371,6 +477,50 @@ void presentFrame() {
     // two waits summed to ~31 fps. Present(0) tears at worst like real VGA
     // writes did, and the delta-driven animation keeps exact speed either way.
     g_swap->Present(0, 0);
+}
+
+void shutdownPresent() {
+    if (g_asmPresenter) {
+        asm_present_shutdown();
+        std::memset(g_pal, 0, sizeof g_pal);
+        return;
+    }
+
+    if (g_ctx) {
+        g_ctx->ClearState();
+        g_ctx->Flush();
+    }
+
+    if (g_rtv) g_rtv->Release();
+    if (g_ras) g_ras->Release();
+    if (g_samp) g_samp->Release();
+    if (g_ps) g_ps->Release();
+    if (g_vs) g_vs->Release();
+    if (g_il) g_il->Release();
+    if (g_vb) g_vb->Release();
+    if (g_palSrv) g_palSrv->Release();
+    if (g_palTex) g_palTex->Release();
+    if (g_indexSrv) g_indexSrv->Release();
+    if (g_indexTex) g_indexTex->Release();
+    if (g_swap) g_swap->Release();
+    if (g_ctx) g_ctx->Release();
+    if (g_dev) g_dev->Release();
+
+    g_rtv = nullptr;
+    g_ras = nullptr;
+    g_samp = nullptr;
+    g_ps = nullptr;
+    g_vs = nullptr;
+    g_il = nullptr;
+    g_vb = nullptr;
+    g_palSrv = nullptr;
+    g_palTex = nullptr;
+    g_indexSrv = nullptr;
+    g_indexTex = nullptr;
+    g_swap = nullptr;
+    g_ctx = nullptr;
+    g_dev = nullptr;
+    std::memset(g_pal, 0, sizeof g_pal);
 }
 
 }  // namespace vk

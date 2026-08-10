@@ -11,6 +11,7 @@ BITS 64
 DEFAULT REL
 
 %include "eos.inc"
+%include "win64_abi.inc"
 
 section .text
 
@@ -56,7 +57,7 @@ eos_dispatch:
         push    r14
         push    r15
         ; 8 pushes (incl rbp) -> rsp%16==8; sub 0x28 -> 0 at call sites
-        sub     rsp, 0x28
+        sub     rsp, WIN64_EOS_DISPATCH_CALL_FRAME_BYTES
 
         cmp     eax, EOS_QUERY_MEMORY
         je      .query_mem

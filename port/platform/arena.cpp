@@ -85,6 +85,17 @@ bool platformInit() {
     return true;
 }
 
+void platformShutdown() {
+    if (g_arena) {
+        VirtualFree(g_arena, 0, MEM_RELEASE);
+        g_arena = nullptr;
+    }
+    g_arenaCursor = 0;
+    g_archive.clear();
+    g_archive.shrink_to_fit();
+    g_arenaReady = false;
+}
+
 uint32_t arenaAlloc(uint32_t bytes) {
     // align to 16 to keep the demo's movsd loops happy
     bytes = (bytes + 15) & ~15u;

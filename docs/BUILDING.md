@@ -63,7 +63,7 @@ VOODKA.exe --diag <dir>        GPU readback diagnostics
 VOODKA.exe --audiocheck [sec]  audio subsystem self-check (default 20 s)
 VOODKA.exe --selftest          render the built-in test pattern
 Space                          pause/resume (freezes retrace + audio)
-Esc                            quit (scene-dependent, as in the original)
+Esc                            quit immediately from any scene/loading state
 ```
 
 `frames2img.exe` converts a `--record` `frames.raw` into PNG stills.

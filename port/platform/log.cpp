@@ -48,4 +48,13 @@ void logFlush() {
     }
 }
 
+void logShutdown() {
+    if (!g_logInit) return;
+    logFlush();
+    if (g_log != INVALID_HANDLE_VALUE) CloseHandle(g_log);
+    g_log = INVALID_HANDLE_VALUE;
+    g_logInit = false;
+    DeleteCriticalSection(&g_logCs);
+}
+
 }  // namespace vk
