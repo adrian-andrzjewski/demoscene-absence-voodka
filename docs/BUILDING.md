@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (25 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (30 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -42,6 +42,7 @@ data/vodka.dat      packed assets, byte-identical to the 1996 release archive
 data/world          VIRTUAL viewer object archive (byte-identical to the original)
 music/amnezja2.mod  the 14-channel module the demo plays
 *_selftest.exe      cross-check test binaries + tools
+audio_oracle.exe    libxmp module/timing/PCM oracle for Phase 2 validation
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -74,7 +75,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-27 tests: 17 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+30 tests: 17 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -84,6 +85,9 @@ reproducibility), `build.addr32` (COFF relocation hygiene),
 byte-identical to the original and decodes), and `v3d.viewer_parse` (the
 asset viewer's parser vs all 27 original 3D assets: 9 archive V3D/V3M
 headers, all 16 CODE/DATAS mesh pair counts, 2 VIRTUAL world objects).
+`audio.oracle` inventories `amnezja2.mod` and records the current libxmp
+44.1 kHz stereo PCM and row-transition baseline for the dedicated assembly
+player.
 Python-based tests skip cleanly if no interpreter is found.
 
 ## Tools (`port/tools/`)
@@ -100,6 +104,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `extract_v3d` | pulls the 9 V3D/V3M assets (entries 12-15, 31-35) out of `data/vodka.dat` |
 | `asset_viewer` | D3D11 viewer: flat-shaded/wireframe orbit view of every 3D asset in the original (9 archive V3D/V3M + 16 CODE/DATAS meshes + 2 VIRTUAL world objects) |
 | `asset_viewer_selftest` | parse-only validation of all 27 assets (CTest `v3d.viewer_parse`) |
+| `audio_oracle` | Phase 2A host-side libxmp module inventory, PCM hash, and row/tick trace oracle (CTest `audio.oracle`) |
 
 ## Troubleshooting
 

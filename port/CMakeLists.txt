@@ -430,6 +430,16 @@ endif()
 add_subdirectory("${CMAKE_SOURCE_DIR}/../modules/libxmp"
                  "${CMAKE_BINARY_DIR}/libxmp")
 
+# Phase 2A: host-side libxmp behavioral oracle.  This remains a validation
+# tool; it is deliberately not linked into the production assembly core.
+add_executable(audio_oracle tools/validate/audio_oracle.cpp)
+target_compile_definitions(audio_oracle PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_oracle PRIVATE xmp_static)
+add_test(NAME audio.oracle
+         COMMAND audio_oracle
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod"
+                 "${CMAKE_CURRENT_BINARY_DIR}/audio_oracle_report.txt")
+
 # ---- V3D asset viewer (standalone validation tool) ---------------------------
 add_subdirectory(tools/asset_viewer)
 

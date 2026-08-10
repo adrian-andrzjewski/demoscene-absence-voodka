@@ -440,6 +440,12 @@ Go only if:
 No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
 stable 100% assembly demo has not been demonstrated without this gate.
 
+Current Phase 2A result (2026-08-10): **GO to the offline NASM parser/mixer
+slice.** The host oracle passes and records a 263.429-second, 11,617,219-frame
+44.1 kHz stereo PCM baseline, 2,688 row transitions, and the module-specific
+effect inventory. Do not integrate WASAPI or remove libxmp until the NASM
+parser and mixer match this baseline.
+
 ---
 
 ## Phase 3 — Pure Windows x64 runtime and thread substrate
