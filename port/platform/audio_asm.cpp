@@ -56,6 +56,7 @@ struct Runtime {
     AudioPcmRing ring{};
     AudioLiveControl control{};
     AudioRingThreadArgs workerArgs{};
+    AudioAssemblyWorkerArgs workerServiceArgs{};
     AudioRingThreadReport workerReport{};
 
     HANDLE producerHandle = nullptr;
@@ -135,15 +136,6 @@ bool buildTimeline(const uint8_t* module, uint32_t moduleSize,
         runtime->tickTimesMs[frame] = rows[row].timeMs;
     }
     return true;
-}
-
-DWORD WINAPI workerControllerThread(void* raw) {
-    auto* runtime = static_cast<Runtime*>(raw);
-    const uint32_t result = asm_audio_ring_thread_probe(
-        &runtime->workerArgs, &runtime->workerReport);
-    InterlockedExchange(&runtime->workerControllerResult,
-                        static_cast<LONG>(result));
-    return result;
 }
 
 bool issueState(Runtime* runtime, uint32_t state, uint32_t* sequenceOut) {
@@ -315,6 +307,11 @@ int audioAsmInit(const char* modPath, int) {
         reinterpret_cast<volatile uint32_t*>(&g_runtime.producerError),
     };
     g_runtime.workerArgs = {&g_runtime.ring, 0, &g_runtime.control};
+    g_runtime.workerServiceArgs = {
+        &g_runtime.workerArgs,
+        &g_runtime.workerReport,
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.workerControllerResult),
+    };
     g_runtime.producerHandle = CreateThread(
         nullptr, 0,
         reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_producer_thread),
@@ -331,7 +328,9 @@ int audioAsmInit(const char* modPath, int) {
     }
 
     g_runtime.workerControllerHandle = CreateThread(
-        nullptr, 0, workerControllerThread, &g_runtime, 0, nullptr);
+        nullptr, 0,
+        reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_ring_thread_entry),
+        &g_runtime.workerServiceArgs, 0, nullptr);
     if (!g_runtime.workerControllerHandle) {
         logPrint("[audio-asm] worker controller creation failed\n");
         audioAsmShutdown();

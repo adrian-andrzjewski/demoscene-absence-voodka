@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2T passed; default production swap remains**
+Status: **Phase 2A through Phase 2U passed; default production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -857,3 +857,26 @@ clock, scene boundaries, seek behavior, and full-demo stability. It is still
 a **NO-GO** for removing `audio_asm.cpp`, libxmp, or the C++ platform layer:
 storage ownership, module/timeline preparation, controller lifetime, and
 Windows-facing application integration remain in C++.
+
+## Phase 2U result: assembly WASAPI worker entry
+
+Phase 2U removes the C++ function between `CreateThread` and the assembly
+WASAPI service. `asm_audio_ring_thread_entry` now adapts the one-argument
+Win32 thread ABI to the existing two-record assembly probe, publishes the
+fixed-width result, and returns the same status code. The C++ shim still owns
+the thread handle and joins it, so this remains a reversible boundary.
+
+The Phase 2U validation is:
+
+```text
+focused lifecycle/integration CTest               4/4 passed; 56.24 s
+full Release CTest suite                          51/51 passed; 102.37 s
+full P1-P8 playback                               exit 0; 252.3 s
+full scene sequence                               P1, P2, P3, P5, P6, P7, P8
+full device stream                                11,079,243 frames; underruns 0; 12,820 markers
+full final ModPos                                 0x2803
+```
+
+This is a **GO** for moving audio storage and service-state ownership behind
+the assembly ABI. It is not yet a **GO** for removing C++ handle management,
+module loading, timeline preparation, or libxmp from the production build.

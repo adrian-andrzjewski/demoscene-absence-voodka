@@ -43,3 +43,18 @@ static_assert(sizeof(AudioAssemblyProducerArgs) == 112);
 // DWORD WINAPI-compatible entry point for CreateThread.  It returns 0 on a
 // clean stop or 1 after publishing producerFailed.
 extern "C" uint32_t __stdcall asm_audio_producer_thread(void* args);
+
+// Assembly-owned Win32 thread entry for the assembly WASAPI service. The
+// host still supplies fixed argument/report records and joins the handle, but
+// no C++ function sits between CreateThread and the assembly probe.
+struct AudioAssemblyWorkerArgs {
+    const AudioRingThreadArgs* args; // 0
+    AudioRingThreadReport* report;   // 8
+    volatile uint32_t* result;       // 16
+};
+
+static_assert(offsetof(AudioAssemblyWorkerArgs, report) == 8);
+static_assert(offsetof(AudioAssemblyWorkerArgs, result) == 16);
+static_assert(sizeof(AudioAssemblyWorkerArgs) == 24);
+
+extern "C" uint32_t __stdcall asm_audio_ring_thread_entry(void* args);

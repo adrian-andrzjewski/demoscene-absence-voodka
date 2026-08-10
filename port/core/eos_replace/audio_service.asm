@@ -27,6 +27,10 @@ DEFAULT REL
 %define PROD_DONE                  96
 %define PROD_ERROR                104
 
+%define WORKER_ARGS                0
+%define WORKER_REPORT              8
+%define WORKER_RESULT             16
+
 %define CONTROL_REQUESTED_SEEK_TICK 16
 %define CONTROL_SEEK_SEQUENCE       20
 %define CONTROL_PRODUCER_SEEK_ACK   24
@@ -62,10 +66,30 @@ extern asm_audio_live_next
 extern asm_audio_mix_tick_states_continuous
 extern asm_audio_ring_push
 extern asm_audio_ring_push_marker
+extern asm_audio_ring_thread_probe
 
 global asm_audio_producer_thread
+global asm_audio_ring_thread_entry
 
 section .text
+
+; DWORD WINAPI asm_audio_ring_thread_entry(AudioAssemblyWorkerArgs* service)
+; Translate CreateThread's one argument into the probe's two ABI arguments
+; and publish the result after the probe has returned.
+asm_audio_ring_thread_entry:
+        push    rbp
+        mov     rbp, rsp
+        push    r12
+        sub     rsp, 0x28
+        mov     r12, rcx
+        mov     rcx, [r12 + WORKER_ARGS]
+        mov     rdx, [r12 + WORKER_REPORT]
+        call    asm_audio_ring_thread_probe
+        mov     [r12 + WORKER_RESULT], eax
+        add     rsp, 0x28
+        pop     r12
+        pop     rbp
+        ret
 
 ; DWORD WINAPI asm_audio_producer_thread(AudioAssemblyProducerArgs* args)
 asm_audio_producer_thread:

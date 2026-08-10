@@ -171,6 +171,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
 | `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
 | `VOODKA --asm-audio` | Phase 2T full eight-part assembly producer service witness: scene progression, seek/timeline behavior, and clean WASAPI teardown |
+| `asm_audio_ring_thread_entry` | Phase 2U assembly-owned CreateThread entry for the live WASAPI worker (exercised by the production assembly-audio CTests) |
 | `VOODKA --asm-audio --part 1 --auto-pause-ms 1000` | Phase 2S real Win32 Space pause/resume injection through the assembly audio service (CTest `audio.assembly_demo_pause`) |
 | `VOODKA --asm-audio --part 1 --auto-close-ms 2000` | Phase 2S real WM_CLOSE teardown during playback (CTest `audio.assembly_demo_close`) |
 | `VOODKA_ASM_AUDIO_FAIL_DEVICE=1 VOODKA --asm-audio --part 1` | Phase 2S deterministic assembly-device initialization failure and cleanup (CTest `audio.assembly_audio_fail_device`) |
