@@ -32,6 +32,8 @@ static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep) {
 // bridge symbols (extern "C"): select which part the assembly core runs
 extern "C" void vk_set_entry_part(int part);
 extern "C" LRESULT CALLBACK asm_voodka_wndproc(HWND, UINT, WPARAM, LPARAM);
+extern "C" HWND asm_create_voodka_window(HINSTANCE);
+extern "C" void asm_destroy_voodka_window(HWND, HINSTANCE);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -301,13 +303,10 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
             vk::logPrint("[app] auto-close after %ld ms\n", autoCloseMs);
     }
 
-    // ---- register window ------------------------------------------------
-    WNDCLASSW wc{};
+    // ---- register/create window -------------------------------------------
 #if defined(VOODKA_REFERENCE_BUILD)
+    WNDCLASSW wc{};
     wc.lpfnWndProc = WndProc;
-#else
-    wc.lpfnWndProc = asm_voodka_wndproc;
-#endif
     wc.hInstance = hInst;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.lpszClassName = kWinClass;
@@ -354,8 +353,6 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         rc.bottom = y + winH;
     }
 
-    // WS_EX_TOPMOST makes the window topmost from the very first frame; the
-    // WM_ACTIVATE handler in WndProc then keeps it there for the whole process.
     HWND hwnd = CreateWindowExW(WS_EX_TOPMOST, kWinClass,
                                 L"VOODKA (Absence 1996x - Windows x64 port)",
                                 WS_OVERLAPPEDWINDOW,
@@ -366,16 +363,25 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         vk::shutdownAll();
         return 1;
     }
-    g_hwnd = hwnd;
     ShowWindow(hwnd, SW_SHOW);
     UpdateWindow(hwnd);
-    // Cement the z-order and hand the window input focus so it comes up on top
-    // and active even if another app was foreground at launch time.
     SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
                  SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
     SetForegroundWindow(hwnd);
     SetActiveWindow(hwnd);
     SetFocus(hwnd);
+#else
+    // Production window class, geometry, creation, show, focus, and topmost
+    // handoff are owned by the native x64 adapter. The C++ host receives only
+    // the resulting HWND and continues with the existing subsystem order.
+    HWND hwnd = asm_create_voodka_window(hInst);
+    if (!hwnd) {
+        vk::logPrint("[app] assembly window bootstrap failed\n");
+        vk::shutdownAll();
+        return 1;
+    }
+#endif
+    g_hwnd = hwnd;
     vk::progressInit(hwnd);
 
     // Start before any archive/module/scene loading. The assembly core can
@@ -538,10 +544,16 @@ void shutdownAll() {
     if (g_hwnd) {
         HWND h = g_hwnd;
         g_hwnd = nullptr;
+#if defined(VOODKA_REFERENCE_BUILD)
         if (IsWindow(h)) DestroyWindow(h);
+#else
+        asm_destroy_voodka_window(h, g_hInst);
+#endif
     }
     if (g_hInst) {
+#if defined(VOODKA_REFERENCE_BUILD)
         UnregisterClassW(kWinClass, g_hInst);
+#endif
         g_hInst = nullptr;
     }
     vk::logFlush();

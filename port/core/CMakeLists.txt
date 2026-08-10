@@ -15,6 +15,7 @@ set(VOODKA_CORE_ASM
     eos_replace/d3d11_asm_probe.asm
     eos_replace/d3d11_asm_present.asm
     eos_replace/win32_app_wndproc.asm
+    eos_replace/win32_app_window.asm
     eos_replace/boot.asm
     eos_replace/toonel.asm
     inc/globals.asm

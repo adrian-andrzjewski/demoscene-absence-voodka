@@ -1,6 +1,6 @@
 # Phase 3 progress: pure Win32/thread runtime and callback integration
 
-Status: **Phase 3A passed; Phase 3B callback integration passed.**
+Status: **Phase 3A passed; Phase 3B.1 callback and 3B.2 window bootstrap passed.**
 
 Snapshot date: **2026-08-10**
 
@@ -103,11 +103,42 @@ The focused gates exercised production pause/resume, production close, and
 reference close. The full suite retained all rendering, audio, timing, asset,
 Win32, D3D11, and dedicated assembly-audio checks.
 
-## Next gate: Phase 3B.2
+## Phase 3B.2 window bootstrap
 
-Phase 3B.2 must move window bootstrap and the application lifecycle handoff
-behind a stable assembly adapter without changing behavior. It should cover
-class registration, geometry, window creation/show/focus, input watcher
-startup, and the transition into `DemoStart32`. The C++ reference executable
-remains mandatory until those paths pass the same full-demo visual, audio,
-timing, and stability witnesses.
+[`win32_app_window.asm`](../port/core/eos_replace/win32_app_window.asm) now
+owns the production window bootstrap and teardown. It implements:
+
+- `WNDCLASSW` construction and registration with the assembly callback;
+- cursor/background setup through `LoadCursorW` and `GetStockObject`;
+- client-to-outer geometry conversion through `AdjustWindowRectEx`;
+- primary-monitor work-area discovery with full-screen fallback;
+- centered and clamped window placement;
+- `CreateWindowExW` with the exact production style, title, and instance;
+- show, update, topmost, foreground, active-window, and focus handoff; and
+- `IsWindow`, `DestroyWindow`, and `UnregisterClassW` teardown.
+
+`VOODKA.exe` now receives only the resulting HWND before continuing through the
+existing C++ subsystem order. `VOODKA_REFERENCE.exe` retains the original
+C++ registration, geometry, creation, and teardown path.
+
+### Phase 3B.2 validation
+
+```text
+Release build                                      passed
+focused bootstrap/lifecycle gates                  4/4 passed; 58.43 s
+full regression suite                              54/54 passed; 104.27 s
+production bootstrap                               NASM x64
+reference bootstrap                                C++ differential oracle
+```
+
+The focused gates covered production P1 playback, production pause/resume,
+production close, and reference close. No rendering, audio, timing, or
+shutdown regressions were observed.
+
+## Next gate: Phase 3B.3
+
+Phase 3B.3 must address the remaining process-entry and host handoff surface:
+command-line acquisition/parsing, DPI-policy setup, crash-filter installation,
+input-watcher startup, and the transition into `DemoStart32`. The C++ reference
+executable remains mandatory until those paths pass the same full-demo visual,
+audio, timing, and stability witnesses.

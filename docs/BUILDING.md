@@ -72,7 +72,9 @@ from elsewhere). To distribute, zip those three files (add `VIRTUAL.exe` +
 The shipped `VOODKA.exe` registers the NASM x64 callback in
 `core/eos_replace/win32_app_wndproc.asm`. `VOODKA_REFERENCE.exe` intentionally
 keeps the C++ callback so close, pause, input, and lifecycle behavior can be
-compared while the remaining application host is migrated.
+compared while the remaining application host is migrated. Production window
+class registration, monitor-aware geometry, creation, focus, and teardown are
+also implemented in `core/eos_replace/win32_app_window.asm`.
 
 ## Running
 
@@ -181,6 +183,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `d3d11_asm_present_probe` | Phase 1B standalone NASM D3D11/COM presenter, GPU readback, Present, and Release gate (CTest `d3d11.asm_present_probe`) |
 | `win32_runtime_probe` | Phase 3A no-CRT NASM process, HWND/WndProc, message pump, worker/event, exception-filter registration, and teardown gate (CTest `win32.runtime_probe`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
+| `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |

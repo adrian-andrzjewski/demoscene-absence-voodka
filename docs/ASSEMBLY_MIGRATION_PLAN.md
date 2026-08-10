@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.1 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.2 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -926,13 +926,17 @@ deterministic teardown ownership. Phase 3B.1 now uses a NASM x64 WndProc in the
 shipped target while retaining the C++ callback in `VOODKA_REFERENCE.exe` as
 the differential oracle. The callback preserves keyboard, pause, activation,
 paint, close, destroy, and default-message behavior.
+Phase 3B.2 now moves production `WNDCLASSW` construction, monitor-aware
+geometry, `CreateWindowExW`, show/focus/topmost handoff, and window/class
+teardown into NASM. `VOODKA_REFERENCE.exe` retains the C++ bootstrap as the
+differential oracle.
 Release validation includes the 54-test suite plus direct timeline runs.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.2: assembly-owned
-window bootstrap and application lifecycle handoff. Process entry, command
-line parsing, geometry/class registration, input watcher startup, and final
-shutdown remain C++ until that gate has equivalent evidence.
+libxmp for differential validation. The next gate is Phase 3B.3: assembly
+process entry and host handoff. Command-line acquisition/parsing, DPI-policy
+setup, crash-filter installation, input-watcher startup, and the transition
+into `DemoStart32` remain C++ until that gate has equivalent evidence.
