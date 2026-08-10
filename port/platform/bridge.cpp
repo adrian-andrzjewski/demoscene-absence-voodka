@@ -114,6 +114,22 @@ static int g_entry_part = 0;
 void vk_set_entry_part(int part) { g_entry_part = part; }
 int  vk_get_entry_part()         { return g_entry_part; }
 
+// Native x64 production WndProc wrappers. The reference executable keeps
+// app.cpp's C++ callback for differential validation; VOODKA's callback calls
+// these fixed C ABI names from win32_app_wndproc.asm.
+void vk_key_down(uint32_t scancode) {
+    vk::keyDown(static_cast<uint8_t>(scancode));
+}
+void vk_key_up(uint32_t scancode) {
+    vk::keyUp(static_cast<uint8_t>(scancode));
+}
+void vk_pause_toggle() {
+    vk::pauseToggle();
+}
+void vk_request_quit() {
+    vk::requestQuit();
+}
+
 // trace hook from NASM (simple %s/%x/%d formatting via platform logger)
 void vk_log_printf(const char* fmt, ...) {
     char buf[512];

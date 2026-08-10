@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3A (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.1 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -920,17 +920,19 @@ coordinated seek, repeated-seek stress, production-clock witnesses, and
 deterministic lifecycle/device-failure hooks are now implemented as reversible
 gates. The shipped target also uses the NASM D3D11/COM presenter by default;
 the complete C++ presenter is retained only in `VOODKA_REFERENCE.exe`.
-Phase 3A has now proven a standalone no-CRT assembly process with Win32 window,
+Phase 3A has proven a standalone no-CRT assembly process with Win32 window,
 WndProc, message-pump, worker-thread, event, atomic, exception-filter, and
-deterministic teardown ownership. This probe is isolated from the production
-target; Phase 3B is the application integration gate.
+deterministic teardown ownership. Phase 3B.1 now uses a NASM x64 WndProc in the
+shipped target while retaining the C++ callback in `VOODKA_REFERENCE.exe` as
+the differential oracle. The callback preserves keyboard, pause, activation,
+paint, close, destroy, and default-message behavior.
 Release validation includes the 54-test suite plus direct timeline runs.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is the production import,
-PCM, timeline, and full-playback parity audit, followed by removal of the
-remaining C++ production-platform orchestration in risk order, beginning with
-the Phase 3B Win32 window/thread/exception integration substrate.
+libxmp for differential validation. The next gate is Phase 3B.2: assembly-owned
+window bootstrap and application lifecycle handoff. Process entry, command
+line parsing, geometry/class registration, input watcher startup, and final
+shutdown remain C++ until that gate has equivalent evidence.

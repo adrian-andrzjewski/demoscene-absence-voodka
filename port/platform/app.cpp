@@ -31,6 +31,7 @@ static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep) {
 
 // bridge symbols (extern "C"): select which part the assembly core runs
 extern "C" void vk_set_entry_part(int part);
+extern "C" LRESULT CALLBACK asm_voodka_wndproc(HWND, UINT, WPARAM, LPARAM);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -302,7 +303,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
 
     // ---- register window ------------------------------------------------
     WNDCLASSW wc{};
+#if defined(VOODKA_REFERENCE_BUILD)
     wc.lpfnWndProc = WndProc;
+#else
+    wc.lpfnWndProc = asm_voodka_wndproc;
+#endif
     wc.hInstance = hInst;
     wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
     wc.lpszClassName = kWinClass;

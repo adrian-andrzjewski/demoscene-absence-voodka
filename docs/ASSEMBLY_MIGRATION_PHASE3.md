@@ -1,14 +1,15 @@
-# Phase 3 progress: pure Win32/thread runtime feasibility gate
+# Phase 3 progress: pure Win32/thread runtime and callback integration
 
-Status: **Phase 3A passed; the no-CRT Win32/thread substrate is feasible.**
+Status: **Phase 3A passed; Phase 3B callback integration passed.**
 
 Snapshot date: **2026-08-10**
 
 Phase 3 begins the highest-risk remaining platform work. It tests whether a
 native x64 assembly process can perform the Windows startup, window, message,
 thread, synchronization, exception-filter registration, and shutdown work
-without relying on C/C++ startup objects. The production demo is not switched
-to this substrate yet; the probe remains an isolated gate.
+without relying on C/C++ startup objects. The first production integration
+slice now uses the proven assembly callback while retaining the C++ host and
+reference executable.
 
 ## Phase 3A scope
 
@@ -59,17 +60,54 @@ imports                                            KERNEL32.dll, USER32.dll only
 CRT/C++ runtime imports                            none
 ```
 
-This is a **GO** for Phase 3B: moving the real application window and lifecycle
-entry contract behind an assembly adapter while retaining the current C++ host
-as the reference target. It is a **NO-GO** for claiming a pure assembly demo
-process: the production application still owns window creation, input, timing,
-logging, crash handling, and shutdown in C++.
+This was a **GO** for Phase 3B: moving the real application callback behind an
+assembly adapter while retaining the current C++ host as the reference target.
+It remains a **NO-GO** for claiming a pure assembly demo process: the
+production application still owns process entry, window creation, command-line
+parsing, input watcher startup, timing, logging, crash handling, and shutdown
+in C++.
 
-## Next gate: Phase 3B
+## Phase 3B callback integration
 
-Phase 3B must connect the proven substrate to the existing application without
-changing behavior. It should first replace the production target's window and
-message-pump calls behind a stable ABI, then validate ESC/window-close teardown,
-pause/resume, D3D11/audio lifetime ordering, and repeated startup/shutdown.
-The C++ reference executable remains mandatory until those paths pass the same
-full-demo visual, audio, timing, and stability witnesses.
+[`win32_app_wndproc.asm`](../port/core/eos_replace/win32_app_wndproc.asm) is
+now linked into the production core. `VOODKA.exe` registers this native x64
+callback; `VOODKA_REFERENCE.exe` continues to register the original C++
+`WndProc` for differential validation.
+
+The assembly callback preserves the current behavior for:
+
+- keyboard make/break scancode translation, including extended keys;
+- Space edge detection and pause/resume dispatch;
+- `WM_PAINT` validation with `BeginPaint`/`EndPaint`;
+- topmost-window restoration on activation;
+- `WM_CLOSE` -> `DestroyWindow` and quit request;
+- `WM_DESTROY` -> `PostQuitMessage` and quit request; and
+- default messages through `DefWindowProcW`.
+
+The four C++ calls are fixed C ABI wrappers (`vk_key_down`, `vk_key_up`,
+`vk_pause_toggle`, and `vk_request_quit`). They preserve the existing input,
+pause, and global-cancellation ownership while making the callback itself
+native assembly.
+
+### Phase 3B validation
+
+```text
+Release build                                      passed
+focused production/reference lifecycle gates      3/3 passed; 32.23 s
+full regression suite                              54/54 passed; 104.31 s
+production callback                                NASM x64
+reference callback                                 C++ differential oracle
+```
+
+The focused gates exercised production pause/resume, production close, and
+reference close. The full suite retained all rendering, audio, timing, asset,
+Win32, D3D11, and dedicated assembly-audio checks.
+
+## Next gate: Phase 3B.2
+
+Phase 3B.2 must move window bootstrap and the application lifecycle handoff
+behind a stable assembly adapter without changing behavior. It should cover
+class registration, geometry, window creation/show/focus, input watcher
+startup, and the transition into `DemoStart32`. The C++ reference executable
+remains mandatory until those paths pass the same full-demo visual, audio,
+timing, and stability witnesses.
