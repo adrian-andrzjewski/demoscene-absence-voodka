@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (39 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (40 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -49,6 +49,7 @@ audio_mod_event_probe.exe  NASM-vs-libxmp packed event cross-check
 audio_mod_voice_probe.exe  NASM-vs-libxmp row voice identity cross-check
 audio_mod_tick_probe.exe   NASM-vs-libxmp per-tick effect/state cross-check
 audio_mod_mixer_probe.exe  native assembly PCM mixer vs libxmp tick-stream cross-check
+audio_mod_stream_probe.exe  continuous bounded assembly mixer history gate
 audio_wasapi_asm_probe.exe assembly-owned COM/WASAPI endpoint and buffer gate
 audio_thread_asm_probe.exe assembly-owned WASAPI worker-thread lifecycle gate
 audio_pcm_thread_probe.exe native PCM handoff into the assembly worker
@@ -84,7 +85,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-39 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+40 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -107,6 +108,9 @@ pan, event, and logical sample-position state against libxmp.
 `audio.mod_pcm` compares every direct-tick signed-16 stereo sample from the
 native x64 assembly mixer against libxmp; the complete checked-in stream is
 11,613,525 frames with FNV-1a `18C7451650A7C772`.
+`audio.mod_stream` sends those same native states through 78 irregular bounded
+assembly mixer calls while preserving caller-owned anti-click/ramp history;
+the complete stream must retain the same PCM hash.
 `audio.wasapi_asm_probe` performs the complete 44.1 kHz stereo PCM WASAPI
 activation, event, buffer, stop/reset, and COM teardown sequence in NASM; the
 C++ executable only validates its fixed-width report.
@@ -139,6 +143,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_mod_event_probe` | Phase 2D NASM MOD event decoder vs libxmp event cross-check (CTest `audio.mod_events`) |
 | `audio_mod_voice_probe` | Phase 2D NASM row voice identity vs libxmp channel state cross-check (CTest `audio.mod_voices`) |
 | `audio_mod_tick_probe` | Phase 2E NASM per-tick effect/state vs libxmp channel state cross-check (CTest `audio.mod_ticks`) |
+| `audio_mod_stream_probe` | Phase 2J bounded continuous assembly mixer history gate (CTest `audio.mod_stream`) |
 | `audio_wasapi_asm_probe` | Phase 2G assembly COM/WASAPI endpoint, format, buffer, and teardown gate (CTest `audio.wasapi_asm_probe`) |
 | `audio_thread_asm_probe` | Phase 2H assembly worker lifecycle and event-driven render gate (CTest `audio.thread_asm_probe`) |
 | `audio_pcm_thread_probe` | Phase 2I native PCM-to-WASAPI handoff and timeline snapshot gate (CTest `audio.pcm_thread_probe`) |

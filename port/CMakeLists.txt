@@ -495,6 +495,21 @@ add_test(NAME audio.mod_pcm
          COMMAND audio_mod_mixer_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
 
+# Phase 2J feasibility gate: preserve the assembly mixer's anti-click/ramp
+# history across deliberately irregular bounded calls. This is the continuity
+# contract required before a live tracker/ring producer can replace the
+# immutable Phase 2I stream.
+add_executable(audio_mod_stream_probe
+    tools/validate/audio_mod_stream_probe.cpp)
+target_compile_definitions(audio_mod_stream_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_mod_stream_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/validate")
+target_link_libraries(audio_mod_stream_probe PRIVATE voodka_core)
+add_test(NAME audio.mod_stream
+         COMMAND audio_mod_stream_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
+
 # ---- V3D asset viewer (standalone validation tool) ---------------------------
 add_subdirectory(tools/asset_viewer)
 

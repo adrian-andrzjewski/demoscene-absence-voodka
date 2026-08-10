@@ -441,8 +441,9 @@ No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
 stable 100% assembly demo has not been demonstrated without this gate.
 
 Current Phase 2 result (2026-08-10): **GO through the native effect-state,
-offline PCM mixer, WASAPI/COM device, assembly-worker, and bounded PCM handoff
-gates; NO-GO to the live production swap or libxmp removal.** The
+offline PCM mixer, stateful bounded mixer, WASAPI/COM device, assembly-worker,
+and bounded PCM handoff gates; NO-GO to the live production swap or libxmp
+removal.** The
 host oracle passes and records a
 263.429-second, 11,617,219-frame 44.1 kHz stereo PCM baseline, 2,688 row
 transitions, and the module-specific effect inventory. `audio.mod_parse` passes
@@ -466,7 +467,12 @@ passes 10 repeated one-second lifecycles with real callback wakeups, 23,296 to
 Phase 2I now passes 10 repeated bounded handoffs of the exact native PCM
 stream: 45,864 to 46,305 device frames, 99 to 100 wakeups/snapshots, zero
 timeouts, zero source wraps, and clean worker exit. That handoff is immutable
-pre-rendered PCM, not yet the live production player.
+pre-rendered PCM, not yet the live production player. Phase 2J proves that the
+same complete stream remains sample-identical through 78 irregular bounded
+mixer calls with caller-owned anti-click/ramp history, retaining PCM FNV
+`18C7451650A7C772`. The tracker is still an offline whole-stream state
+generator, so this is a continuity GO but not a live-player or libxmp-removal
+GO.
 
 ---
 

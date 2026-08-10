@@ -66,6 +66,11 @@ DEFAULT REL
 %define LOCAL_PREV_L                     -532
 %define LOCAL_PREV_R                     -536
 %define LOCAL_NEXT_SAMPLE                -540
+%define LOCAL_OLD_L_PTR                  -560
+%define LOCAL_OLD_R_PTR                  -568
+%define LOCAL_SLEFT_PTR                  -576
+%define LOCAL_SRIGHT_PTR                 -584
+%define LOCAL_HISTORY_PTR                -592
 
 ; Keep the 14-entry history arrays below the saved-register area.  The
 ; prologue saves seven qwords below RBP (-8 through -64); placing OLD_L at
@@ -78,16 +83,27 @@ DEFAULT REL
 %define STACK_BYTES                      32768
 
 global asm_audio_mix_tick_states
+global asm_audio_mix_tick_states_continuous
 
 section .text
 
-; uint32_t asm_audio_mix_tick_states(const uint8_t* module,
-;                                    uint32_t moduleSize,
-;                                    const AudioTickState* states,
-;                                    uint32_t stateFrames,
-;                                    int16_t* output,
-;                                    uint32_t outputCapacity)
+; The ordinary entry passes a null history pointer and retains the original
+; isolated-call behavior. The continuous entry receives a seventh argument:
+; AudioMixerHistory* history. Its four 14-channel arrays remain live across
+; bounded calls, preserving anti-click/ramp continuity.
 asm_audio_mix_tick_states:
+        xor     r10d, r10d
+        jmp     audio_mix_tick_states_entry
+
+; uint32_t asm_audio_mix_tick_states_continuous(
+;     const uint8_t* module, uint32_t moduleSize,
+;     const AudioTickState* states, uint32_t stateFrames,
+;     int16_t* output, uint32_t outputCapacity,
+;     AudioMixerHistory* history)
+asm_audio_mix_tick_states_continuous:
+        mov     r10, [rsp + 56]            ; seventh stack argument
+
+audio_mix_tick_states_entry:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -113,6 +129,7 @@ asm_audio_mix_tick_states:
         mov     r14d, r9d                   ; state frame count
         mov     r15, [rbp + 48]             ; output
         mov     ebx, [rbp + 56]             ; output capacity
+        mov     [rbp + LOCAL_HISTORY_PTR], r10
         test    r12, r12
         jz      .bad
         test    r13, r13
@@ -146,21 +163,45 @@ asm_audio_mix_tick_states:
         add     r10d, MOD_SAMPLE_DATA_OFFSET
         mov     dword [rbp + LOCAL_SAMPLE_DATA], r10d
 
-        ; Clear per-channel mixer history.  libxmp starts note ramps and
-        ; anticlick state from zero.
-        lea     rdi, [rbp + OLD_L]
+        ; Select caller-owned history for bounded calls, or the original
+        ; stack-local arrays for the isolated entry point. Only the isolated
+        ; path clears the arrays; continuous callers initialize once and keep
+        ; the resulting state for the next chunk.
+        mov     rax, [rbp + LOCAL_HISTORY_PTR]
+        test    rax, rax
+        jz      .history_stack
+        lea     rdx, [rax + 0]
+        mov     [rbp + LOCAL_OLD_L_PTR], rdx
+        lea     rdx, [rax + 56]
+        mov     [rbp + LOCAL_OLD_R_PTR], rdx
+        lea     rdx, [rax + 112]
+        mov     [rbp + LOCAL_SLEFT_PTR], rdx
+        lea     rdx, [rax + 168]
+        mov     [rbp + LOCAL_SRIGHT_PTR], rdx
+        jmp     .history_ready
+.history_stack:
+        lea     rdx, [rbp + OLD_L]
+        mov     [rbp + LOCAL_OLD_L_PTR], rdx
+        lea     rdx, [rbp + OLD_R]
+        mov     [rbp + LOCAL_OLD_R_PTR], rdx
+        lea     rdx, [rbp + SLEFT]
+        mov     [rbp + LOCAL_SLEFT_PTR], rdx
+        lea     rdx, [rbp + SRIGHT]
+        mov     [rbp + LOCAL_SRIGHT_PTR], rdx
         xor     eax, eax
+        mov     rdi, [rbp + LOCAL_OLD_L_PTR]
         mov     ecx, MOD_CHANNELS
         rep stosd
-        lea     rdi, [rbp + OLD_R]
+        mov     rdi, [rbp + LOCAL_OLD_R_PTR]
         mov     ecx, MOD_CHANNELS
         rep stosd
-        lea     rdi, [rbp + SLEFT]
+        mov     rdi, [rbp + LOCAL_SLEFT_PTR]
         mov     ecx, MOD_CHANNELS
         rep stosd
-        lea     rdi, [rbp + SRIGHT]
+        mov     rdi, [rbp + LOCAL_SRIGHT_PTR]
         mov     ecx, MOD_CHANNELS
         rep stosd
+.history_ready:
 
         mov     dword [rbp + LOCAL_FRAME_INDEX], 0
         xor     esi, esi                    ; output frame count
@@ -229,10 +270,9 @@ asm_audio_mix_tick_states:
         shr     edx, 8
         imul    edx, edx
         mov     eax, edx
-        mov     rdx, qword [rbp + SLEFT]
         ; SLEFT/SRIGHT are arrays, so index them using the current channel.
         mov     eax, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         movsxd  rdx, dword [r10 + rax * 4]
         mov     eax, dword [rbp + LOCAL_AC_MUL]
         shr     eax, 8
@@ -242,7 +282,7 @@ asm_audio_mix_tick_states:
         sar     rdx, 32
         add     dword [rdi], edx
         mov     eax, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         movsxd  rdx, dword [r10 + rax * 4]
         mov     eax, dword [rbp + LOCAL_AC_MUL]
         shr     eax, 8
@@ -256,13 +296,13 @@ asm_audio_mix_tick_states:
         jnz     .restart_anticlick_loop
 .restart_clear_history:
         mov     eax, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + OLD_L]
+        mov     r10, [rbp + LOCAL_OLD_L_PTR]
         mov     dword [r10 + rax * 4], 0
-        lea     r10, [rbp + OLD_R]
+        mov     r10, [rbp + LOCAL_OLD_R_PTR]
         mov     dword [r10 + rax * 4], 0
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         mov     dword [r10 + rax * 4], 0
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         mov     dword [r10 + rax * 4], 0
 .restart_done:
 
@@ -392,13 +432,13 @@ asm_audio_mix_tick_states:
         jmp     .ramp_ready
 .ramp_nonzero:
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + OLD_L]
+        mov     r10, [rbp + LOCAL_OLD_L_PTR]
         mov     eax, dword [rbp + LOCAL_TARGET_L]
         sub     eax, dword [r10 + rcx * 4]
         cdq
         idiv    dword [rbp + LOCAL_RAMP_LEFT]
         mov     dword [rbp + LOCAL_DELTA_L], eax
-        lea     r10, [rbp + OLD_R]
+        mov     r10, [rbp + LOCAL_OLD_R_PTR]
         mov     eax, dword [rbp + LOCAL_TARGET_R]
         sub     eax, dword [r10 + rcx * 4]
         cdq
@@ -406,10 +446,10 @@ asm_audio_mix_tick_states:
         mov     dword [rbp + LOCAL_DELTA_R], eax
 .ramp_ready:
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         mov     eax, dword [r10 + rcx * 4]
         mov     dword [rbp + LOCAL_LAST_L], eax
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         mov     eax, dword [r10 + rcx * 4]
         mov     dword [rbp + LOCAL_LAST_R], eax
         lea     rax, [rbp + MIX_BUFFER]
@@ -454,11 +494,11 @@ asm_audio_mix_tick_states:
         mov     eax, dword [rdx]
         sub     eax, dword [rbp + LOCAL_PREV_L]
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         mov     dword [r10 + rcx * 4], eax
         mov     eax, dword [rdx + 4]
         sub     eax, dword [rbp + LOCAL_PREV_R]
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         mov     dword [r10 + rcx * 4], eax
         mov     rdx, qword [rbp + LOCAL_BUF_PTR]
         mov     eax, dword [rdx]
@@ -536,14 +576,14 @@ asm_audio_mix_tick_states:
         cmp     dword [rbp + LOCAL_RAMP_LEFT], 0
         je      .constant_level
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + OLD_L]
+        mov     r10, [rbp + LOCAL_OLD_L_PTR]
         mov     eax, dword [r10 + rcx * 4]
         mov     edx, eax
         sar     edx, 8
         mov     dword [rbp + LOCAL_LEVEL_L], edx
         add     eax, dword [rbp + LOCAL_DELTA_L]
         mov     dword [r10 + rcx * 4], eax
-        lea     r10, [rbp + OLD_R]
+        mov     r10, [rbp + LOCAL_OLD_R_PTR]
         mov     eax, dword [r10 + rcx * 4]
         mov     edx, eax
         sar     edx, 8
@@ -646,25 +686,25 @@ asm_audio_mix_tick_states:
         jnz     .anticlick_loop
 .anticlick_done:
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + OLD_L]
+        mov     r10, [rbp + LOCAL_OLD_L_PTR]
         mov     dword [r10 + rcx * 4], 0
-        lea     r10, [rbp + OLD_R]
+        mov     r10, [rbp + LOCAL_OLD_R_PTR]
         mov     dword [r10 + rcx * 4], 0
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         mov     dword [r10 + rcx * 4], 0
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         mov     dword [r10 + rcx * 4], 0
         jmp     .channel_next
 
 .voice_finish_active:
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + OLD_L]
+        mov     r10, [rbp + LOCAL_OLD_L_PTR]
         mov     eax, dword [rbp + LOCAL_TARGET_L]
         mov     dword [r10 + rcx * 4], eax
-        lea     r10, [rbp + OLD_R]
+        mov     r10, [rbp + LOCAL_OLD_R_PTR]
         mov     eax, dword [rbp + LOCAL_TARGET_R]
         mov     dword [r10 + rcx * 4], eax
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         mov     rdx, qword [rbp + LOCAL_BUF_PTR]
         lea     rdi, [rbp + MIX_BUFFER]
         cmp     rdx, rdi
@@ -673,7 +713,7 @@ asm_audio_mix_tick_states:
         mov     eax, dword [rdx]
         sub     eax, dword [rbp + LOCAL_PREV_L]
         mov     dword [r10 + rcx * 4], eax
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         mov     eax, dword [rdx + 4]
         sub     eax, dword [rbp + LOCAL_PREV_R]
         mov     dword [r10 + rcx * 4], eax
@@ -682,13 +722,13 @@ asm_audio_mix_tick_states:
 
 .voice_silent:
         mov     ecx, dword [rbp + LOCAL_CHANNEL]
-        lea     r10, [rbp + OLD_L]
+        mov     r10, [rbp + LOCAL_OLD_L_PTR]
         mov     dword [r10 + rcx * 4], 0
-        lea     r10, [rbp + OLD_R]
+        mov     r10, [rbp + LOCAL_OLD_R_PTR]
         mov     dword [r10 + rcx * 4], 0
-        lea     r10, [rbp + SLEFT]
+        mov     r10, [rbp + LOCAL_SLEFT_PTR]
         mov     dword [r10 + rcx * 4], 0
-        lea     r10, [rbp + SRIGHT]
+        mov     r10, [rbp + LOCAL_SRIGHT_PTR]
         mov     dword [r10 + rcx * 4], 0
 .channel_next:
         inc     r9d
