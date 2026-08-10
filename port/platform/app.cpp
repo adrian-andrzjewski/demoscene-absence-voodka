@@ -34,6 +34,8 @@ extern "C" void vk_set_entry_part(int part);
 extern "C" LRESULT CALLBACK asm_voodka_wndproc(HWND, UINT, WPARAM, LPARAM);
 extern "C" HWND asm_create_voodka_window(HINSTANCE);
 extern "C" void asm_destroy_voodka_window(HWND, HINSTANCE);
+extern "C" int vk_voodka_host_main(HINSTANCE, LPSTR, int);
+extern "C" int asm_voodka_winmain(HINSTANCE, HINSTANCE, LPSTR, int);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -206,14 +208,16 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     return DefWindowProcW(h, m, w, l);
 }
 
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
+extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     g_hInst = hInst;
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
 
     // Per-monitor DPI awareness: window geometry is expressed in physical
     // pixels, so centering stays consistent across DPI-scaled desktops.
+#if defined(VOODKA_REFERENCE_BUILD)
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+#endif
 
     // optional: --record <dir>  (deterministic frame+palette capture)
     //       and  --diag <dir>   (GPU readback diagnostics)
@@ -520,6 +524,19 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     vk::shutdownAll();
     return rcode;
 }
+
+// Keep the CRT-owned external entry until the C++ host is gone. The shipped
+// target transfers immediately into the NASM handoff; the reference target
+// calls the host directly so its C++ lifecycle remains the differential oracle.
+#if defined(VOODKA_REFERENCE_BUILD)
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int nCmdShow) {
+    return vk_voodka_host_main(hInst, lpCmd, nCmdShow);
+}
+#else
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmd, int nCmdShow) {
+    return asm_voodka_winmain(hInst, hPrev, lpCmd, nCmdShow);
+}
+#endif
 
 namespace vk {
 

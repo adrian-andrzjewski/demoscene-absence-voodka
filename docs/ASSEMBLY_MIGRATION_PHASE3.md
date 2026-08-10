@@ -1,6 +1,6 @@
 # Phase 3 progress: pure Win32/thread runtime and callback integration
 
-Status: **Phase 3A passed; Phase 3B.1 callback and 3B.2 window bootstrap passed.**
+Status: **Phase 3A passed; Phase 3B.1/3B.2 and the 3B.3 host handoff passed.**
 
 Snapshot date: **2026-08-10**
 
@@ -135,10 +135,42 @@ The focused gates covered production P1 playback, production pause/resume,
 production close, and reference close. No rendering, audio, timing, or
 shutdown regressions were observed.
 
-## Next gate: Phase 3B.3
+## Phase 3B.3 assembly host handoff
 
-Phase 3B.3 must address the remaining process-entry and host handoff surface:
-command-line acquisition/parsing, DPI-policy setup, crash-filter installation,
-input-watcher startup, and the transition into `DemoStart32`. The C++ reference
-executable remains mandatory until those paths pass the same full-demo visual,
-audio, timing, and stability witnesses.
+[`win32_app_entry.asm`](../port/core/eos_replace/win32_app_entry.asm) is now
+the production handoff immediately after the CRT invokes the trivial C++
+`WinMain` shim. It:
+
+- obtains the process instance through `GetModuleHandleA`;
+- obtains the raw process command line through `GetCommandLineA`;
+- applies `DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2` through Win32; and
+- calls the existing C++ host through the fixed
+  `vk_voodka_host_main(HINSTANCE, LPSTR, int)` ABI.
+
+The reference executable continues to call the host directly from its C++
+`WinMain`. This is deliberately an assembly handoff, not yet a custom linker
+entry: the C++ host still uses the CRT and STL, so bypassing CRT initialization
+would be unsafe at this stage.
+
+### Phase 3B.3 validation
+
+```text
+Release build                                      passed
+production/reference handoff gates                3/3 passed; 31.12 s
+full regression suite                              54/54 passed; 104.31 s
+production handoff                                 NASM x64
+reference handoff                                  C++ direct path
+```
+
+The production tests exercised raw command-line acquisition, P1 startup,
+clean close, and normal host/subsystem sequencing. The complete suite retained
+all rendering, audio, timing, asset, Win32, D3D11, and assembly-audio checks.
+
+## Next gate: Phase 3B.4
+
+Phase 3B.4 must migrate the remaining early host setup: assembly-side command
+line parsing/argument storage, crash-filter registration and reporting, and
+input-watcher startup. It must preserve all seek, recording, diagnostic,
+pause, close, and failure-injection behavior. The C++ reference executable
+remains mandatory until those paths pass the same full-demo visual, audio,
+timing, and stability witnesses.

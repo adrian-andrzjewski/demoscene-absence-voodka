@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.2 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.3 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -930,13 +930,18 @@ Phase 3B.2 now moves production `WNDCLASSW` construction, monitor-aware
 geometry, `CreateWindowExW`, show/focus/topmost handoff, and window/class
 teardown into NASM. `VOODKA_REFERENCE.exe` retains the C++ bootstrap as the
 differential oracle.
+Phase 3B.3 now transfers the production CRT `WinMain` shim into a NASM host
+handoff that obtains the module handle and raw command line, applies DPI policy,
+and calls the existing C++ host ABI. The reference target keeps direct C++
+entry. This is intentionally not a custom `/ENTRY` yet because the host still
+depends on CRT/STL initialization.
 Release validation includes the 54-test suite plus direct timeline runs.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.3: assembly
-process entry and host handoff. Command-line acquisition/parsing, DPI-policy
-setup, crash-filter installation, input-watcher startup, and the transition
-into `DemoStart32` remain C++ until that gate has equivalent evidence.
+libxmp for differential validation. The next gate is Phase 3B.4: assembly-side
+command-line parsing and argument storage, crash-filter registration/reporting,
+and input-watcher startup. The transition into `DemoStart32` and final
+subsystem orchestration remain C++ until those gates have equivalent evidence.
