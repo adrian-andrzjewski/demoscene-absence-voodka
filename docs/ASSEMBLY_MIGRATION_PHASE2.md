@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2K passed; live tracker-to-device swap remains**
+Status: **Phase 2A through Phase 2L passed; live tracker-to-device swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2K changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2L changes production playback.
 
 ## Phase 2A scope
 
@@ -414,13 +414,13 @@ The production application remains on C++/libxmp.
 
 ## Next implementation slices
 
-1. Feed the proven live tracker states into a bounded producer/consumer ring
-   while preserving the Phase 2I timeline snapshot ABI.
-2. Connect that ring to the assembly WASAPI worker behind `--asm-audio`, then
-   compare device timing, PCM counters, scene boundaries, pause/seek behavior,
-   and shutdown against the C++/libxmp path.
-3. Run full-demo and long-run gates, then remove libxmp from the production
-   target; retain it in host-only oracle tools until release signoff.
+1. Connect the proven bounded live ring to the assembly WASAPI worker behind
+   `--asm-audio`, then compare device timing, PCM counters, scene boundaries,
+   pause/seek behavior, and shutdown against the C++/libxmp path.
+2. Add the live pause/seek command protocol and full-demo synchronization
+   gates, including long-run starvation and teardown stress.
+3. Remove libxmp from the production target only after those gates pass; retain
+   it in host-only oracle tools until release signoff.
 
 ## Phase 2I go/no-go
 
@@ -515,5 +515,42 @@ C++/libxmp.
 can run incrementally for the complete module and preserve exact state and PCM
 behavior across continuous mixer chunks.
 **NO-GO to live WASAPI playback or libxmp removal yet:** the next feasibility
-gate is the concurrent producer/ring contract and its shutdown, underrun, and
-pause/seek behavior.
+gate is feeding that ring from the assembly WASAPI worker and proving its
+shutdown, underrun, pause/seek, and full-demo synchronization behavior.
+
+## Phase 2L result: concurrent live PCM/timeline ring
+
+Phase 2L adds the bounded handoff needed between the live tracker/mixer and the
+assembly-owned device worker:
+
+- [`audio_ring.asm`](../port/core/eos_replace/audio_ring.asm) implements a
+  context-based lock-free SPSC ring for interleaved stereo PCM. It publishes
+  payload bytes before its producer index, never overwrites unread frames, and
+  exposes explicit close and backpressure-event counters.
+- The same ABI carries a bounded timeline-marker queue containing absolute
+  output-frame positions and original `(order << 8) | row` ModPos values.
+- [`audio_live_ring_probe.cpp`](../port/tools/validate/audio_live_ring_probe.cpp)
+  runs the persistent assembly tracker and continuous mixer in a producer
+  thread, consumes the ring concurrently, verifies wrap/backpressure/close
+  behavior, and checks every timeline marker.
+- CTest name: `audio.live_ring`.
+
+The gate reports:
+
+```text
+live tracker states                            13,440
+PCM frames                                    11,613,525
+PCM FNV-1a                                    18C7451650A7C772
+timeline markers                               13,440
+marker mismatches                              0
+producer/consumer failures                     0
+underrun events                                 0
+marker overflow events                          0
+repeat runs                                    10/10
+```
+
+This is a **GO** for the bounded concurrent live tracker-to-PCM/timeline
+contract, including wrap-around, producer backpressure, marker ordering, and
+clean closure. It remains a **NO-GO** for the production switch: the ring is
+not yet the source for the assembly WASAPI worker, and pause/seek plus full-demo
+A/V synchronization remain unproven. Production remains C++/libxmp.

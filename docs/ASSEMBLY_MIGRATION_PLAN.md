@@ -441,8 +441,9 @@ No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
 stable 100% assembly demo has not been demonstrated without this gate.
 
 Current Phase 2 result (2026-08-10): **GO through the native effect-state,
-offline PCM mixer, stateful bounded mixer, persistent live tracker,
-WASAPI/COM device, assembly-worker, and bounded PCM handoff gates; NO-GO to
+offline PCM mixer, stateful bounded mixer, persistent live tracker, concurrent
+bounded PCM/timeline ring, WASAPI/COM device, assembly-worker, and bounded PCM
+handoff gates; NO-GO to
 the live production swap or libxmp removal.** The
 host oracle passes and records a
 263.429-second, 11,617,219-frame 44.1 kHz stereo PCM baseline, 2,688 row
@@ -460,8 +461,7 @@ as the oracle. The assembly-owned WASAPI probe now passes exact 44.1 kHz
 stereo PCM negotiation, event delivery, render-buffer acquisition/release,
 stop/reset, and 20 repeated teardown runs. Do not connect it to production or
 remove libxmp until the assembly-owned worker also passes its join/teardown
-stress gate, the live tracker is connected through a bounded producer/ring,
-and the side-by-side path
+stress gate, the live ring feeds the device worker, and the side-by-side path
 survives full-demo A/V synchronization. The Phase 2H worker harness now
 passes 10 repeated one-second lifecycles with real callback wakeups, 23,296 to
 25,856 serviced frames per run, zero timeouts, and clean Stop/Reset/join results.
@@ -477,8 +477,12 @@ GO.
 Phase 2K now runs the tracker incrementally for all 13,440 ticks: every state
 byte matches the offline oracle, the completion sentinel is correct, and the
 live states retain PCM FNV `18C7451650A7C772` through 78 continuous mixer
-chunks. The assembly tracker is not yet connected to a concurrent ring or the
-WASAPI worker, so production remains unchanged.
+chunks. Phase 2L now passes the concurrent bounded ring gate: the live producer
+and consumer transfer all 11,613,525 exact PCM frames and all 13,440 ModPos
+markers through a wrapping SPSC queue, with zero marker mismatches, zero
+producer or consumer failures, zero underrun/marker-overflow events, and 10/10
+repeated runs. The ring is not yet connected to the WASAPI worker, so
+production and libxmp usage remain unchanged.
 
 ---
 

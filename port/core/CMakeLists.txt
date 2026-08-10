@@ -8,6 +8,7 @@ set(VOODKA_CORE_ASM
     eos_replace/audio_voice.asm
     eos_replace/audio_effects.asm
     eos_replace/audio_pcm.asm
+    eos_replace/audio_ring.asm
     eos_replace/audio_wasapi_probe.asm
     eos_replace/audio_thread_probe.asm
     eos_replace/d3d11_asm_probe.asm
