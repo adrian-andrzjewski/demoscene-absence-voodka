@@ -519,4 +519,15 @@ target_link_libraries(d3d11_asm_present_probe PRIVATE
 )
 add_test(NAME d3d11.asm_present_probe COMMAND d3d11_asm_present_probe)
 
+# Phase 2G feasibility gate: the C++ host only prints the report. NASM owns
+# COM initialization, WASAPI endpoint activation, event-driven client setup,
+# render-buffer acquisition/release, and ordered teardown.
+add_executable(audio_wasapi_asm_probe
+    tools/validate/audio_wasapi_asm_probe.cpp)
+target_compile_definitions(audio_wasapi_asm_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_wasapi_asm_probe PRIVATE
+    voodka_core ole32 kernel32)
+add_test(NAME audio.wasapi_asm_probe COMMAND audio_wasapi_asm_probe)
+
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

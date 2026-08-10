@@ -440,8 +440,9 @@ Go only if:
 No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
 stable 100% assembly demo has not been demonstrated without this gate.
 
-Current Phase 2 result (2026-08-10): **GO through the native effect-state and
-offline PCM mixer gates; NO-GO to WASAPI integration or libxmp removal.** The
+Current Phase 2 result (2026-08-10): **GO through the native effect-state,
+offline PCM mixer, and WASAPI/COM device gates; NO-GO to the threaded
+production swap or libxmp removal.** The
 host oracle passes and records a
 263.429-second, 11,617,219-frame 44.1 kHz stereo PCM baseline, 2,688 row
 transitions, and the module-specific effect inventory. `audio.mod_parse` passes
@@ -454,9 +455,11 @@ instrument, sample, volume, pan, event, and logical sample-position behavior.
 sample mismatches and PCM FNV-1a `18C7451650A7C772`. The mixer covers the
 checked-in signed-8-bit mono soundtrack path, including loop-boundary
 interpolation, ramps, anti-click, one-shots, and E9 retriggers. Keep libxmp
-as the oracle and do not integrate WASAPI or remove it from production until
-the mixer survives the side-by-side device gate and full-demo A/V
-synchronization.
+as the oracle. The assembly-owned WASAPI probe now passes exact 44.1 kHz
+stereo PCM negotiation, event delivery, render-buffer acquisition/release,
+stop/reset, and 20 repeated teardown runs. Do not connect it to production or
+remove libxmp until the threaded path survives the side-by-side device gate
+and full-demo A/V synchronization.
 
 ---
 

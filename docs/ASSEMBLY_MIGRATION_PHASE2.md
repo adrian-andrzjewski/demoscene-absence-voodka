@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2F passed offline; device path and production swap remain**
+Status: **Phase 2A through Phase 2G passed; threaded production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2F changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2G changes production playback.
 
 ## Phase 2A scope
 
@@ -295,18 +295,50 @@ If the module changes, the oracle fails before an assembly implementation can
 silently be tested against the wrong soundtrack. The expected inventory must
 then be reviewed and deliberately updated.
 
+## Phase 2G result: native WASAPI/COM device gate
+
+Phase 2G proves the Windows audio API boundary without allowing C++ to own a
+COM interface or audio resource:
+
+- [`audio_wasapi_probe.asm`](../port/core/eos_replace/audio_wasapi_probe.asm)
+  performs `CoInitializeEx`, `CoCreateInstance`, default endpoint selection,
+  `IAudioClient` activation, exact 44.1 kHz stereo 16-bit negotiation,
+  event-callback setup, start, wait, render-buffer acquisition/release, stop,
+  reset, ordered COM release, event close, and `CoUninitialize`.
+- [`audio_wasapi_asm_probe.cpp`](../port/tools/validate/audio_wasapi_asm_probe.cpp)
+  only owns the fixed-width report and pass/fail assertions.
+- CTest name: `audio.wasapi_asm_probe`.
+
+The device gate passes on the current Windows endpoint:
+
+```text
+COM / endpoint / activation / format / initialize     S_OK
+buffer size                                          2646 frames
+event callback                                       delivered
+GetBuffer / ReleaseBuffer                            S_OK / S_OK
+Stop / Reset                                         S_OK / S_OK
+format                                               PCM 44100 Hz stereo
+silent render chunk                                  256 frames
+repeat teardown runs                                 20/20 passed
+```
+
+This is a **GO** for direct assembly COM/WASAPI interoperability and a
+**NO-GO** for the production audio switch. The audio thread, tracker-state
+ownership, PCM-to-device streaming, pause/seek behavior, long-run underrun
+margin, and full-demo A/V synchronization remain unproven. Production
+`VOODKA.exe` remains on the C++/libxmp path.
+
 ## Next implementation slices
 
-1. Add a separate NASM WASAPI/COM probe and an assembly audio-thread harness;
-   keep the proven mixer behind a side-by-side production switch.
-2. Connect the proven mixer to an event-driven render thread behind an
-   `--asm-audio` switch.
+1. Add an assembly-owned render thread around the proven PCM mixer, with an
+   explicit published ModPos snapshot and idempotent stop/join protocol.
+2. Run it side-by-side with the C++ path behind `--asm-audio`, then compare
+   device timing, PCM counters, scene boundaries, and shutdown behavior.
 
-## Phase 2F go/no-go
+## Phase 2G go/no-go
 
-**GO through the offline native PCM mixer.** The oracle, NASM parser, timing
-engine, event decoder, row voice identity engine, effect/tick engine, and
-module-specific mixer agree on the complete direct-tick stream.
-**NO-GO to WASAPI, libxmp removal, or a production assembly-audio switch yet:**
-the audio thread, device integration, and full-demo synchronization remain
-unproven.
+**GO through the native WASAPI/COM device boundary.** The native mixer and
+direct assembly vtable calls work against the current endpoint, including
+event-driven client setup, buffer ownership, and teardown.
+**NO-GO to libxmp removal or a production assembly-audio switch yet:** the
+audio thread and full-demo synchronization remain unproven.
