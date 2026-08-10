@@ -74,6 +74,9 @@ void     timerInit();          // start the 70Hz retrace emulation
 uint64_t getFrameCounter();   // VGA-retrace emulated counter
 void     waitVbl();           // block until next presented retrace tick
 uint64_t getQpcUs();          // high-resolution microseconds since app start
+void     timelineInit(const char* path); // optional per-frame A/V witness
+void     timelineFrame(uint64_t frame, uint64_t qpcUs, uint32_t modpos);
+void     timelineClose();
 
 // ---- progress reporting ------------------------------------------------------
 // Centralized run-progress: updates the window title + structured log whenever

@@ -31,6 +31,7 @@ constexpr uint32_t kMarkerCapacity = 16384;
 constexpr uint32_t kPrebufferFrames = 8192;
 constexpr uint32_t kPushChunk = 1024;
 constexpr uint32_t kDurationMs = 1000;
+constexpr uint32_t kLongRunDurationMs = 15000;
 constexpr uint32_t kControlDurationMs = 2200;
 constexpr uint32_t kSeekDurationMs = 3200;
 constexpr uint32_t kSeekStressDurationMs = 6500;
@@ -148,6 +149,67 @@ struct AudioSeekSegment {
     uint32_t start;
     uint32_t sourceTick;
 };
+
+struct AudioTimelineSample {
+    uint64_t elapsedUs;
+    uint32_t consumedFrames;
+    uint32_t publishedFrame;
+    uint32_t modpos;
+    uint32_t paused;
+};
+
+struct AudioTimelineArgs {
+    AudioRingThreadReport* report;
+    AudioLiveControl* control;
+    std::vector<AudioTimelineSample>* samples;
+    volatile LONG stop;
+    int64_t qpcStart;
+    int64_t qpcFrequency;
+};
+
+int64_t qpcNow() {
+    LARGE_INTEGER value{};
+    QueryPerformanceCounter(&value);
+    return value.QuadPart;
+}
+
+DWORD WINAPI timelineThread(void* raw) {
+    auto* args = static_cast<AudioTimelineArgs*>(raw);
+    while (InterlockedCompareExchange(&args->stop, 0, 0) == 0) {
+        const int64_t now = qpcNow();
+        const uint64_t elapsed = now >= args->qpcStart
+            ? static_cast<uint64_t>(
+                (now - args->qpcStart) * 1000000.0 /
+                static_cast<double>(args->qpcFrequency))
+            : 0;
+        MemoryBarrier();
+        const uint32_t consumed = args->control
+            ? args->control->workerConsumedFrames
+            : args->report->publishedPcmFrame;
+        const uint32_t published = args->report->publishedPcmFrame;
+        const uint32_t modpos = args->report->publishedModPos;
+        const uint32_t paused = args->control
+            ? args->control->acknowledgedState : 0;
+        args->samples->push_back({elapsed, consumed, published, modpos,
+                                  paused});
+        Sleep(10);
+    }
+    return 0;
+}
+
+bool writeTimeline(const char* path,
+                   const std::vector<AudioTimelineSample>& samples) {
+    if (!path || !path[0]) return true;
+    std::ofstream file(path, std::ios::binary | std::ios::trunc);
+    if (!file) return false;
+    file << "# elapsed_us consumed_frames published_frame modpos paused\n";
+    for (const auto& sample : samples) {
+        file << sample.elapsedUs << ' ' << sample.consumedFrames << ' '
+             << sample.publishedFrame << ' ' << sample.modpos << ' '
+             << sample.paused << '\n';
+    }
+    return static_cast<bool>(file);
+}
 
 bool producerHandleSeek(ProducerArgs* args,
                         AudioLiveTrackerContext* tracker,
@@ -401,14 +463,41 @@ uint32_t expectedSegmentModPos(
 } // namespace
 
 int main(int argc, char** argv) {
-    const bool controlMode = argc == 3 && std::strcmp(argv[2], "--control") == 0;
-    const bool seekMode = argc == 3 && std::strcmp(argv[2], "--seek") == 0;
-    const bool stressMode = argc == 3 && std::strcmp(argv[2], "--stress") == 0;
+    bool controlMode = false;
+    bool seekMode = false;
+    bool stressMode = false;
+    bool longRunMode = false;
+    const char* timelinePath = nullptr;
+    for (int i = 2; i < argc; ++i) {
+        if (std::strcmp(argv[i], "--control") == 0 &&
+            !controlMode && !seekMode && !stressMode && !longRunMode) {
+            controlMode = true;
+        } else if (std::strcmp(argv[i], "--seek") == 0 &&
+                   !controlMode && !seekMode && !stressMode && !longRunMode) {
+            seekMode = true;
+        } else if (std::strcmp(argv[i], "--stress") == 0 &&
+                   !controlMode && !seekMode && !stressMode && !longRunMode) {
+            stressMode = true;
+        } else if (std::strcmp(argv[i], "--longrun") == 0 &&
+                   !controlMode && !seekMode && !stressMode &&
+                   !longRunMode) {
+            longRunMode = true;
+        } else if (std::strcmp(argv[i], "--timeline") == 0 &&
+                   i + 1 < argc && !timelinePath) {
+            timelinePath = argv[++i];
+        } else {
+            std::cerr << "usage: audio_live_wasapi_probe <module.mod> "
+                         "[--control|--seek|--stress] "
+                         "[--longrun] [--timeline <path>]\n";
+            return 2;
+        }
+    }
     const bool seekCommandMode = seekMode || stressMode;
     const bool commandMode = controlMode || seekCommandMode;
-    if (argc != 2 && !commandMode) {
+    if (argc < 2 || !argv[1][0]) {
         std::cerr << "usage: audio_live_wasapi_probe <module.mod> "
-                     "[--control|--seek|--stress]\n";
+                     "[--control|--seek|--stress] "
+                     "[--longrun] [--timeline <path>]\n";
         return 2;
     }
 
@@ -513,8 +602,9 @@ int main(int argc, char** argv) {
     AudioRingThreadArgs args{
         &ring,
         controlMode ? kControlDurationMs :
+            (longRunMode ? kLongRunDurationMs :
             (stressMode ? kSeekStressDurationMs :
-                (seekMode ? kSeekDurationMs : kDurationMs)),
+                (seekMode ? kSeekDurationMs : kDurationMs))),
         commandMode ? &control : nullptr};
     AudioRingThreadReport report{};
     std::vector<AudioSeekCheckpoint> seekCheckpoints;
@@ -527,13 +617,36 @@ int main(int argc, char** argv) {
     uint32_t seekBaseConsumed = 0;
     uint32_t seekSequence = 0;
     DWORD probeWait = WAIT_OBJECT_0;
+    std::vector<AudioTimelineSample> timelineSamples;
+    AudioTimelineArgs timelineArgs{};
+    HANDLE timelineHandle = nullptr;
+    LARGE_INTEGER timelineFrequency{};
+    QueryPerformanceFrequency(&timelineFrequency);
     if (prebuffered) {
-        if (!commandMode) {
+        if (!commandMode && !timelinePath) {
             result = asm_audio_ring_thread_probe(&args, &report);
         } else {
             ProbeThreadArgs probe{&args, &report};
             HANDLE probeHandle = CreateThread(nullptr, 0, probeThread, &probe,
                                               0, nullptr);
+            if (probeHandle) {
+                if (timelinePath) {
+                    timelineArgs.report = &report;
+                    timelineArgs.control = commandMode ? &control : nullptr;
+                    timelineArgs.samples = &timelineSamples;
+                    timelineArgs.stop = 0;
+                    timelineArgs.qpcStart = qpcNow();
+                    timelineArgs.qpcFrequency = timelineFrequency.QuadPart;
+                    timelineHandle = CreateThread(nullptr, 0, timelineThread,
+                                                  &timelineArgs, 0, nullptr);
+                    if (!timelineHandle) {
+                        InterlockedExchange(&timelineArgs.stop, 1);
+                        WaitForSingleObject(probeHandle, INFINITE);
+                        CloseHandle(probeHandle);
+                        probeHandle = nullptr;
+                    }
+                }
+            }
             if (probeHandle) {
                 Sleep(100);
                 auto performSeek = [&](uint32_t targetTick,
@@ -659,6 +772,16 @@ int main(int argc, char** argv) {
         }
     }
 
+    if (timelineHandle) {
+        InterlockedExchange(&timelineArgs.stop, 1);
+        WaitForSingleObject(timelineHandle, INFINITE);
+        CloseHandle(timelineHandle);
+    }
+    if (!writeTimeline(timelinePath, timelineSamples)) {
+        std::cerr << "audio_live_wasapi_probe: cannot write timeline\n";
+        result = 1;
+    }
+
     InterlockedExchange(&producer.stopRequested, 1);
     DWORD producerWait = WaitForSingleObject(producerHandle, 10000);
     if (producerWait != WAIT_OBJECT_0) {
@@ -735,6 +858,7 @@ int main(int argc, char** argv) {
         "pcm_fnv=0x%016llX expected_fnv=0x%016llX control=%u "
         "pause_transitions=%u paused_frames=%u final_paused=%u "
         "seek_base=%u post_seek_frames=%u seek_sequence=%u seek_count=%u "
+        "timeline_samples=%u "
         "paused_stable=%u probe_wait=%08X producer_wait=%08X "
         "producer_failed=%ld\n",
         result, prebuffered ? 1u : 0u, stateFrames, producer.producedStates,
@@ -749,6 +873,7 @@ int main(int argc, char** argv) {
         commandMode ? 1u : 0u, report.pauseTransitions, report.pausedFrames,
         report.finalPausedState, seekBaseConsumed, postSeekFrames,
         seekSequence, static_cast<uint32_t>(seekCheckpoints.size()),
+        static_cast<uint32_t>(timelineSamples.size()),
         pausedStable ? 1u : 0u, probeWait, producerWait, producer.failed);
 
     const bool hresultsOk =
@@ -766,9 +891,10 @@ int main(int argc, char** argv) {
         common.firstWait == 1 && common.eventWakeups > 0 &&
         common.frames > 0 && common.timeouts == 0 && common.workerExit == 0 &&
         common.durationMs ==
+            (longRunMode ? kLongRunDurationMs :
             (controlMode ? kControlDurationMs :
                 (stressMode ? kSeekStressDurationMs :
-                    (seekMode ? kSeekDurationMs : kDurationMs)));
+                    (seekMode ? kSeekDurationMs : kDurationMs))));
     const bool consumedRangeOk = !seekCommandMode
         ? report.consumedFrames <= totalFrames
         : expectedHashOk && !seekSegments.empty() &&
@@ -815,11 +941,21 @@ int main(int argc, char** argv) {
         !commandMode ||
         (controlOk && report.pauseTransitions == expectedPauseTransitions &&
          report.pausedFrames > 0 && report.finalPausedState == 0);
-    if (!hresultsOk || !threadOk || !transferOk || !controlReportOk) {
+    bool timelineOk = !timelinePath || timelineSamples.size() >= 2;
+    for (size_t i = 1; i < timelineSamples.size(); ++i) {
+        const auto& previous = timelineSamples[i - 1];
+        const auto& current = timelineSamples[i];
+        timelineOk = timelineOk && current.elapsedUs >= previous.elapsedUs &&
+            current.consumedFrames >= previous.consumedFrames &&
+            current.publishedFrame >= previous.publishedFrame;
+    }
+    if (!hresultsOk || !threadOk || !transferOk || !controlReportOk ||
+        !timelineOk) {
         std::cerr << "audio_live_wasapi_probe: FAIL hresults=" << hresultsOk
                   << " thread=" << threadOk
                   << " transfer=" << transferOk
-                  << " control=" << controlReportOk << '\n';
+                  << " control=" << controlReportOk
+                  << " timeline=" << timelineOk << '\n';
         return 1;
     }
     return 0;

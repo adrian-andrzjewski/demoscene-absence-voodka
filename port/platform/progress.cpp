@@ -61,6 +61,7 @@ void progressInit(void* hwnd) {
 
 void progressUpdate() {
     uint32_t mp = getModPos();
+    timelineFrame(getFrameCounter(), getQpcUs(), mp);
 
     // find the active scene: the last boundary <= current ModPos
     int idx = 0;

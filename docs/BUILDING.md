@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (46 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (47 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -59,6 +59,7 @@ audio_live_wasapi_probe.exe live ring-to-assembly-WASAPI handoff gate
 audio_live_wasapi_probe.exe --control pause/resume command-protocol gate
 audio_live_wasapi_probe.exe --seek coordinated tracker/mixer seek gate
 audio_live_wasapi_probe.exe --stress repeated live-seek/teardown stress gate
+audio_live_wasapi_probe.exe --longrun sustained 15-second live handoff gate
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -77,6 +78,7 @@ VOODKA.exe --ms N              start N milliseconds into the module
 VOODKA.exe --music <file>      override the module path
 VOODKA.exe --record <dir>      dump every frame (320x200 index + palette)
 VOODKA.exe --diag <dir>        GPU readback diagnostics
+VOODKA.exe --timeline <file>   per-frame QPC/ModPos/audio-clock witness
 VOODKA.exe --audiocheck [sec]  audio subsystem self-check (default 20 s)
 VOODKA.exe --selftest          render the built-in test pattern
 Space                          pause/resume (freezes retrace + audio)
@@ -91,7 +93,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-46 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+47 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -165,6 +167,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --control` | Phase 2N ordered pause/resume acknowledgement, ring freeze, PCM-prefix, and teardown gate (CTest `audio.live_wasapi_control`) |
 | `audio_live_wasapi_probe --seek` | Phase 2O pause, producer quiescence, PCM/marker ring flush, tracker/mixer reposition, post-seek refill, and A/V timeline validation (CTest `audio.live_wasapi_seek`) |
 | `audio_live_wasapi_probe --stress` | Phase 2P three-seek live stress across one producer/ring/WASAPI worker, segment PCM/timeline validation, and clean teardown (CTest `audio.live_wasapi_stress`) |
+| `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
 
 ## Troubleshooting
 

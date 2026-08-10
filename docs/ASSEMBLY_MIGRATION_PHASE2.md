@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2P passed; live production swap remains**
+Status: **Phase 2A through Phase 2Q passed; live production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -702,3 +702,45 @@ and the measured teardown window. It remains a **NO-GO** for the production
 switch and libxmp removal until full-demo scene-driven A/V comparison,
 extended starvation testing, production shutdown stress, and the final
 application integration gate pass.
+
+## Phase 2Q result: production-clock and sustained-transfer witnesses
+
+Phase 2Q adds the evidence needed before attempting to select the assembly
+player in the real demo process, without changing the production audio path:
+
+- `VOODKA.exe --timeline <file>` records one row per rendered 70 Hz frame at
+  the same `waitVbl()` choke point used by the assembly scene code. Each row
+  contains the frame number, QPC time, the exact ModPos returned to the scene,
+  and the current libxmp elapsed-clock value.
+- `audio_live_wasapi_probe --timeline <file>` samples the assembly-owned
+  WASAPI worker's consumed PCM boundary, published timeline marker, and pause
+  state while the device is active. The file is a diagnostic witness only;
+  it does not participate in playback.
+- `audio_live_wasapi_probe --longrun` keeps the same native assembly producer,
+  ring, and WASAPI worker alive for 15 seconds and validates the complete PCM
+  prefix, marker transfer, no-underrun contract, and clean teardown.
+
+The first synchronized slice passed on the Release build:
+
+```text
+production P1 timeline                          1,814 frames, clean exit
+production ModPos range                         0x0000 -> 0x0400
+production QPC/ModPos monotonicity              clean
+assembly basic live timeline                    64 samples, 0x0009 at ~1.0 s
+assembly repeated-seek timeline                 408 samples, monotonic
+assembly repeated-seek underruns                0
+assembly repeated-seek marker overflows         0
+```
+
+The production `audio_elapsed_us` field is deliberately informational: the
+current libxmp `fi.time` value can restart at an order boundary, whereas the
+monotonic ModPos and QPC fields are the synchronization contract. The first
+slice therefore does not treat that legacy diagnostic field as an A/V gate.
+
+The 15-second sustained-transfer CTest is the next repeatable starvation
+baseline. This is a **GO** for adding production-clock observability and for
+the sustained assembly handoff witness. It remains a **NO-GO** for selecting
+assembly audio in `VOODKA.exe`: the assembly worker still needs a persistent
+start/stop service ABI, the producer must be moved behind the production
+audio interface, and the full eight-part run must be compared with aligned
+frame/ModPos/audio evidence before libxmp can be removed.
