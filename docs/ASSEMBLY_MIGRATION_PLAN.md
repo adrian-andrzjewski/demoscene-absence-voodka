@@ -441,8 +441,8 @@ No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
 stable 100% assembly demo has not been demonstrated without this gate.
 
 Current Phase 2 result (2026-08-10): **GO through the native effect-state,
-offline PCM mixer, and WASAPI/COM device gates; NO-GO to the threaded
-production swap or libxmp removal.** The
+offline PCM mixer, WASAPI/COM device, assembly-worker, and bounded PCM handoff
+gates; NO-GO to the live production swap or libxmp removal.** The
 host oracle passes and records a
 263.429-second, 11,617,219-frame 44.1 kHz stereo PCM baseline, 2,688 row
 transitions, and the module-specific effect inventory. `audio.mod_parse` passes
@@ -459,11 +459,14 @@ as the oracle. The assembly-owned WASAPI probe now passes exact 44.1 kHz
 stereo PCM negotiation, event delivery, render-buffer acquisition/release,
 stop/reset, and 20 repeated teardown runs. Do not connect it to production or
 remove libxmp until the assembly-owned worker also passes its join/teardown
-stress gate, the tracker mixer is connected, and the side-by-side path
+stress gate, the live tracker mixer is connected, and the side-by-side path
 survives full-demo A/V synchronization. The Phase 2H worker harness now
 passes 10 repeated one-second lifecycles with real callback wakeups, 23,296 to
-25,856 serviced frames per run, zero timeouts, and clean Stop/Reset/join results; it
-intentionally writes silence and is not yet the production player.
+25,856 serviced frames per run, zero timeouts, and clean Stop/Reset/join results.
+Phase 2I now passes 10 repeated bounded handoffs of the exact native PCM
+stream: 45,864 to 46,305 device frames, 99 to 100 wakeups/snapshots, zero
+timeouts, zero source wraps, and clean worker exit. That handoff is immutable
+pre-rendered PCM, not yet the live production player.
 
 ---
 

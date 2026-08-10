@@ -4,47 +4,10 @@
 // supplies a duration, receives a fixed-width report, and checks that the
 // worker joined after servicing real endpoint wakeups.
 
-#include <cstddef>
+#include "audio_thread_abi.h"
+
 #include <cstdint>
 #include <cstdio>
-
-struct AudioThreadAsmProbeReport {
-    uint32_t threadCreated;
-    uint32_t threadPriority;
-    uint32_t threadWait;
-    uint32_t comHr;
-    uint32_t enumeratorHr;
-    uint32_t endpointHr;
-    uint32_t activateHr;
-    uint32_t formatHr;
-    uint32_t initializeHr;
-    uint32_t bufferSize;
-    uint32_t eventCreated;
-    uint32_t setEventHr;
-    uint32_t serviceHr;
-    uint32_t startHr;
-    uint32_t firstWait;
-    uint32_t paddingHr;
-    uint32_t paddingFrames;
-    uint32_t getBufferHr;
-    uint32_t releaseHr;
-    uint32_t stopHr;
-    uint32_t resetHr;
-    uint32_t eventWakeups;
-    uint32_t frames;
-    uint32_t timeouts;
-    uint32_t workerExit;
-    uint32_t durationMs;
-};
-
-static_assert(sizeof(AudioThreadAsmProbeReport) == 104);
-static_assert(offsetof(AudioThreadAsmProbeReport, firstWait) == 56);
-static_assert(offsetof(AudioThreadAsmProbeReport, paddingFrames) == 64);
-static_assert(offsetof(AudioThreadAsmProbeReport, eventWakeups) == 84);
-static_assert(offsetof(AudioThreadAsmProbeReport, durationMs) == 100);
-
-extern "C" uint32_t asm_audio_thread_probe(
-    uint32_t durationMs, AudioThreadAsmProbeReport* report);
 
 int main() {
     constexpr uint32_t kDurationMs = 1000;

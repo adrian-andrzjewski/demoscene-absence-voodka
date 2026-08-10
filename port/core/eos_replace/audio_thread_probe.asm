@@ -1,10 +1,11 @@
 ; audio_thread_probe.asm - assembly-owned WASAPI render-thread harness.
 ;
-; This gate deliberately writes silence. It proves the hardest platform
-; lifetime boundary first: the worker initializes its own COM apartment,
-; owns the WASAPI interfaces and event, services repeated render wakeups,
-; observes a process stop event, and tears everything down before joining.
-; The proven native PCM mixer is connected only after this substrate passes.
+; The no-PCM entry writes silence while proving the hardest platform lifetime
+; boundary first: the worker initializes its own COM apartment, owns the
+; WASAPI interfaces and event, services repeated render wakeups, observes a
+; process stop event, and tears everything down before joining. The PCM entry
+; reuses that ownership path and copies a bounded native mixer stream directly
+; into the render buffers.
 
 BITS 64
 DEFAULT REL
@@ -20,6 +21,7 @@ DEFAULT REL
 %define WASAPI_BUFFER_100NS                600000
 %define THREAD_WAIT_TIMEOUT_MS             1000
 %define THREAD_MAX_FRAMES                  256
+%define PCM_THREAD_MAX_FRAMES              4096
 %define WAIT_OBJECT_0                      0
 %define WAIT_TIMEOUT                       0x102
 %define THREAD_PRIORITY_ABOVE_NORMAL       1
@@ -39,7 +41,7 @@ DEFAULT REL
 %define IAudioRenderClient_RELEASE_BUFFER  4
 %define IUNKNOWN_RELEASE                  2
 
-; AudioThreadAsmProbeReport: twenty-five uint32_t fields.
+; AudioThreadAsmProbeReport: twenty-six uint32_t fields.
 %define REPORT_THREAD_CREATED             0
 %define REPORT_THREAD_PRIORITY            4
 %define REPORT_THREAD_WAIT                8
@@ -68,6 +70,22 @@ DEFAULT REL
 %define REPORT_DURATION_MS              100
 %define REPORT_BYTES                    104
 
+; AudioPcmThreadArgs offsets.
+%define ARGS_PCM                           0
+%define ARGS_PCM_FRAMES                    8
+%define ARGS_TICK_STARTS                  16
+%define ARGS_MODPOS                       24
+%define ARGS_TICK_COUNT                   32
+%define ARGS_DURATION_MS                  36
+
+; Extra fields after the common thread report.
+%define PCM_REPORT_PUBLISHED_TICK        104
+%define PCM_REPORT_PUBLISHED_MODPOS      108
+%define PCM_REPORT_PUBLISHED_FRAME       112
+%define PCM_REPORT_SNAPSHOT_UPDATES      116
+%define PCM_REPORT_SOURCE_LOOPS          120
+%define PCM_REPORT_BYTES                 124
+
 extern CoInitializeEx
 extern CoUninitialize
 extern CoCreateInstance
@@ -82,6 +100,7 @@ extern SetThreadPriority
 extern Sleep
 
 global asm_audio_thread_probe
+global asm_audio_pcm_thread_probe
 
 section .bss
 align 8
@@ -99,6 +118,16 @@ thread_started:          resd 1
 thread_com_initialized:  resd 1
 thread_first_wait_seen:  resd 1
 thread_thread_id:        resd 1
+thread_pcm_mode:         resd 1
+thread_report_bytes:     resd 1
+thread_pcm_ptr:          resq 1
+thread_pcm_frames:       resd 1
+thread_tick_starts:      resq 1
+thread_modpos_by_tick:    resq 1
+thread_tick_count:       resd 1
+thread_pcm_cursor:       resd 1
+thread_published_tick:    resd 1
+thread_source_loops:      resd 1
 
 section .data
 align 4
@@ -305,11 +334,37 @@ audio_thread_probe_worker:
         mov     eax, dword [r12 + REPORT_BUFFER_SIZE]
         sub     eax, dword [r12 + REPORT_PADDING_FRAMES]
         jbe     .worker_wait
+        cmp     dword [rel thread_pcm_mode], 0
+        jne     .pcm_chunk_limit
         cmp     eax, THREAD_MAX_FRAMES
         jbe     .chunk_selected
         mov     eax, THREAD_MAX_FRAMES
+        jmp     .chunk_selected
+.pcm_chunk_limit:
+        cmp     eax, PCM_THREAD_MAX_FRAMES
+        jbe     .chunk_selected
+        mov     eax, PCM_THREAD_MAX_FRAMES
 .chunk_selected:
         mov     r14d, eax
+
+        ; A PCM handoff never asks WASAPI for more source frames than remain
+        ; before the immutable stream wraps.  The one-second probe does not
+        ; reach the wrap, but keeping the boundary explicit makes the ABI
+        ; safe for later looping tests.
+        cmp     dword [rel thread_pcm_mode], 0
+        je      .pcm_chunk_ready
+        mov     eax, dword [rel thread_pcm_frames]
+        sub     eax, dword [rel thread_pcm_cursor]
+        test    eax, eax
+        jnz     .pcm_source_available
+        mov     dword [rel thread_pcm_cursor], 0
+        inc     dword [rel thread_source_loops]
+        mov     eax, dword [rel thread_pcm_frames]
+.pcm_source_available:
+        cmp     r14d, eax
+        jbe     .pcm_chunk_ready
+        mov     r14d, eax
+.pcm_chunk_ready:
 
         mov     rcx, [rel thread_render]
         mov     edx, r14d
@@ -320,9 +375,64 @@ audio_thread_probe_worker:
         test    eax, eax
         js      .worker_cleanup
 
+        cmp     dword [rel thread_pcm_mode], 0
+        je      .release_silence
+
+        ; The negotiated format is interleaved signed 16-bit stereo: one
+        ; output frame is one dword.  The copy is deliberately in assembly so
+        ; the device handoff has no C++ conversion or buffer ownership path.
+        mov     rdi, [rel thread_buffer_data]
+        mov     rsi, [rel thread_pcm_ptr]
+        mov     eax, dword [rel thread_pcm_cursor]
+        lea     rsi, [rsi + rax * 4]
+        mov     ecx, r14d
+        cld
+        rep movsd
+
+        mov     eax, dword [rel thread_pcm_cursor]
+        add     eax, r14d
+        cmp     eax, dword [rel thread_pcm_frames]
+        jb      .pcm_cursor_store
+        sub     eax, dword [rel thread_pcm_frames]
+        inc     dword [rel thread_source_loops]
+.pcm_cursor_store:
+        mov     dword [rel thread_pcm_cursor], eax
+
+        ; Publish a stable timeline point only after the corresponding PCM
+        ; frames have been copied.  tickStarts is cumulative output-frame
+        ; timing; modposByTick is the immutable (order<<8)|row snapshot.
+        mov     ecx, dword [rel thread_published_tick]
+.publish_tick_loop:
+        mov     eax, ecx
+        inc     eax
+        cmp     eax, dword [rel thread_tick_count]
+        jae     .publish_tick_done
+        mov     rdx, [rel thread_tick_starts]
+        mov     ebx, dword [rdx + rax * 4]
+        cmp     dword [rel thread_pcm_cursor], ebx
+        jb      .publish_tick_done
+        inc     ecx
+        mov     dword [rel thread_published_tick], ecx
+        jmp     .publish_tick_loop
+.publish_tick_done:
+        mov     rdx, [rel thread_modpos_by_tick]
+        mov     eax, dword [rel thread_published_tick]
+        mov     eax, dword [rdx + rax * 4]
+        mov     dword [r12 + PCM_REPORT_PUBLISHED_MODPOS], eax
+        mov     eax, dword [rel thread_published_tick]
+        mov     dword [r12 + PCM_REPORT_PUBLISHED_TICK], eax
+        mov     eax, dword [rel thread_pcm_cursor]
+        mov     dword [r12 + PCM_REPORT_PUBLISHED_FRAME], eax
+        inc     dword [r12 + PCM_REPORT_SNAPSHOT_UPDATES]
+
+        xor     r8d, r8d                    ; PCM data was written
+        jmp     .release_buffer
+
+.release_silence:
+        mov     r8d, AUDCLNT_BUFFERFLAGS_SILENT
+.release_buffer:
         mov     rcx, [rel thread_render]
         mov     edx, r14d
-        mov     r8d, AUDCLNT_BUFFERFLAGS_SILENT
         mov     rax, [rcx]
         call    qword [rax + IAudioRenderClient_RELEASE_BUFFER * 8]
         mov     dword [r12 + REPORT_RELEASE_HR], eax
@@ -389,6 +499,11 @@ audio_thread_probe_worker:
         je      .worker_no_com
         call    CoUninitialize
 .worker_no_com:
+        cmp     dword [rel thread_pcm_mode], 0
+        je      .worker_report_exit
+        mov     eax, dword [rel thread_source_loops]
+        mov     dword [r12 + PCM_REPORT_SOURCE_LOOPS], eax
+.worker_report_exit:
         mov     dword [r12 + REPORT_WORKER_EXIT], r13d
         mov     eax, r13d
         add     rsp, 0x88
@@ -405,6 +520,17 @@ audio_thread_probe_worker:
 ; uint32_t asm_audio_thread_probe(uint32_t durationMs,
 ;                                 AudioThreadAsmProbeReport* report)
 asm_audio_thread_probe:
+        xor     r8d, r8d                    ; no PCM handoff context
+        jmp     audio_thread_probe_entry
+
+; uint32_t asm_audio_pcm_thread_probe(const AudioPcmThreadArgs* args,
+;                                     AudioPcmThreadReport* report)
+asm_audio_pcm_thread_probe:
+        mov     r8, rcx                     ; retain args across the prologue
+        mov     ecx, dword [r8 + ARGS_DURATION_MS]
+        jmp     audio_thread_probe_entry
+
+audio_thread_probe_entry:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -420,9 +546,36 @@ asm_audio_thread_probe:
         mov     r12, rdx                    ; report pointer
         mov     r13d, 1
 
+        mov     dword [rel thread_pcm_mode], 0
+        mov     dword [rel thread_report_bytes], REPORT_BYTES
+        mov     qword [rel thread_pcm_ptr], 0
+        mov     dword [rel thread_pcm_frames], 0
+        mov     qword [rel thread_tick_starts], 0
+        mov     qword [rel thread_modpos_by_tick], 0
+        mov     dword [rel thread_tick_count], 0
+        mov     dword [rel thread_pcm_cursor], 0
+        mov     dword [rel thread_published_tick], 0
+        mov     dword [rel thread_source_loops], 0
+        test    r8, r8
+        jz      .main_args_ready
+        mov     dword [rel thread_pcm_mode], 1
+        mov     dword [rel thread_report_bytes], PCM_REPORT_BYTES
+        mov     rax, [r8 + ARGS_PCM]
+        mov     [rel thread_pcm_ptr], rax
+        mov     eax, [r8 + ARGS_PCM_FRAMES]
+        mov     [rel thread_pcm_frames], eax
+        mov     rax, [r8 + ARGS_TICK_STARTS]
+        mov     [rel thread_tick_starts], rax
+        mov     rax, [r8 + ARGS_MODPOS]
+        mov     [rel thread_modpos_by_tick], rax
+        mov     eax, [r8 + ARGS_TICK_COUNT]
+        mov     [rel thread_tick_count], eax
+.main_args_ready:
+
         mov     rdi, r12
         xor     eax, eax
-        mov     ecx, REPORT_BYTES / 4
+        mov     ecx, [rel thread_report_bytes]
+        shr     ecx, 2
         rep stosd
         mov     dword [r12 + REPORT_DURATION_MS], esi
 
@@ -491,6 +644,16 @@ asm_audio_thread_probe:
         mov     qword [rel thread_enumerator], 0
         mov     qword [rel thread_closest_format], 0
         mov     qword [rel thread_buffer_data], 0
+        mov     qword [rel thread_pcm_ptr], 0
+        mov     qword [rel thread_tick_starts], 0
+        mov     qword [rel thread_modpos_by_tick], 0
+        mov     dword [rel thread_pcm_frames], 0
+        mov     dword [rel thread_tick_count], 0
+        mov     dword [rel thread_pcm_cursor], 0
+        mov     dword [rel thread_published_tick], 0
+        mov     dword [rel thread_source_loops], 0
+        mov     dword [rel thread_pcm_mode], 0
+        mov     dword [rel thread_report_bytes], 0
         mov     dword [rel thread_started], 0
         mov     dword [rel thread_com_initialized], 0
         mov     dword [rel thread_first_wait_seen], 0

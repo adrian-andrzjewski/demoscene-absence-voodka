@@ -537,8 +537,27 @@ add_executable(audio_thread_asm_probe
     tools/validate/audio_thread_asm_probe.cpp)
 target_compile_definitions(audio_thread_asm_probe PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_thread_asm_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/validate")
 target_link_libraries(audio_thread_asm_probe PRIVATE
     voodka_core ole32 kernel32)
 add_test(NAME audio.thread_asm_probe COMMAND audio_thread_asm_probe)
+
+# Phase 2I feasibility gate: the host pre-renders the exact native assembly
+# tracker/mixer stream, then passes immutable PCM and tick/ModPos timing arrays
+# to the assembly worker. NASM performs the signed-16 stereo device copy and
+# publishes the post-copy timeline snapshot; production audio remains on the
+# existing C++/libxmp path until the live handoff is proven.
+add_executable(audio_pcm_thread_probe
+    tools/validate/audio_pcm_thread_probe.cpp)
+target_compile_definitions(audio_pcm_thread_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_pcm_thread_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/tools/validate")
+target_link_libraries(audio_pcm_thread_probe PRIVATE
+    voodka_core ole32 kernel32)
+add_test(NAME audio.pcm_thread_probe
+         COMMAND audio_pcm_thread_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

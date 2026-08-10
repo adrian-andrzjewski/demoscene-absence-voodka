@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2H passed; tracker-to-device swap remains**
+Status: **Phase 2A through Phase 2I passed; live tracker-to-device swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A through 2H changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2I changes production playback.
 
 ## Phase 2A scope
 
@@ -360,13 +360,6 @@ for connecting the tracker mixer or replacing production audio. Tracker state
 ownership, published ModPos snapshots, PCM-to-device equivalence, pause/seek,
 long-run underrun margin, and full-demo A/V synchronization remain ahead.
 
-## Next implementation slices
-
-1. Connect the proven assembly tracker/mixer state to this worker through a
-   fixed published snapshot and bounded PCM ring/buffer contract.
-2. Run the connected path side-by-side with the C++ path behind `--asm-audio`,
-   then compare device timing, PCM counters, scene boundaries, and shutdown.
-
 ## Phase 2H go/no-go
 
 **GO through the assembly-owned audio-thread substrate.** The worker owns its
@@ -374,3 +367,67 @@ COM apartment and WASAPI resources, services real callback wakeups, and joins
 after ordered stop/reset/release cleanup.
 **NO-GO to libxmp removal or a production assembly-audio switch yet:** the
 tracker mixer has not been connected to the worker or full-demo timeline.
+
+## Phase 2I result: native PCM-to-device handoff and timeline snapshot
+
+Phase 2I connects the already-proven native tracker/mixer output to the
+already-proven assembly-owned WASAPI worker without putting a C++ object or
+library callback in the device path:
+
+- [`audio_pcm_thread_probe.cpp`](../port/tools/validate/audio_pcm_thread_probe.cpp)
+  uses the native NASM parser, tracker state tracer, and PCM mixer to render
+  the complete exact signed-16 stereo stream. It builds cumulative output-frame
+  tick boundaries and `(order << 8) | row` ModPos values as immutable handoff
+  arrays.
+- [`audio_thread_probe.asm`](../port/core/eos_replace/audio_thread_probe.asm)
+  receives that bounded handoff, copies the actual interleaved stereo PCM into
+  `IAudioRenderClient` buffers, and publishes the timeline only after the
+  corresponding device frames have been copied. It owns the worker, COM
+  apartment, WASAPI interfaces, event waits, and teardown.
+- [`audio_thread_abi.h`](../port/tools/validate/audio_thread_abi.h) defines the
+  fixed x64 argument/report layouts shared by the probe and NASM. The host
+  validator only prepares immutable test data and checks the report.
+- CTest name: `audio.pcm_thread_probe`.
+
+The current endpoint reports:
+
+```text
+pre-rendered native PCM                         11,613,525 frames
+PCM FNV-1a                                      18C7451650A7C772
+tracker states                                  13,440
+one-second device frames                       45,864-46,305
+event wakeups                                  99-100
+WASAPI HRESULTs / timeouts                     all zero
+post-copy timeline snapshots                   99-100
+published ModPos                               0x000A
+source wraps                                   0
+worker exit / Stop / Reset                     0 / S_OK / S_OK
+repeat handoff runs                            10/10 passed
+```
+
+This is a **GO** for the bounded native PCM-to-WASAPI handoff, assembly buffer
+copy, and post-copy timeline publication. It is deliberately still a **NO-GO**
+for the production switch: the probe pre-renders the whole soundtrack, has no
+live tracker state owner, and does not exercise pause, seek, scene-driven audio
+selection, full-demo synchronization, or long-run ring-buffer starvation.
+The production application remains on C++/libxmp.
+
+## Next implementation slices
+
+1. Replace the immutable pre-render with a live assembly tracker/mixer owner
+   feeding a bounded PCM ring while preserving the same timeline snapshot ABI.
+2. Add a side-by-side `--asm-audio` path, then compare device timing, PCM
+   counters, scene boundaries, pause/seek behavior, and shutdown against the
+   C++/libxmp path.
+3. Only after full-demo and long-run gates pass, remove libxmp from the
+   production target; retain it in host-only oracle tools until release signoff.
+
+## Phase 2I go/no-go
+
+**GO through the native PCM-to-device handoff.** Native NASM-generated PCM is
+accepted by the assembly-owned worker, real WASAPI buffers receive it, and the
+assembly worker publishes a matching post-copy ModPos snapshot with clean
+repeatable teardown.
+**NO-GO to live production audio or libxmp removal yet:** the current gate is
+an immutable pre-rendered stream. A live ring-buffer mixer, pause/seek contract,
+full-demo A/V synchronization, and long-run underrun evidence remain required.
