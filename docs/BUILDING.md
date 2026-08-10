@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (45 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (46 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -58,6 +58,7 @@ audio_pcm_thread_probe.exe native PCM handoff into the assembly worker
 audio_live_wasapi_probe.exe live ring-to-assembly-WASAPI handoff gate
 audio_live_wasapi_probe.exe --control pause/resume command-protocol gate
 audio_live_wasapi_probe.exe --seek coordinated tracker/mixer seek gate
+audio_live_wasapi_probe.exe --stress repeated live-seek/teardown stress gate
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -90,7 +91,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-45 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+46 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -163,6 +164,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe` | Phase 2M live tracker/mixer ring into assembly-owned WASAPI with PCM-prefix and ModPos validation (CTest `audio.live_wasapi_probe`) |
 | `audio_live_wasapi_probe --control` | Phase 2N ordered pause/resume acknowledgement, ring freeze, PCM-prefix, and teardown gate (CTest `audio.live_wasapi_control`) |
 | `audio_live_wasapi_probe --seek` | Phase 2O pause, producer quiescence, PCM/marker ring flush, tracker/mixer reposition, post-seek refill, and A/V timeline validation (CTest `audio.live_wasapi_seek`) |
+| `audio_live_wasapi_probe --stress` | Phase 2P three-seek live stress across one producer/ring/WASAPI worker, segment PCM/timeline validation, and clean teardown (CTest `audio.live_wasapi_stress`) |
 
 ## Troubleshooting
 

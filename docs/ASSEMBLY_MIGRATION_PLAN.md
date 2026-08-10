@@ -495,7 +495,13 @@ assembly tracker and mixer history resume at tick 1,024, and the resulting
 pre-seek prefix plus post-seek suffix has the expected PCM FNV and ModPos
 timeline with zero underruns or marker overflows. Production and libxmp usage
 remain unchanged pending scene-driven full-demo A/V comparison, long-run
-starvation, repeated-seek stress, and shutdown stress.
+starvation, repeated-seek stress, and shutdown stress. Phase 2P now passes
+10/10 repeated-seek stress runs on a single live pipeline: ticks 1,024, 4,096,
+and 8,192 are reached in order, every PCM segment and ModPos checkpoint is
+exact, six control transitions complete per run, and zero underruns, marker
+overflows, worker timeouts, or producer failures occur. Production and libxmp
+usage remain unchanged pending full-demo A/V comparison, extended starvation,
+production shutdown stress, and final application integration.
 
 ---
 

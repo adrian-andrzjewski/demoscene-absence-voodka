@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2O passed; live production swap remains**
+Status: **Phase 2A through Phase 2P passed; live production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -668,3 +668,37 @@ assembly-WASAPI resume transaction. It is still a **NO-GO** for production
 selection and libxmp removal: full-demo scene-driven seeks, soundtrack/A/V
 comparison, long-run starvation, repeated seek stress, and shutdown stress
 remain to be proven.
+
+## Phase 2P result: repeated live-seek and teardown stress
+
+Phase 2P keeps one producer, one bounded PCM/marker ring, and one
+assembly-owned WASAPI worker alive while issuing three seeks in sequence:
+ticks 1,024, 4,096, and 8,192. Each transaction pauses at a render boundary,
+quiesces the producer, flushes both ring cursors, resets tracker and mixer
+state, refills, and resumes. The validator hashes every reached segment rather
+than only the final suffix, and checks the timeline marker visible at every
+pause boundary.
+
+- Command: `audio_live_wasapi_probe --stress`.
+- CTest name: `audio.live_wasapi_stress`.
+- The six-second worker window exercises real device pacing, ring backpressure,
+  repeated command sequencing, and orderly producer/worker teardown.
+
+The Release stress gate passed 10/10 direct repeats:
+
+```text
+seek sequence                                      1,024 -> 4,096 -> 8,192
+pause/resume transitions                           6 per run
+device frames                                     284,414 to 288,855
+segment PCM FNV                                   exact for every segment
+segment ModPos checkpoints                         exact at every pause
+ring underrun / marker overflow                   0 / 0
+worker timeouts / producer failures               0 / 0
+clean probe and producer joins                    10/10
+```
+
+This is a **GO** for repeated live seek sequencing, bounded ring recovery,
+and the measured teardown window. It remains a **NO-GO** for the production
+switch and libxmp removal until full-demo scene-driven A/V comparison,
+extended starvation testing, production shutdown stress, and the final
+application integration gate pass.
