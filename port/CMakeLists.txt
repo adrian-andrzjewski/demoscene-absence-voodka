@@ -618,5 +618,8 @@ target_link_libraries(audio_live_wasapi_probe PRIVATE
 add_test(NAME audio.live_wasapi_probe
          COMMAND audio_live_wasapi_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
+add_test(NAME audio.live_wasapi_control
+         COMMAND audio_live_wasapi_probe
+                 "${VOODKA_REPO_ROOT}/music/amnezja2.mod" --control)
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

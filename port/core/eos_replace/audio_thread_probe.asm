@@ -89,6 +89,13 @@ DEFAULT REL
 ; AudioRingThreadArgs offsets.
 %define RING_ARGS_RING                    0
 %define RING_ARGS_DURATION                8
+%define RING_ARGS_CONTROL                16
+
+; AudioLiveControl offsets.
+%define CONTROL_REQUESTED_STATE           0
+%define CONTROL_REQUEST_SEQUENCE          4
+%define CONTROL_ACK_STATE                 8
+%define CONTROL_ACK_SEQUENCE             12
 
 ; Extra fields after the common thread report for the live ring entry.
 %define RING_REPORT_PUBLISHED_MODPOS    104
@@ -100,7 +107,10 @@ DEFAULT REL
 %define RING_REPORT_MARKER_OVERRUNS     128
 %define RING_REPORT_PCM_FNV_LO          132
 %define RING_REPORT_PCM_FNV_HI          136
-%define RING_REPORT_BYTES               140
+%define RING_REPORT_PAUSE_TRANSITIONS   140
+%define RING_REPORT_PAUSED_FRAMES       144
+%define RING_REPORT_FINAL_PAUSED        148
+%define RING_REPORT_BYTES               152
 
 %define FNV64_OFFSET_LO                 0x84222325
 %define FNV64_OFFSET_HI                 0xCBF29CE4
@@ -155,6 +165,10 @@ thread_ring_ptr:          resq 1
 thread_ring_consumed:     resd 1
 thread_ring_marker:       resq 1
 thread_ring_fnv:          resq 1
+thread_control_ptr:       resq 1
+thread_control_state:     resd 1
+thread_control_sequence:  resd 1
+thread_ring_chunk_paused: resd 1
 
 section .data
 align 4
@@ -186,6 +200,28 @@ thread_pcm_format:
         dw 0
 
 section .text
+
+; Observe and acknowledge one controller command at an audio boundary.
+; r12 is the worker report pointer. The controller publishes state before the
+; sequence; the worker acknowledges state before the matching sequence.
+audio_thread_control_update:
+        mov     rax, [rel thread_control_ptr]
+        test    rax, rax
+        jz      .control_done
+        mov     edx, dword [rax + CONTROL_REQUEST_SEQUENCE]
+        cmp     edx, dword [rel thread_control_sequence]
+        je      .control_done
+        mfence
+        mov     ecx, dword [rax + CONTROL_REQUESTED_STATE]
+        and     ecx, 1
+        mov     dword [rel thread_control_state], ecx
+        mov     dword [rax + CONTROL_ACK_STATE], ecx
+        mfence
+        mov     dword [rax + CONTROL_ACK_SEQUENCE], edx
+        mov     dword [rel thread_control_sequence], edx
+        inc     dword [r12 + RING_REPORT_PAUSE_TRANSITIONS]
+.control_done:
+        ret
 
 ; DWORD WINAPI audio_thread_probe_worker(LPVOID report).
 audio_thread_probe_worker:
@@ -375,6 +411,15 @@ audio_thread_probe_worker:
 .chunk_selected:
         mov     r14d, eax
 
+        cmp     dword [rel thread_pcm_mode], 2
+        jne     .control_chunk_done
+        mov     dword [rel thread_ring_chunk_paused], 0
+        call    audio_thread_control_update
+        cmp     dword [rel thread_control_state], 0
+        je      .control_chunk_done
+        mov     dword [rel thread_ring_chunk_paused], 1
+.control_chunk_done:
+
         ; A PCM handoff never asks WASAPI for more source frames than remain
         ; before the immutable stream wraps.  The one-second probe does not
         ; reach the wrap, but keeping the boundary explicit makes the ABI
@@ -406,8 +451,14 @@ audio_thread_probe_worker:
         cmp     dword [rel thread_pcm_mode], 0
         je      .release_silence
         cmp     dword [rel thread_pcm_mode], 2
-        je      .copy_ring
+        jne     .immutable_copy
 
+.ring_control_after_get:
+        cmp     dword [rel thread_ring_chunk_paused], 0
+        jne     .release_silence
+        jmp     .copy_ring
+
+.immutable_copy:
         ; The negotiated format is interleaved signed 16-bit stereo: one
         ; output frame is one dword.  The copy is deliberately in assembly so
         ; the device handoff has no C++ conversion or buffer ownership path.
@@ -533,6 +584,13 @@ audio_thread_probe_worker:
         mov     dword [r12 + REPORT_RELEASE_HR], eax
         test    eax, eax
         js      .worker_cleanup
+        cmp     dword [rel thread_pcm_mode], 2
+        jne     .release_count
+        cmp     dword [rel thread_ring_chunk_paused], 0
+        je      .release_count
+        add     dword [r12 + RING_REPORT_PAUSED_FRAMES], r14d
+        mov     dword [rel thread_ring_chunk_paused], 0
+.release_count:
         inc     dword [r12 + REPORT_EVENT_WAKEUPS]
         add     dword [r12 + REPORT_FRAMES], r14d
         jmp     .worker_wait
@@ -613,6 +671,8 @@ audio_thread_probe_worker:
         mov     dword [r12 + RING_REPORT_PCM_FNV_LO], eax
         shr     rax, 32
         mov     dword [r12 + RING_REPORT_PCM_FNV_HI], eax
+        mov     eax, dword [rel thread_control_state]
+        mov     dword [r12 + RING_REPORT_FINAL_PAUSED], eax
 .worker_report_exit:
         cmp     dword [rel thread_pcm_mode], 1
         jne     .worker_report_done
@@ -686,6 +746,10 @@ audio_thread_probe_entry:
         mov     qword [rel thread_ring_marker], 0
         mov     rax, (FNV64_OFFSET_HI << 32) | FNV64_OFFSET_LO
         mov     [rel thread_ring_fnv], rax
+        mov     qword [rel thread_control_ptr], 0
+        mov     dword [rel thread_control_state], 0
+        mov     dword [rel thread_control_sequence], 0
+        mov     dword [rel thread_ring_chunk_paused], 0
         test    r8, r8
         jz      .main_args_ready
         cmp     r9d, 2
@@ -708,6 +772,8 @@ audio_thread_probe_entry:
         mov     dword [rel thread_report_bytes], RING_REPORT_BYTES
         mov     rax, [r8 + RING_ARGS_RING]
         mov     [rel thread_ring_ptr], rax
+        mov     rax, [r8 + RING_ARGS_CONTROL]
+        mov     [rel thread_control_ptr], rax
 .main_args_ready:
 
         mov     rdi, r12
@@ -794,6 +860,10 @@ audio_thread_probe_entry:
         mov     dword [rel thread_ring_consumed], 0
         mov     qword [rel thread_ring_marker], 0
         mov     qword [rel thread_ring_fnv], 0
+        mov     qword [rel thread_control_ptr], 0
+        mov     dword [rel thread_control_state], 0
+        mov     dword [rel thread_control_sequence], 0
+        mov     dword [rel thread_ring_chunk_paused], 0
         mov     dword [rel thread_pcm_mode], 0
         mov     dword [rel thread_report_bytes], 0
         mov     dword [rel thread_started], 0

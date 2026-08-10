@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (43 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (44 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -56,6 +56,7 @@ audio_wasapi_asm_probe.exe assembly-owned COM/WASAPI endpoint and buffer gate
 audio_thread_asm_probe.exe assembly-owned WASAPI worker-thread lifecycle gate
 audio_pcm_thread_probe.exe native PCM handoff into the assembly worker
 audio_live_wasapi_probe.exe live ring-to-assembly-WASAPI handoff gate
+audio_live_wasapi_probe.exe --control pause/resume command-protocol gate
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -88,7 +89,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-43 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+44 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -159,6 +160,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_thread_asm_probe` | Phase 2H assembly worker lifecycle and event-driven render gate (CTest `audio.thread_asm_probe`) |
 | `audio_pcm_thread_probe` | Phase 2I native PCM-to-WASAPI handoff and timeline snapshot gate (CTest `audio.pcm_thread_probe`) |
 | `audio_live_wasapi_probe` | Phase 2M live tracker/mixer ring into assembly-owned WASAPI with PCM-prefix and ModPos validation (CTest `audio.live_wasapi_probe`) |
+| `audio_live_wasapi_probe --control` | Phase 2N ordered pause/resume acknowledgement, ring freeze, PCM-prefix, and teardown gate (CTest `audio.live_wasapi_control`) |
 
 ## Troubleshooting
 

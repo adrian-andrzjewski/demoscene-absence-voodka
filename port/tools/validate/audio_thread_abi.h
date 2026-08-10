@@ -54,9 +54,20 @@ struct AudioPcmThreadReport {
     uint32_t sourceLoops;
 };
 
+struct AudioLiveControl {
+    // The producer/controller publishes requestedState before requestSequence.
+    // The assembly worker acknowledges both only after it has observed the
+    // command and reached the corresponding render boundary.
+    volatile uint32_t requestedState;
+    volatile uint32_t requestSequence;
+    volatile uint32_t acknowledgedState;
+    volatile uint32_t acknowledgedSequence;
+};
+
 struct AudioRingThreadArgs {
     AudioPcmRing* ring;
     uint32_t durationMs;
+    AudioLiveControl* control;
 };
 
 #pragma pack(push, 1)
@@ -70,6 +81,9 @@ struct AudioRingThreadReport {
     uint32_t overrunEvents;
     uint32_t markerOverruns;
     uint64_t pcmFnv;
+    uint32_t pauseTransitions;
+    uint32_t pausedFrames;
+    uint32_t finalPausedState;
 };
 #pragma pack(pop)
 
@@ -93,10 +107,15 @@ static_assert(offsetof(AudioPcmThreadReport, publishedPcmFrame) == 112);
 static_assert(offsetof(AudioPcmThreadReport, snapshotUpdates) == 116);
 static_assert(offsetof(AudioPcmThreadReport, sourceLoops) == 120);
 
-static_assert(sizeof(AudioRingThreadArgs) == 16);
-static_assert(offsetof(AudioRingThreadArgs, durationMs) == 8);
+static_assert(sizeof(AudioLiveControl) == 16);
+static_assert(offsetof(AudioLiveControl, requestSequence) == 4);
+static_assert(offsetof(AudioLiveControl, acknowledgedState) == 8);
+static_assert(offsetof(AudioLiveControl, acknowledgedSequence) == 12);
 
-static_assert(sizeof(AudioRingThreadReport) == 140);
+static_assert(sizeof(AudioRingThreadArgs) == 24);
+static_assert(offsetof(AudioRingThreadArgs, durationMs) == 8);
+static_assert(offsetof(AudioRingThreadArgs, control) == 16);
+
 static_assert(offsetof(AudioRingThreadReport, publishedModPos) == 104);
 static_assert(offsetof(AudioRingThreadReport, publishedPcmFrame) == 108);
 static_assert(offsetof(AudioRingThreadReport, snapshotUpdates) == 112);
@@ -105,6 +124,10 @@ static_assert(offsetof(AudioRingThreadReport, underrunEvents) == 120);
 static_assert(offsetof(AudioRingThreadReport, overrunEvents) == 124);
 static_assert(offsetof(AudioRingThreadReport, markerOverruns) == 128);
 static_assert(offsetof(AudioRingThreadReport, pcmFnv) == 132);
+static_assert(offsetof(AudioRingThreadReport, pauseTransitions) == 140);
+static_assert(offsetof(AudioRingThreadReport, pausedFrames) == 144);
+static_assert(offsetof(AudioRingThreadReport, finalPausedState) == 148);
+static_assert(sizeof(AudioRingThreadReport) == 152);
 
 extern "C" uint32_t asm_audio_thread_probe(
     uint32_t durationMs, AudioThreadAsmProbeReport* report);

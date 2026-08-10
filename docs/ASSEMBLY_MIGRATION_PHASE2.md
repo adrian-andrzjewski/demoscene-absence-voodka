@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2M passed; live production swap remains**
+Status: **Phase 2A through Phase 2N passed; live production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -414,11 +414,10 @@ The production application remains on C++/libxmp.
 
 ## Next implementation slices
 
-1. Connect the proven bounded live ring to the assembly WASAPI worker behind
-   `--asm-audio`, then compare device timing, PCM counters, scene boundaries,
-   pause/seek behavior, and shutdown against the C++/libxmp path.
-2. Add the live pause/seek command protocol and full-demo synchronization
-   gates, including long-run starvation and teardown stress.
+1. Add seek/reposition commands with a coordinated ring flush and tracker/
+   mixer reset, then compare every reached ModPos against the C++/libxmp path.
+2. Add full-demo synchronization, long-run starvation, and teardown stress
+   gates around the controlled assembly audio path.
 3. Remove libxmp from the production target only after those gates pass; retain
    it in host-only oracle tools until release signoff.
 
@@ -595,3 +594,40 @@ path and its one-second teardown boundary. It is still a **NO-GO** for the
 production switch or libxmp removal: the current application has no assembly
 audio command protocol, pause/seek equivalence, full-demo A/V comparison, or
 long-run starvation and shutdown stress result.
+
+## Phase 2N result: ordered pause/resume control
+
+Phase 2N adds the first live command boundary without changing the production
+audio path:
+
+- `AudioLiveControl` is a fixed-width shared ABI containing requested state,
+  request sequence, acknowledged state, and acknowledged sequence.
+- `audio_thread_probe.asm` observes and acknowledges commands at an audio
+  render boundary. While paused it releases silent WASAPI buffers, does not
+  consume PCM or timeline markers, and resumes from the exact same ring read
+  position.
+- `audio_live_wasapi_probe --control` runs the producer and assembly worker on
+  separate host threads so the controller can issue real pause/resume commands
+  while WASAPI is active. It checks command ordering, ring-read stability,
+  consumed PCM-prefix identity, ModPos publication, and clean join/teardown.
+- CTest name: `audio.live_wasapi_control`.
+
+The Release control gate passed 10/10 direct repeats:
+
+```text
+commands acknowledged                            pause=1, resume=1
+pause transitions                                 2
+paused device frames                              11,907 to 12,348
+ring read position during pause                  stable
+consumed PCM FNV                                  equals expected prefix
+ring underrun / marker overflow                   0 / 0
+worker timeouts / producer failures               0 / 0
+final paused state                                0
+clean probe and producer joins                    10/10
+```
+
+This is a **GO** for the ordered pause/resume control and its no-consumption
+pause semantics. It remains a **NO-GO** for seek, production selection, and
+libxmp removal: seek requires a coordinated ring flush plus tracker/mixer
+reposition, and full-demo A/V synchronization and long-run stress are still
+unproven.

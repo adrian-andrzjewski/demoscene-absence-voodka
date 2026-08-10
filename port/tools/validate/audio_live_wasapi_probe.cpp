@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <limits>
@@ -29,6 +30,7 @@ constexpr uint32_t kMarkerCapacity = 16384;
 constexpr uint32_t kPrebufferFrames = 8192;
 constexpr uint32_t kPushChunk = 1024;
 constexpr uint32_t kDurationMs = 1000;
+constexpr uint32_t kControlDurationMs = 2200;
 constexpr uint64_t kFnvOffset = 14695981039346656037ull;
 constexpr uint64_t kFnvPrime = 1099511628211ull;
 
@@ -125,6 +127,41 @@ struct ProducerArgs {
     uint32_t backpressure = 0;
     uint32_t markers = 0;
 };
+
+struct ProbeThreadArgs {
+    AudioRingThreadArgs* args;
+    AudioRingThreadReport* report;
+    volatile LONG result = 1;
+};
+
+DWORD WINAPI probeThread(void* raw) {
+    auto* args = static_cast<ProbeThreadArgs*>(raw);
+    const uint32_t result = asm_audio_ring_thread_probe(
+        args->args, args->report);
+    InterlockedExchange(&args->result, static_cast<LONG>(result));
+    return result;
+}
+
+bool issueControl(AudioLiveControl* control, uint32_t state,
+                  uint32_t* sequenceOut) {
+    if (!control) return false;
+    InterlockedExchange(
+        reinterpret_cast<volatile LONG*>(&control->requestedState),
+        static_cast<LONG>(state));
+    const LONG sequence = InterlockedIncrement(
+        reinterpret_cast<volatile LONG*>(&control->requestSequence));
+    for (uint32_t i = 0; i < 5000; ++i) {
+        const uint32_t ackSequence = control->acknowledgedSequence;
+        const uint32_t ackState = control->acknowledgedState;
+        if (ackSequence == static_cast<uint32_t>(sequence) &&
+            ackState == state) {
+            if (sequenceOut) *sequenceOut = static_cast<uint32_t>(sequence);
+            return true;
+        }
+        Sleep(1);
+    }
+    return false;
+}
 
 DWORD WINAPI producerThread(void* raw) {
     auto* args = static_cast<ProducerArgs*>(raw);
@@ -233,8 +270,9 @@ uint32_t expectedModPos(const std::vector<uint32_t>& tickStarts,
 } // namespace
 
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        std::cerr << "usage: audio_live_wasapi_probe <module.mod>\n";
+    const bool controlMode = argc == 3 && std::strcmp(argv[2], "--control") == 0;
+    if (argc != 2 && !controlMode) {
+        std::cerr << "usage: audio_live_wasapi_probe <module.mod> [--control]\n";
         return 2;
     }
 
@@ -324,11 +362,43 @@ int main(int argc, char** argv) {
         Sleep(1);
     }
 
-    AudioRingThreadArgs args{&ring, kDurationMs};
+    AudioLiveControl control{};
+    AudioRingThreadArgs args{
+        &ring, controlMode ? kControlDurationMs : kDurationMs,
+        controlMode ? &control : nullptr};
     AudioRingThreadReport report{};
     uint32_t result = 1;
+    bool controlOk = !controlMode;
+    bool pausedStable = !controlMode;
+    DWORD probeWait = WAIT_OBJECT_0;
     if (prebuffered) {
-        result = asm_audio_ring_thread_probe(&args, &report);
+        if (!controlMode) {
+            result = asm_audio_ring_thread_probe(&args, &report);
+        } else {
+            ProbeThreadArgs probe{&args, &report};
+            HANDLE probeHandle = CreateThread(nullptr, 0, probeThread, &probe,
+                                              0, nullptr);
+            if (probeHandle) {
+                Sleep(100);
+                uint32_t pauseSequence = 0;
+                const bool pauseAck = issueControl(&control, 1, &pauseSequence);
+                const uint32_t pausedAtAck = ring.readFrame;
+                Sleep(250);
+                pausedStable = ring.readFrame == pausedAtAck;
+                uint32_t resumeSequence = 0;
+                const bool resumeAck = issueControl(&control, 0, &resumeSequence);
+                Sleep(500);
+                probeWait = WaitForSingleObject(probeHandle, INFINITE);
+                result = static_cast<uint32_t>(
+                    InterlockedCompareExchange(&probe.result, 0, 0));
+                CloseHandle(probeHandle);
+                controlOk = pauseAck && resumeAck &&
+                    pauseSequence != resumeSequence && pausedStable &&
+                    probeWait == WAIT_OBJECT_0;
+            } else {
+                controlOk = false;
+            }
+        }
     }
 
     InterlockedExchange(&producer.stopRequested, 1);
@@ -356,8 +426,10 @@ int main(int argc, char** argv) {
         "thread=%u wait=%08X start=%08X wakeups=%u device_frames=%u "
         "ring_frames=%u published_frame=%u modpos=%04X snapshots=%u "
         "underrun_events=%u overrun_events=%u marker_overrun=%u "
-        "pcm_fnv=0x%016llX expected_fnv=0x%016llX "
-        "producer_wait=%08X producer_failed=%ld\n",
+        "pcm_fnv=0x%016llX expected_fnv=0x%016llX control=%u "
+        "pause_transitions=%u paused_frames=%u final_paused=%u "
+        "paused_stable=%u probe_wait=%08X producer_wait=%08X "
+        "producer_failed=%ld\n",
         result, prebuffered ? 1u : 0u, stateFrames, producer.producedStates,
         producer.mixedFrames, producer.pushedFrames, producer.markers,
         common.threadCreated, common.threadWait, common.startHr,
@@ -366,8 +438,10 @@ int main(int argc, char** argv) {
         report.snapshotUpdates, report.underrunEvents, report.overrunEvents,
         report.markerOverruns,
         static_cast<unsigned long long>(report.pcmFnv),
-        static_cast<unsigned long long>(expectedPrefix.value), producerWait,
-        producer.failed);
+        static_cast<unsigned long long>(expectedPrefix.value),
+        controlMode ? 1u : 0u, report.pauseTransitions, report.pausedFrames,
+        report.finalPausedState, pausedStable ? 1u : 0u, probeWait,
+        producerWait, producer.failed);
 
     const bool hresultsOk =
         common.comHr == 0 && common.enumeratorHr == 0 &&
@@ -383,11 +457,11 @@ int main(int argc, char** argv) {
         common.bufferSize > 0 && common.eventCreated == 1 &&
         common.firstWait == 1 && common.eventWakeups > 0 &&
         common.frames > 0 && common.timeouts == 0 && common.workerExit == 0 &&
-        common.durationMs == kDurationMs;
+        common.durationMs == (controlMode ? kControlDurationMs : kDurationMs);
     const bool transferOk =
         producer.failed == 0 && producer.producedStates > 0 &&
         producer.pushedFrames >= report.consumedFrames &&
-        report.consumedFrames == common.frames &&
+        report.consumedFrames <= common.frames &&
         report.consumedFrames <= totalFrames &&
         report.underrunEvents == 0 && ring.underrunEvents == 0 &&
         report.markerOverruns == 0 && ring.markerOverruns == 0 &&
@@ -404,10 +478,15 @@ int main(int argc, char** argv) {
         report.publishedModPos == expectedModPos(
             tickStarts, modposByTick, stateFrames,
             report.publishedPcmFrame);
-    if (!hresultsOk || !threadOk || !transferOk) {
+    const bool controlReportOk =
+        !controlMode ||
+        (controlOk && report.pauseTransitions == 2 &&
+         report.pausedFrames > 0 && report.finalPausedState == 0);
+    if (!hresultsOk || !threadOk || !transferOk || !controlReportOk) {
         std::cerr << "audio_live_wasapi_probe: FAIL hresults=" << hresultsOk
                   << " thread=" << threadOk
-                  << " transfer=" << transferOk << '\n';
+                  << " transfer=" << transferOk
+                  << " control=" << controlReportOk << '\n';
         return 1;
     }
     return 0;

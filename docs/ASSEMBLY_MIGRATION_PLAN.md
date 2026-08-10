@@ -483,8 +483,13 @@ worker consumes 45,864-46,305 exact PCM-prefix frames under 99-100 real device
 wakeups, publishes 53 ModPos snapshots, matches an independent assembly PCM
 witness, and records zero consumer underruns, marker overflows, timeouts, or
 producer failures across 10 repeats. Production remains C++/libxmp until the
-command protocol, full-demo A/V comparison, long-run starvation test, and
-shutdown stress gate are complete.
+pause/resume command gate, seek/reposition equivalence, full-demo A/V
+comparison, long-run starvation test, and shutdown stress gate are complete.
+Phase 2N now passes ordered pause/resume control: the assembly worker
+acknowledges both commands, holds the ring read position stable for the pause,
+resumes without losing source frames, and retains the exact consumed PCM
+prefix across 10 repeats. Seek still requires a coordinated ring flush and
+tracker/mixer reposition, so production and libxmp usage remain unchanged.
 
 ---
 
