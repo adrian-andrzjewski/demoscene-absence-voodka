@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (53 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (54 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -36,6 +36,7 @@ checkout is relocatable.
 ```
 VOODKA.exe          the demo (assembly audio; no libxmp dependency)
 VOODKA_REFERENCE.exe non-shipped C++/libxmp behavioral-oracle build
+win32_runtime_probe.exe no-CRT assembly Win32/thread lifecycle feasibility gate
 VIRTUAL.exe         the standalone VR-engine test viewer (Esc quits; --check loads+exits)
 asset_viewer.exe   the V3D/V3M asset viewer (loads all 9 3D models from data/vodka.dat)
 asset_viewer_selftest.exe  parse-only validation (CTest v3d.viewer_parse)
@@ -97,7 +98,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-53 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+54 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -173,6 +174,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --stress` | Phase 2P three-seek live stress across one producer/ring/WASAPI worker, segment PCM/timeline validation, and clean teardown (CTest `audio.live_wasapi_stress`) |
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
 | `d3d11_asm_present_probe` | Phase 1B standalone NASM D3D11/COM presenter, GPU readback, Present, and Release gate (CTest `d3d11.asm_present_probe`) |
+| `win32_runtime_probe` | Phase 3A no-CRT NASM process, HWND/WndProc, message pump, worker/event, exception-filter registration, and teardown gate (CTest `win32.runtime_probe`) |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |

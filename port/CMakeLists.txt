@@ -545,6 +545,23 @@ add_subdirectory(tools/asset_viewer)
 add_subdirectory(core)
 add_subdirectory(platform)
 
+# Phase 3A feasibility gate: a standalone no-CRT process owns the Win32
+# window/thread substrate in native x64 assembly.  This deliberately stays
+# outside VOODKA.exe until the ABI and teardown contract is proven repeatedly.
+add_executable(win32_runtime_probe WIN32
+    core/eos_replace/win32_runtime_probe.asm)
+target_include_directories(win32_runtime_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/core/inc"
+    "${CMAKE_SOURCE_DIR}/core/eos_replace")
+set_target_properties(win32_runtime_probe PROPERTIES
+    LINKER_LANGUAGE ASM_NASM)
+target_link_options(win32_runtime_probe PRIVATE
+    "/ENTRY:asm_runtime_probe_entry"
+    "/NODEFAULTLIB")
+target_link_libraries(win32_runtime_probe PRIVATE kernel32 user32)
+add_test(NAME win32.runtime_probe COMMAND win32_runtime_probe)
+set_tests_properties(win32.runtime_probe PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.
