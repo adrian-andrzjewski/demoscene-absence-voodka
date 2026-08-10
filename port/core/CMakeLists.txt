@@ -4,6 +4,8 @@ set(VOODKA_CORE_ASM
     eos_replace/eos_dispatch.asm
     eos_replace/audio_mod.asm
     eos_replace/audio_tracker.asm
+    eos_replace/audio_event.asm
+    eos_replace/audio_voice.asm
     eos_replace/d3d11_asm_probe.asm
     eos_replace/d3d11_asm_present.asm
     eos_replace/boot.asm

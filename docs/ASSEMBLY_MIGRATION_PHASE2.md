@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A, Phase 2B parser, and Phase 2C timing gates passed; assembly mixer not yet started**
+Status: **Phase 2A through Phase 2D passed; assembly mixer and device path not yet started**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A, 2B, or 2C changes production playback.
+vendored `libxmp`. Nothing in Phase 2A through 2D changes production playback.
 
 ## Phase 2A scope
 
@@ -68,7 +68,7 @@ peak absolute sample    32768
 row trace FNV-1a         E827FA024D5B7867
 ```
 
-These values are the Phase 2B acceptance baseline. A NASM parser/mixer must
+These values are the Phase 2 reference baseline. A NASM parser/mixer must
 first reproduce the module inventory and row trace, then reproduce the PCM
 hashes before any WASAPI integration or production audio switch is attempted.
 
@@ -141,6 +141,40 @@ frames. The final transition is at 263,350 ms, matching the oracle trace. This
 is a timing gate only: no note period, channel voice, effect state, sample
 loop, interpolation, PCM mixer, thread, or WASAPI implementation is claimed.
 
+## Phase 2D result: native event and row voice identity gates
+
+Phase 2D establishes the first stateful audio boundary without starting the
+mixer:
+
+- [`audio_event.asm`](../port/core/eos_replace/audio_event.asm) decodes one
+  packed MOD event into the eight-byte event ABI without calls into C, Windows,
+  or libxmp.
+- [`audio_mod_event_probe.cpp`](../port/tools/validate/audio_mod_event_probe.cpp)
+  compares every packed event in the module with libxmp's decoded event.
+- [`audio_voice.asm`](../port/core/eos_replace/audio_voice.asm) walks all
+  2,688 chronological rows and tracks current zero-based note, instrument,
+  selected sample, and sample-header volume for all 14 channels.
+- [`audio_mod_voice_probe.cpp`](../port/tools/validate/audio_mod_voice_probe.cpp)
+  compares row-start voice identity and row events against libxmp.
+- CTest names: `audio.mod_events` and `audio.mod_voices`.
+
+The gates pass:
+
+```text
+packed events checked       34944
+row transitions checked      2688
+voice states checked        37632
+event decoding mismatches       0
+voice identity mismatches       0
+```
+
+The implementation includes the verified libxmp compatibility rules for
+period-to-note conversion, filtered `8xx`, zero-parameter continuation
+rewrites, zero-based channel keys, and FT2 tone-portamento retention of the
+previous base note/instrument. The voice gate deliberately does not claim
+period slides, vibrato, final mixed volume/pan, retrigger position, sample
+loop execution, PCM interpolation, or device output.
+
 ## Initial contract boundary
 
 The eventual assembly player must expose the equivalent of:
@@ -180,16 +214,19 @@ then be reviewed and deliberately updated.
 
 ## Next implementation slices
 
-1. Implement native channel/note state, sample-loop handling, and a software
-   tracker tick engine for offline PCM mixing, initially without WASAPI.
-2. Compare complete PCM and row-transition hashes against the oracle.
+1. Implement native tick/effect state for `1xx`, `3xx`, `4xx`, `6xx`, `Axx`,
+   `Cxx`, `Exx`, and `Fxx`, with period/volume snapshots before mixing.
+2. Add sample loop execution and a software mixer offline, initially without
+   WASAPI; compare complete PCM and row-transition hashes against the oracle.
 3. Add a separate NASM WASAPI/COM probe, then connect the proven mixer to an
    event-driven render thread behind an `--asm-audio` switch.
 
-## Phase 2C go/no-go
+## Phase 2D go/no-go
 
-**GO to the offline mixer slice.** The oracle, NASM parser, and NASM timing
-engine agree on the checked-in module and complete row-transition trace.
+**GO to the native effect/tick-state slice.** The oracle, NASM parser, timing
+engine, event decoder, and row voice identity engine agree on the complete
+checked-in module timeline.
 **NO-GO to WASAPI, libxmp removal, or a production assembly-audio switch yet:**
-note/channel state, effect execution, PCM equivalence, the audio thread,
-device integration, and full-demo synchronization remain unproven.
+effect execution, period/volume/pan state, sample loops, PCM equivalence, the
+audio thread, device integration, and full-demo synchronization remain
+unproven.
