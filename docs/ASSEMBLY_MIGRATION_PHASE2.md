@@ -1,11 +1,11 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A and Phase 2B parser gate passed; assembly mixer not yet started**
+Status: **Phase 2A, Phase 2B parser, and Phase 2C timing gates passed; assembly mixer not yet started**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
 application still uses the C++ `audio.cpp` implementation and links the
-vendored `libxmp`. Nothing in Phase 2A or 2B changes production playback.
+vendored `libxmp`. Nothing in Phase 2A, 2B, or 2C changes production playback.
 
 ## Phase 2A scope
 
@@ -115,6 +115,32 @@ This gate proves that assembly can own the module representation. It does not
 yet prove tracker execution, effect semantics, sample interpolation, mixing,
 or a Windows audio device backend.
 
+## Phase 2C result: NASM tracker timing gate
+
+The next gate is a native NASM state machine for the module timeline:
+
+- [`audio_tracker.asm`](../port/core/eos_replace/audio_tracker.asm) walks the
+  order list and rows without C, Windows, or libxmp calls.
+- [`audio_tracker_abi.h`](../port/tools/validate/audio_tracker_abi.h) defines
+  the packed row-transition record.
+- [`audio_mod_trace_probe.cpp`](../port/tools/validate/audio_mod_trace_probe.cpp)
+  compares every transition directly with `xmp_play_frame` and
+  `xmp_get_frame_info`.
+- CTest name: `audio.mod_trace`.
+
+The engine reproduces the module-specific timing contract:
+
+- 42 order positions, 64 rows per pattern, and five replay ticks per row;
+- `Fxx < 0x20` changes speed and `Fxx >= 0x20` changes BPM;
+- libxmp's order-start timestamp reset behavior;
+- per-tick IEEE-754 double accumulation and integer truncation for elapsed
+  milliseconds and frame time.
+
+The complete comparison passes all 2,688 row transitions and all 13,440 replay
+frames. The final transition is at 263,350 ms, matching the oracle trace. This
+is a timing gate only: no note period, channel voice, effect state, sample
+loop, interpolation, PCM mixer, thread, or WASAPI implementation is claimed.
+
 ## Initial contract boundary
 
 The eventual assembly player must expose the equivalent of:
@@ -154,16 +180,16 @@ then be reviewed and deliberately updated.
 
 ## Next implementation slices
 
-1. Implement a software tracker tick engine and offline PCM mixer, initially
-   without WASAPI.
+1. Implement native channel/note state, sample-loop handling, and a software
+   tracker tick engine for offline PCM mixing, initially without WASAPI.
 2. Compare complete PCM and row-transition hashes against the oracle.
 3. Add a separate NASM WASAPI/COM probe, then connect the proven mixer to an
    event-driven render thread behind an `--asm-audio` switch.
 
-## Phase 2B go/no-go
+## Phase 2C go/no-go
 
-**GO to the offline mixer slice.** The oracle and NASM parser agree on the
-checked-in module inventory and effect/event statistics. **NO-GO to WASAPI,
-libxmp removal, or a production assembly-audio switch yet:** tracker tick
-execution, PCM equivalence, the audio thread, device integration, and
-full-demo synchronization remain unproven.
+**GO to the offline mixer slice.** The oracle, NASM parser, and NASM timing
+engine agree on the checked-in module and complete row-transition trace.
+**NO-GO to WASAPI, libxmp removal, or a production assembly-audio switch yet:**
+note/channel state, effect execution, PCM equivalence, the audio thread,
+device integration, and full-demo synchronization remain unproven.
