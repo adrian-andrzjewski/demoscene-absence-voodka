@@ -403,6 +403,12 @@ void audioAsmShutdown();
 
 int audioAsmInit(const char* modPath, int) {
     if (g_runtime.initialized) return 1;
+    char forcedFailure[4] = {};
+    if (GetEnvironmentVariableA("VOODKA_ASM_AUDIO_FAIL_DEVICE",
+                                forcedFailure, sizeof(forcedFailure)) != 0) {
+        logPrint("[audio-asm] forced device failure injection\n");
+        return 0;
+    }
     if (!modPath || !readModule(modPath, &g_runtime.module)) return 0;
 
     audio_abi::Summary summary{};

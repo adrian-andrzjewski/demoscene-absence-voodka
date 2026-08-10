@@ -635,5 +635,18 @@ add_test(NAME audio.live_wasapi_longrun
 add_test(NAME audio.assembly_demo_p1
          COMMAND VOODKA --asm-audio --part 1)
 set_tests_properties(audio.assembly_demo_p1 PROPERTIES TIMEOUT 90)
+add_test(NAME audio.assembly_demo_pause
+         COMMAND VOODKA --asm-audio --part 1 --auto-pause-ms 1000)
+set_tests_properties(audio.assembly_demo_pause PROPERTIES TIMEOUT 90)
+add_test(NAME audio.assembly_demo_close
+         COMMAND VOODKA --asm-audio --part 1 --auto-close-ms 2000)
+set_tests_properties(audio.assembly_demo_close PROPERTIES TIMEOUT 30)
+add_test(NAME audio.assembly_audio_fail_device
+         COMMAND VOODKA --asm-audio --part 1)
+set_tests_properties(audio.assembly_audio_fail_device PROPERTIES
+    TIMEOUT 30
+    WILL_FAIL TRUE
+    ENVIRONMENT "VOODKA_ASM_AUDIO_FAIL_DEVICE=1"
+    PASS_REGULAR_EXPRESSION "forced device failure injection;assembly audio initialization failed")
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

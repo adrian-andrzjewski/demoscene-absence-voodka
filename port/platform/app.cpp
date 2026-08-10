@@ -41,6 +41,85 @@ constexpr int kWinH = 800;
 HWND g_hwnd = nullptr;
 HINSTANCE g_hInst = nullptr;
 volatile LONG g_shutdownStarted = 0;
+
+// Opt-in lifecycle automation used by the runtime gates.  It injects the
+// same window messages a user would generate, so pause/resume and close are
+// exercised through the real Win32 path instead of a private test shortcut.
+struct AutomationState {
+    HWND hwnd = nullptr;
+    HANDLE stop = nullptr;
+    HANDLE thread = nullptr;
+    DWORD pauseAtMs = INFINITE;
+    DWORD closeAtMs = INFINITE;
+};
+AutomationState g_automation;
+
+void postSpace(HWND hwnd) {
+    constexpr LPARAM kSpaceDown = static_cast<LPARAM>(0x00390000);
+    constexpr LPARAM kSpaceUp = static_cast<LPARAM>(0xC0390000);
+    PostMessageW(hwnd, WM_KEYDOWN, VK_SPACE, kSpaceDown);
+    PostMessageW(hwnd, WM_KEYUP, VK_SPACE, kSpaceUp);
+}
+
+DWORD WINAPI automationThreadProc(void* opaque) {
+    auto* state = static_cast<AutomationState*>(opaque);
+    const ULONGLONG start = GetTickCount64();
+    bool paused = false;
+    bool resumed = false;
+    for (;;) {
+        if (WaitForSingleObject(state->stop, 5) == WAIT_OBJECT_0)
+            return 0;
+        const ULONGLONG elapsed = GetTickCount64() - start;
+        if (!paused && state->pauseAtMs != INFINITE &&
+            elapsed >= state->pauseAtMs) {
+            postSpace(state->hwnd);
+            paused = true;
+        }
+        if (paused && !resumed &&
+            elapsed >= static_cast<ULONGLONG>(state->pauseAtMs) + 1000) {
+            postSpace(state->hwnd);
+            resumed = true;
+        }
+        if (state->closeAtMs != INFINITE && elapsed >= state->closeAtMs) {
+            PostMessageW(state->hwnd, WM_CLOSE, 0, 0);
+            return 0;
+        }
+    }
+}
+
+bool startAutomation(HWND hwnd, long pauseAtMs, long closeAtMs) {
+    if (pauseAtMs < 0 && closeAtMs < 0) return true;
+    g_automation = {};
+    g_automation.hwnd = hwnd;
+    g_automation.pauseAtMs = pauseAtMs >= 0 ? static_cast<DWORD>(pauseAtMs)
+                                            : INFINITE;
+    g_automation.closeAtMs = closeAtMs >= 0 ? static_cast<DWORD>(closeAtMs)
+                                            : INFINITE;
+    g_automation.stop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    if (!g_automation.stop) return false;
+    g_automation.thread = CreateThread(nullptr, 0, automationThreadProc,
+                                       &g_automation, 0, nullptr);
+    if (!g_automation.thread) {
+        CloseHandle(g_automation.stop);
+        g_automation.stop = nullptr;
+        return false;
+    }
+    vk::logPrint("[app] lifecycle automation: pause=%s close=%s\n",
+                 pauseAtMs >= 0 ? "enabled" : "off",
+                 closeAtMs >= 0 ? "enabled" : "off");
+    return true;
+}
+
+void stopAutomation() {
+    if (!g_automation.stop) return;
+    SetEvent(g_automation.stop);
+    if (g_automation.thread) {
+        WaitForSingleObject(g_automation.thread, INFINITE);
+        CloseHandle(g_automation.thread);
+    }
+    CloseHandle(g_automation.stop);
+    g_automation = {};
+}
 }
 
 // ---- music module path resolution ------------------------------------------
@@ -140,6 +219,8 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     const char* timelinePath = nullptr;
     bool asmPresenter = false;
     bool asmAudio = false;
+    long autoPauseMs = -1;
+    long autoCloseMs = -1;
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
         std::string f = "--" + std::string(flag);
         auto p = cmd.find(f);
@@ -160,12 +241,31 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
         timelinePath = argDirOf(cmd, "timeline");
         asmPresenter = cmd.find("--asm-present") != std::string::npos;
         asmAudio = cmd.find("--asm-audio") != std::string::npos;
+        auto parseMs = [&](const char* flag) -> long {
+            auto p = cmd.find(flag);
+            if (p == std::string::npos) return -1;
+            std::string rest = cmd.substr(p + std::strlen(flag));
+            size_t st = rest.find_first_not_of(" \t\"=");
+            if (st == std::string::npos) return -1;
+            char* end = nullptr;
+            unsigned long value = strtoul(rest.c_str() + st, &end, 0);
+            if (end == rest.c_str() + st || value > 0x7fffffffUL)
+                return -1;
+            return static_cast<long>(value);
+        };
+        autoPauseMs = parseMs("--auto-pause-ms");
+        autoCloseMs = parseMs("--auto-close-ms");
         if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
         if (timelinePath) vk::logPrint("[app] A/V timeline to '%s'\n", timelinePath);
         if (asmPresenter) vk::logPrint("[app] --asm-present selected\n");
         if (asmAudio) vk::logPrint("[app] --asm-audio selected\n");
+        if (autoPauseMs >= 0)
+            vk::logPrint("[app] auto-pause after %ld ms (resume after 1 s)\n",
+                         autoPauseMs);
+        if (autoCloseMs >= 0)
+            vk::logPrint("[app] auto-close after %ld ms\n", autoCloseMs);
     }
 
     // ---- register window ------------------------------------------------
@@ -278,6 +378,11 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
     }
     vk::diagReadbackInit(diagDir);
     if (vk::quitRequested()) vk::shutdownAndExit();
+    if (!startAutomation(hwnd, autoPauseMs, autoCloseMs)) {
+        vk::logPrint("[app] lifecycle automation initialization failed\n");
+        vk::shutdownAll();
+        return 1;
+    }
 
     // ---- entry-point seeking -----------------------------------------------
     // The demo may begin from a scene in the middle of the timeline; the music
@@ -381,6 +486,7 @@ void shutdownAll() {
         return;
 
     vk::logPrint("[app] shutting down all subsystems\n");
+    ::stopAutomation();
     vk::inputShutdown();
     vk::audioShutdown();
     vk::recClose();

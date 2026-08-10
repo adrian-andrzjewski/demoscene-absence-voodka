@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (48 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (51 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -94,7 +94,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-48 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+51 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -170,6 +170,9 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --stress` | Phase 2P three-seek live stress across one producer/ring/WASAPI worker, segment PCM/timeline validation, and clean teardown (CTest `audio.live_wasapi_stress`) |
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
 | `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
+| `VOODKA --asm-audio --part 1 --auto-pause-ms 1000` | Phase 2S real Win32 Space pause/resume injection through the assembly audio service (CTest `audio.assembly_demo_pause`) |
+| `VOODKA --asm-audio --part 1 --auto-close-ms 2000` | Phase 2S real WM_CLOSE teardown during playback (CTest `audio.assembly_demo_close`) |
+| `VOODKA_ASM_AUDIO_FAIL_DEVICE=1 VOODKA --asm-audio --part 1` | Phase 2S deterministic assembly-device initialization failure and cleanup (CTest `audio.assembly_audio_fail_device`) |
 
 ## Troubleshooting
 

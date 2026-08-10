@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2R passed; default production swap remains**
+Status: **Phase 2A through Phase 2S passed; default production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -786,3 +786,37 @@ path is still libxmp, and device-level PCM capture has not yet been compared
 against the libxmp live stream over the full run. The next gate is to make the
 assembly service's production ABI complete and prove audio/presentation
 fidelity under pause, close, device failure, and repeated full-run stress.
+
+## Phase 2S result: lifecycle and device-failure gate
+
+Phase 2S exercises the failure paths that determine whether the dedicated
+player can survive as a production service rather than only as a successful
+playback path:
+
+- `VOODKA_ASM_AUDIO_FAIL_DEVICE=1` forces assembly audio initialization to fail
+  before the ring, producer, or WASAPI worker is created. The application must
+  report the failure and execute the normal idempotent teardown path.
+- `--auto-pause-ms N` posts a real Space key-down/up pair after `N` ms and
+  resumes one second later. This drives the same Win32 input, pause, and audio
+  control path as a user pause.
+- `--auto-close-ms N` posts a real `WM_CLOSE` after `N` ms. The window-close
+  path must reach `shutdownAndExit`, join the assembly worker and producer, and
+  exit without leaving background audio activity.
+- CTest adds `audio.assembly_audio_fail_device`,
+  `audio.assembly_demo_pause`, and `audio.assembly_demo_close` as repeatable
+  Release gates. The existing libxmp path is not changed.
+
+The Phase 2S evidence is:
+
+```text
+assembly forced device failure                 passed; clean init failure and teardown
+assembly pause/resume P1                       exit 0; PAUSED -> RESUMED; underruns 0
+assembly window close during P1                 exit 0; device frames 106,281; underruns 0
+filtered Phase 2S CTest gates                  3/3 passed; 29.90 s
+```
+
+This is a **GO** for proceeding to repeated lifecycle stress and the shim
+removal design. It is not yet a **GO** for deleting libxmp or the C++ audio
+orchestration: the full-run live audio stream still needs an aligned fidelity
+comparison, and repeated launch/close runs must be completed before the
+assembly service becomes the default.
