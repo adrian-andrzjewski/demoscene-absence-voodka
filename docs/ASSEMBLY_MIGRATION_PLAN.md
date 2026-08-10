@@ -440,16 +440,18 @@ Go only if:
 No-go if the dedicated player cannot reproduce the soundtrack acceptably. A
 stable 100% assembly demo has not been demonstrated without this gate.
 
-Current Phase 2 result (2026-08-10): **GO through the NASM parser, timing,
-event, and row voice identity gates; GO to the native effect/tick-state
-slice.** The host oracle passes and records a
+Current Phase 2 result (2026-08-10): **GO through the native per-tick
+effect-state gate; NO-GO to mixer/WASAPI integration or libxmp removal.** The
+host oracle passes and records a
 263.429-second, 11,617,219-frame 44.1 kHz stereo PCM baseline, 2,688 row
 transitions, and the module-specific effect inventory. `audio.mod_parse` passes
 the complete module inventory, `audio.mod_trace` passes all 2,688 NASM row
 transitions/13,440 replay frames, and `audio.mod_events` plus `audio.mod_voices`
-pass all 34,944 events and 37,632 row/channel identity states. Do not
-integrate WASAPI or remove libxmp until native effect/tick state and the NASM
-mixer match this baseline.
+pass all 34,944 events and 37,632 row/channel identity states. `audio.mod_ticks`
+passes all 188,160 per-channel snapshots, including period, pitch bend, note,
+instrument, sample, volume, pan, event, and logical sample-position behavior.
+Do not integrate WASAPI or remove libxmp until the native mixer matches the
+PCM baseline and full-demo A/V synchronization.
 
 ---
 

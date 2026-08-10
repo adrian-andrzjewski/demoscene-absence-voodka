@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (34 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (35 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -47,6 +47,7 @@ audio_mod_parse_probe.exe  NASM-vs-libxmp module parser cross-check
 audio_mod_trace_probe.exe  NASM-vs-libxmp tracker timing cross-check
 audio_mod_event_probe.exe  NASM-vs-libxmp packed event cross-check
 audio_mod_voice_probe.exe  NASM-vs-libxmp row voice identity cross-check
+audio_mod_tick_probe.exe   NASM-vs-libxmp per-tick effect/state cross-check
 ```
 
 `bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
@@ -79,7 +80,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-34 tests: 19 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+35 tests: 19 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -97,6 +98,8 @@ libxmp on the module layout, samples, orders, patterns, events, and effects.
 libxmp replay trace. `audio.mod_events` compares all packed MOD events, and
 `audio.mod_voices` compares all chronological row-start note/instrument/sample
 states against libxmp.
+`audio.mod_ticks` compares every per-tick period, pitch bend, voice, volume,
+pan, event, and logical sample-position state against libxmp.
 Python-based tests skip cleanly if no interpreter is found.
 
 ## Tools (`port/tools/`)
@@ -118,6 +121,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_mod_trace_probe` | Phase 2C NASM tracker timing vs libxmp row-transition cross-check (CTest `audio.mod_trace`) |
 | `audio_mod_event_probe` | Phase 2D NASM MOD event decoder vs libxmp event cross-check (CTest `audio.mod_events`) |
 | `audio_mod_voice_probe` | Phase 2D NASM row voice identity vs libxmp channel state cross-check (CTest `audio.mod_voices`) |
+| `audio_mod_tick_probe` | Phase 2E NASM per-tick effect/state vs libxmp channel state cross-check (CTest `audio.mod_ticks`) |
 
 ## Troubleshooting
 

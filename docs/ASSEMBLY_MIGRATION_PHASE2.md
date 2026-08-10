@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2D passed; assembly mixer and device path not yet started**
+Status: **Phase 2A through Phase 2E passed; assembly mixer and device path not yet started**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -175,6 +175,46 @@ previous base note/instrument. The voice gate deliberately does not claim
 period slides, vibrato, final mixed volume/pan, retrigger position, sample
 loop execution, PCM interpolation, or device output.
 
+## Phase 2E result: native per-tick effect and sample-state gate
+
+Phase 2E replaces the remaining tracker execution needed to reproduce the
+module's visible per-channel state. It is still an offline validation target;
+the production player and WASAPI path remain unchanged.
+
+- [`audio_effects.asm`](../port/core/eos_replace/audio_effects.asm) executes
+  the module's `1xx`, `3xx`, `4xx`, `5xx`, `6xx`, `Axx`, `Cxx`, `Exx`, and
+  `Fxx` behavior in native x64 assembly.
+- [`audio_tick_abi.h`](../port/tools/validate/audio_tick_abi.h) defines the
+  packed per-channel snapshot, including logical sample position.
+- [`audio_mod_tick_probe.cpp`](../port/tools/validate/audio_mod_tick_probe.cpp)
+  compares every state against libxmp's `xmp_channel_info` and decoded row
+  event.
+- CTest name: `audio.mod_ticks`.
+
+The complete trace passes:
+
+```text
+replay frames                 13440
+channels                          14
+channel states checked        188160
+period mismatches                  0
+pitch-bend mismatches              0
+note/instrument/sample mismatches  0
+volume/pan mismatches              0
+event mismatches                   0
+```
+
+The implementation preserves the module-specific details that were not safe
+to infer from generic MOD documentation: high-nibble volume-slide direction,
+libxmp's `A0F` fine-volume-on-row-start behavior, the effective preallocated
+PAL sample C4 rate of `8287`, and clamping one-shot sample positions at the
+sample end. The probe contains no dependency on libxmp internals; libxmp is
+used only through its public validation API.
+
+This is a **GO** for the native offline effect/tick-state boundary. It is not
+yet a GO for PCM equivalence, loop interpolation, audio threading, WASAPI, or
+removing libxmp from the production target.
+
 ## Initial contract boundary
 
 The eventual assembly player must expose the equivalent of:
@@ -214,19 +254,17 @@ then be reviewed and deliberately updated.
 
 ## Next implementation slices
 
-1. Implement native tick/effect state for `1xx`, `3xx`, `4xx`, `6xx`, `Axx`,
-   `Cxx`, `Exx`, and `Fxx`, with period/volume snapshots before mixing.
-2. Add sample loop execution and a software mixer offline, initially without
-   WASAPI; compare complete PCM and row-transition hashes against the oracle.
-3. Add a separate NASM WASAPI/COM probe, then connect the proven mixer to an
+1. Add exact sample loop execution, interpolation, and a software mixer
+   offline, initially without WASAPI; compare complete PCM and row-transition
+   hashes against the oracle.
+2. Add a separate NASM WASAPI/COM probe, then connect the proven mixer to an
    event-driven render thread behind an `--asm-audio` switch.
 
-## Phase 2D go/no-go
+## Phase 2E go/no-go
 
-**GO to the native effect/tick-state slice.** The oracle, NASM parser, timing
-engine, event decoder, and row voice identity engine agree on the complete
-checked-in module timeline.
+**GO through native per-tick effect state.** The oracle, NASM parser, timing
+engine, event decoder, row voice identity engine, and effect/tick engine agree
+on the complete checked-in module timeline.
 **NO-GO to WASAPI, libxmp removal, or a production assembly-audio switch yet:**
-effect execution, period/volume/pan state, sample loops, PCM equivalence, the
-audio thread, device integration, and full-demo synchronization remain
-unproven.
+sample loops, PCM interpolation/mixing, the audio thread, device integration,
+and full-demo synchronization remain unproven.
