@@ -11,6 +11,7 @@ set(VOODKA_CORE_ASM
     eos_replace/audio_ring.asm
     eos_replace/audio_wasapi_probe.asm
     eos_replace/audio_thread_probe.asm
+    eos_replace/audio_service.asm
     eos_replace/d3d11_asm_probe.asm
     eos_replace/d3d11_asm_present.asm
     eos_replace/boot.asm

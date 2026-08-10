@@ -10,6 +10,7 @@
 #include "../tools/validate/audio_mix_abi.h"
 #include "../tools/validate/audio_mod_abi.h"
 #include "../tools/validate/audio_ring_abi.h"
+#include "../tools/validate/audio_service_abi.h"
 #include "../tools/validate/audio_thread_abi.h"
 #include "../tools/validate/audio_tick_abi.h"
 #include "../tools/validate/audio_tracker_abi.h"
@@ -48,6 +49,10 @@ struct Runtime {
 
     std::vector<int16_t> ringSamples;
     std::vector<AudioRingMarker> ringMarkers;
+    std::vector<AudioTickState> producerStates;
+    std::vector<int16_t> producerPcm;
+    AudioMixerHistory producerHistory{};
+    AudioAssemblyProducerArgs producerArgs{};
     AudioPcmRing ring{};
     AudioLiveControl control{};
     AudioRingThreadArgs workerArgs{};
@@ -59,6 +64,7 @@ struct Runtime {
     volatile LONG producerFailed = 0;
     volatile LONG workerControllerResult = 1;
     volatile LONG producerDone = 0;
+    volatile LONG producerError = 0;
 
     volatile LONG initialized = 0;
     volatile LONG shuttingDown = 0;
@@ -129,168 +135,6 @@ bool buildTimeline(const uint8_t* module, uint32_t moduleSize,
         runtime->tickTimesMs[frame] = rows[row].timeMs;
     }
     return true;
-}
-
-bool stopped(const Runtime* runtime) {
-    return InterlockedCompareExchange(
-        const_cast<volatile LONG*>(&runtime->producerStop), 0, 0) != 0;
-}
-
-bool producerHandleSeek(Runtime* runtime, AudioLiveTrackerContext* tracker,
-                        AudioMixerHistory* history, uint32_t* stateFrame,
-                        uint32_t* lastSeekSequence,
-                        uint32_t* segmentBaseTick,
-                        uint32_t* segmentRingBase, bool* seekSegment) {
-    const uint32_t sequence = runtime->control.seekSequence;
-    if (sequence == *lastSeekSequence) return true;
-
-    InterlockedExchange(
-        reinterpret_cast<volatile LONG*>(
-            &runtime->control.producerSeekAckSequence),
-        static_cast<LONG>(sequence));
-    while (runtime->control.seekCommitSequence != sequence) {
-        if (stopped(runtime)) return false;
-        Sleep(1);
-    }
-
-    uint32_t target = runtime->control.requestedSeekTick;
-    if (target >= runtime->stateFrames) target = runtime->stateFrames - 1;
-    AudioLiveTrackerContext fresh{};
-    if (asm_audio_live_init(runtime->module.data(),
-                            static_cast<uint32_t>(runtime->module.size()),
-                            &fresh) != 0) {
-        InterlockedExchange(&runtime->producerFailed, 1);
-        return false;
-    }
-    AudioTickState discarded[kChannels]{};
-    for (uint32_t i = 0; i < target; ++i) {
-        if (asm_audio_live_next(&fresh, discarded) != 1) {
-            InterlockedExchange(&runtime->producerFailed, 1);
-            return false;
-        }
-    }
-    *tracker = fresh;
-    *history = AudioMixerHistory{};
-    *stateFrame = target;
-    *segmentBaseTick = target;
-    *segmentRingBase = runtime->control.seekRingBaseFrame;
-    *seekSegment = true;
-    *lastSeekSequence = sequence;
-    return true;
-}
-
-DWORD WINAPI producerThread(void* raw) {
-    auto* runtime = static_cast<Runtime*>(raw);
-    AudioLiveTrackerContext tracker{};
-    AudioMixerHistory history{};
-    if (asm_audio_live_init(runtime->module.data(),
-                            static_cast<uint32_t>(runtime->module.size()),
-                            &tracker) != 0) {
-        InterlockedExchange(&runtime->producerFailed, 1);
-        return 1;
-    }
-
-    std::vector<AudioTickState> states(
-        static_cast<size_t>(kTickChunk) * kChannels);
-    const uint32_t scratchFrames = runtime->maxTickFrames * kTickChunk;
-    std::vector<int16_t> pcm(
-        static_cast<size_t>(scratchFrames) * kOutputChannels);
-    uint32_t stateFrame = 0;
-    uint32_t lastSeekSequence = 0;
-    uint32_t segmentBaseTick = 0;
-    uint32_t segmentRingBase = 0;
-    bool seekSegment = false;
-
-    while (!stopped(runtime)) {
-        if (!producerHandleSeek(runtime, &tracker, &history, &stateFrame,
-                                &lastSeekSequence, &segmentBaseTick,
-                                &segmentRingBase, &seekSegment)) {
-            break;
-        }
-        if (stateFrame >= runtime->stateFrames) {
-            InterlockedExchange(&runtime->producerDone, 1);
-            while (!stopped(runtime)) Sleep(10);
-            break;
-        }
-
-        const uint32_t chunkStates = std::min(
-            kTickChunk, runtime->stateFrames - stateFrame);
-        uint32_t chunkFrames = 0;
-        bool seekChanged = false;
-        for (uint32_t i = 0; i < chunkStates; ++i) {
-            if (stopped(runtime)) break;
-            if (runtime->control.seekSequence != lastSeekSequence) {
-                seekChanged = true;
-                break;
-            }
-            auto* state = states.data() + static_cast<size_t>(i) * kChannels;
-            if (asm_audio_live_next(&tracker, state) != 1 ||
-                state[0].tickFrames == 0) {
-                InterlockedExchange(&runtime->producerFailed, 1);
-                break;
-            }
-            for (uint32_t channel = 1; channel < kChannels; ++channel) {
-                if (state[channel].tickFrames != state[0].tickFrames) {
-                    InterlockedExchange(&runtime->producerFailed, 1);
-                    break;
-                }
-            }
-            chunkFrames += state[0].tickFrames;
-        }
-        if (stopped(runtime) || runtime->producerFailed) break;
-        if (seekChanged) continue;
-
-        const uint32_t mixed = asm_audio_mix_tick_states_continuous(
-            runtime->module.data(), static_cast<uint32_t>(runtime->module.size()),
-            states.data(), chunkStates, pcm.data(), scratchFrames, &history);
-        if (mixed != chunkFrames) {
-            InterlockedExchange(&runtime->producerFailed, 1);
-            break;
-        }
-
-        uint32_t pushed = 0;
-        while (pushed < mixed && !stopped(runtime)) {
-            if (runtime->control.seekSequence != lastSeekSequence) {
-                seekChanged = true;
-                break;
-            }
-            const uint32_t got = asm_audio_ring_push(
-                &runtime->ring, pcm.data() +
-                    static_cast<size_t>(pushed) * kOutputChannels,
-                mixed - pushed);
-            if (!got) {
-                Sleep(1);
-                continue;
-            }
-            pushed += got;
-        }
-        if (stopped(runtime)) break;
-        if (seekChanged) continue;
-
-        for (uint32_t i = 0; i < chunkStates; ++i) {
-            if (runtime->control.seekSequence != lastSeekSequence) {
-                seekChanged = true;
-                break;
-            }
-            uint32_t markerFrame = runtime->tickStarts[stateFrame + i];
-            if (seekSegment) {
-                markerFrame = segmentRingBase +
-                    (markerFrame - runtime->tickStarts[segmentBaseTick]);
-            }
-            while (!stopped(runtime) &&
-                   asm_audio_ring_push_marker(
-                       &runtime->ring, markerFrame,
-                       runtime->modposByTick[stateFrame + i]) != 1) {
-                Sleep(1);
-            }
-            if (stopped(runtime)) break;
-        }
-        if (stopped(runtime)) break;
-        if (seekChanged) continue;
-        stateFrame += chunkStates;
-    }
-
-    return runtime->producerFailed ? 1 : 0;
 }
 
 DWORD WINAPI workerControllerThread(void* raw) {
@@ -439,6 +283,11 @@ int audioAsmInit(const char* modPath, int) {
     g_runtime.ringSamples.resize(
         static_cast<size_t>(kRingCapacity) * kOutputChannels);
     g_runtime.ringMarkers.resize(kMarkerCapacity);
+    g_runtime.producerStates.resize(
+        static_cast<size_t>(kTickChunk) * kChannels);
+    const uint32_t scratchFrames = g_runtime.maxTickFrames * kTickChunk;
+    g_runtime.producerPcm.resize(
+        static_cast<size_t>(scratchFrames) * kOutputChannels);
     if (asm_audio_ring_init(&g_runtime.ring, g_runtime.ringSamples.data(),
                             kRingCapacity, g_runtime.ringMarkers.data(),
                             kMarkerCapacity) != 0) {
@@ -447,11 +296,36 @@ int audioAsmInit(const char* modPath, int) {
         return 0;
     }
 
+    g_runtime.producerArgs = {
+        g_runtime.module.data(),
+        static_cast<uint32_t>(g_runtime.module.size()),
+        g_runtime.stateFrames,
+        g_runtime.maxTickFrames,
+        scratchFrames,
+        g_runtime.tickStarts.data(),
+        g_runtime.modposByTick.data(),
+        &g_runtime.ring,
+        &g_runtime.control,
+        g_runtime.producerStates.data(),
+        g_runtime.producerPcm.data(),
+        &g_runtime.producerHistory,
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerDone),
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerError),
+    };
     g_runtime.workerArgs = {&g_runtime.ring, 0, &g_runtime.control};
     g_runtime.producerHandle = CreateThread(
-        nullptr, 0, producerThread, &g_runtime, 0, nullptr);
+        nullptr, 0,
+        reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_producer_thread),
+        &g_runtime.producerArgs,
+        0, nullptr);
     if (!g_runtime.producerHandle || !prebuffered(&g_runtime)) {
-        logPrint("[audio-asm] producer prebuffer failed\n");
+        logPrint("[audio-asm] producer prebuffer failed failed=%ld done=%ld "
+                 "error=%ld write=%u read=%u\n",
+                 g_runtime.producerFailed, g_runtime.producerDone,
+                 g_runtime.producerError,
+                 g_runtime.ring.writeFrame, g_runtime.ring.readFrame);
         audioAsmShutdown();
         return 0;
     }

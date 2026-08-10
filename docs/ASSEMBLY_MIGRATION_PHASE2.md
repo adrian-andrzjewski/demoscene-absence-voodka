@@ -1,6 +1,6 @@
 # Phase 2 progress: dedicated assembly audio gate
 
-Status: **Phase 2A through Phase 2S passed; default production swap remains**
+Status: **Phase 2A through Phase 2T passed; default production swap remains**
 Snapshot date: **2026-08-10**
 
 Phase 2 is the next feasibility gate after the D3D11 presenter. The production
@@ -820,3 +820,40 @@ removal design. It is not yet a **GO** for deleting libxmp or the C++ audio
 orchestration: the full-run live audio stream still needs an aligned fidelity
 comparison, and repeated launch/close runs must be completed before the
 assembly service becomes the default.
+
+## Phase 2T result: native assembly producer service
+
+Phase 2T removes the highest-frequency real-time loop from the C++ audio shim.
+`audio_service.asm` now owns the producer thread entry and performs:
+
+- persistent tracker initialization and per-tick advancement;
+- 14-channel tick-frame validation;
+- continuous assembly mixer calls with caller-owned history;
+- PCM-ring backpressure and timeline-marker publication;
+- pause/stop polling and the coordinated seek transaction; and
+- fixed-width producer failure reporting.
+
+The `AudioAssemblyProducerArgs` ABI is a documented 112-byte structure with
+explicit pointer and scalar offsets. C++ still owns module-file loading,
+offline timing preparation, vector-backed storage, Win32 thread handles, and
+the controller/report wrapper. Those responsibilities remain intentionally
+reversible until the native service has passed the same full-run evidence.
+
+The Release evidence after the producer extraction is:
+
+```text
+assembly audio self-check 3 s                 exit 0; 150,822 device frames; underruns 0
+assembly P1/P2 boundary                       exit 0; 1,154,097 device frames; underruns 0
+assembly P5 seek/run                           exit 0; ModPos 0x1400 -> P5; underruns 0
+assembly full P1-P8                            exit 0; 252.2 s; final ModPos 0x2803
+assembly full scene sequence                   P1, P2, P3, P5, P6, P7, P8
+assembly full device stream                    11,079,684 frames; underruns 0; 12,820 markers
+full Release CTest suite                       51/51 passed; 105.83 s
+```
+
+This is a **GO** for the next shim-reduction step. It proves that moving the
+real-time producer into native x64 assembly preserves the current soundtrack
+clock, scene boundaries, seek behavior, and full-demo stability. It is still
+a **NO-GO** for removing `audio_asm.cpp`, libxmp, or the C++ platform layer:
+storage ownership, module/timeline preparation, controller lifetime, and
+Windows-facing application integration remain in C++.
