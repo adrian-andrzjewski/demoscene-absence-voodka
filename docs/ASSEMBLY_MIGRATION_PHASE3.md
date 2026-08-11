@@ -772,11 +772,56 @@ bridge is now assembly-owned and independently equivalent. Remaining render
 surface is the C++ recording/readback diagnostics around the assembly D3D11
 presenter, followed by the lower-risk timing/input/progress/resource wrappers.
 
-## Next gate: Phase 3B.6.7B.7
+## Phase 3B.6.7B.7 D3D11 recording/diagnostic service
 
-Phase 3B.6.7B.7 should migrate the production D3D11 recording and diagnostic
-file orchestration out of `d3d11_dispatch.cpp`, retaining the assembly COM
-presenter and the C++ reference presenter as separate oracles. Import
+The shipped target no longer compiles `d3d11_dispatch.cpp`. The assembly
+`win32_d3d_dispatch.asm` exports the exact decorated `vk::` presenter-service
+ABI and now owns the remaining host-side D3D11 boundary around the already
+assembly-native COM presenter:
+
+- palette conversion/current-palette state and the deterministic self-test
+  framebuffer pattern;
+- `frames.raw` recording with the original frame/palette ordering and flush
+  behavior;
+- readback diagnostics with separate `frame_src.raw`, `frame_pal.raw`, and
+  `frame_gpu.raw` files, a bounded four-frame capture, dynamic `VirtualAlloc`
+  storage, and Win32 `CreateFileA`/`WriteFile`/`FlushFileBuffers`/`CloseHandle`
+  ownership; and
+- presenter initialization, draw/Present error reporting, input/quit
+  boundary calls, and complete state teardown.
+
+`bridge.cpp` retains only narrow C ABI wrappers for the input/quit/arena
+services needed by the assembly service. The C++ production `std::string`,
+`FILE*`, `std::vector`, and `fopen_s`/stdio path are no longer compiled into
+`VOODKA.exe`; the reference target retains `d3d11_present.cpp` as the C++
+presenter oracle.
+
+The focused probe uses real Win32 files and virtual memory while stubbing only
+the lower assembly COM presenter. It verifies exact output files, byte counts,
+palette masking, self-test pixels, readback capacity, decorated ABI linkage,
+input/quit call order, and teardown.
+
+### Phase 3B.6.7B.7 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM D3D11-service probe                                   1/1 passed; 0.07 s
+full regression suite                                      67/67 passed; 104.38 s
+production d3d11_dispatch.cpp                              not compiled
+production D3D11 host service                              NASM x64
+reference D3D11 presenter                                  C++ oracle
+```
+
+This is a **GO** for the next boundary. The production render path is now
+assembly from P4 rasterization through COM presentation and host-side frame/
+diagnostic output. Remaining production C++ is concentrated in the bridge's
+service wrappers, timing/input/pause/progress, audio dispatch, and the minimal
+CRT entry boundary.
+
+## Next gate: Phase 3B.6.7B.8
+
+Phase 3B.6.7B.8 should inventory and reduce the remaining production bridge,
+audio-dispatch, timing, input/pause, progress, and resource wrappers. Import
 attribution, full-demo playback, A/V synchronization, and failure/lifecycle
 probes remain mandatory; custom `/ENTRY` is still deferred until no production
 C++ object requires CRT initialization.

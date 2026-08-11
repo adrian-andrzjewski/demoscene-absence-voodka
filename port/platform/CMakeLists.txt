@@ -13,10 +13,10 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 set(VOODKA_PLATFORM_SOURCES
     production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
-    d3d11_dispatch.cpp
     audio_dispatch.cpp
     win32_platform_abi.asm
     p4_raster.asm
+    win32_d3d_dispatch.asm
 )
 
 set(VOODKA_REFERENCE_SOURCES

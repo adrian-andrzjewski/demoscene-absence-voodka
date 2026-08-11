@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.6 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.7 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -992,12 +992,17 @@ the production P4 textured-triangle bridge from `bridge.cpp` into a standalone
 NASM SSE2/double-precision scan converter. Its complete-frame raster probe and
 the complete 66-test suite pass; the reference target retains the C++
 rasterizer as the oracle.
+Phase 3B.6.7B.7 now removes the production `d3d11_dispatch.cpp` object. NASM
+owns the decorated presenter ABI, palette and self-test state, frame recording,
+bounded GPU readback diagnostics, Win32 file handles, VirtualAlloc storage, and
+presenter lifecycle; the real 67-test suite including production P1/pause/close
+playback passes, while the reference presenter remains C++.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.7: remove
-the remaining production D3D11 recording/readback diagnostic file
-orchestration while retaining the reference target as the differential
-oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.8: reduce
+the remaining production bridge, audio-dispatch, timing, input/pause, and
+progress/resource wrappers while retaining the reference target as the
+differential oracle.

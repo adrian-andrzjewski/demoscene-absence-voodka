@@ -691,6 +691,18 @@ target_include_directories(p4_raster_probe PRIVATE
 add_test(NAME p4.raster COMMAND p4_raster_probe)
 set_tests_properties(p4.raster PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.7 witness: validate the production NASM D3D11 service ABI,
+# palette/frame recording, readback diagnostics, and lifecycle state.
+add_executable(win32_d3d_dispatch_probe
+    tools/validate/win32_d3d_dispatch_probe.cpp
+    platform/win32_d3d_dispatch.asm)
+target_compile_definitions(win32_d3d_dispatch_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_d3d_dispatch_probe PRIVATE
+    platform "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+target_link_libraries(win32_d3d_dispatch_probe PRIVATE kernel32)
+add_test(NAME win32.d3d_dispatch COMMAND win32_d3d_dispatch_probe)
+set_tests_properties(win32.d3d_dispatch PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

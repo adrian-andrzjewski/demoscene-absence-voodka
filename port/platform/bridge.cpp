@@ -255,6 +255,12 @@ void vk_pause_toggle() {
 void vk_request_quit() {
     vk::requestQuit();
 }
+void vk_platform_update_input() {
+    vk::updateInput();
+}
+int vk_platform_quit_requested() {
+    return vk::quitRequested() ? 1 : 0;
+}
 
 // Production shutdown coordinator ABI. The order is owned by
 // win32_shutdown.asm; these wrappers keep each existing subsystem teardown
