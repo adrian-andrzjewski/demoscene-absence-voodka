@@ -150,12 +150,17 @@ $machine = [BitConverter]::ToUInt16($bytes, $peOffset + 4)
 $optional = $peOffset + 24
 $optionalMagic = [BitConverter]::ToUInt16($bytes, $optional)
 $subsystem = [BitConverter]::ToUInt16($bytes, $optional + 68)
+$dllCharacteristics = [BitConverter]::ToUInt16($bytes, $optional + 70)
 $entryRva = [BitConverter]::ToUInt32($bytes, $optional + 16)
-Write-Host ("PE: machine=0x{0:X4}, optional=0x{1:X4}, subsystem={2}, entry-RVA=0x{3:X}" -f
-    $machine, $optionalMagic, $subsystem, $entryRva)
+Write-Host ("PE: machine=0x{0:X4}, optional=0x{1:X4}, subsystem={2}, entry-RVA=0x{3:X}, DLL-characteristics=0x{4:X4}" -f
+    $machine, $optionalMagic, $subsystem, $entryRva, $dllCharacteristics)
 if ($machine -ne 0x8664) { Fail "production PE is not x64" }
 if ($optionalMagic -ne 0x20b) { Fail "production PE is not PE32+" }
 if ($subsystem -ne 2) { Fail "production PE is not a Windows GUI image" }
+if (($dllCharacteristics -band 0x20) -eq 0) { Fail "production PE lacks high-entropy VA support" }
+if (($dllCharacteristics -band 0x40) -eq 0) { Fail "production PE lacks ASLR/DynamicBase" }
+if (($dllCharacteristics -band 0x100) -eq 0) { Fail "production PE lacks NX compatibility" }
+Write-Host "Image contract: high-entropy VA, ASLR, and NX compatible"
 
 # Validate the generated shipped-target graph, not merely the final binary.
 $projectText = Get-Content -LiteralPath $projectPath -Raw

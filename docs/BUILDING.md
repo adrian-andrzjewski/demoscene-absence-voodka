@@ -77,7 +77,9 @@ run the PE/source/import checks and the live P4 smoke with:
 .\port\verify_production.ps1 -Config Release -RunTests -PackageRun -FullRun
 ```
 
-The second command runs the CTest matrix, the live P4 gate, and the complete
+The verifier also checks the x64/PE32+ GUI image contract, native entry,
+ASLR, high-entropy VA, NX compatibility, and forbidden runtime imports. The
+second command runs the CTest matrix, the live P4 gate, and the complete
 production playback from an isolated package containing only `VOODKA.exe`,
 `data\vodka.dat`, and `music\amnezja2.mod`; it records an A/V timeline under
 `port/build/`, verifies frame/audio monotonicity and terminal ModPos `0x2803`,
