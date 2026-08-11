@@ -8,6 +8,7 @@ BITS 64
 DEFAULT REL
 
 %include "win64_abi.inc"
+%include "window_title.inc"
 
 extern ?getModPos@vk@@YAIXZ
 extern ?getFrameCounter@vk@@YA_KXZ
@@ -16,7 +17,11 @@ extern ?timelineFrame@vk@@YAX_K0I@Z
 extern ?audioElapsedSec@vk@@YANXZ
 extern asm_log_vformat
 extern vk_log_printf
+%if VOODKA_DEBUG_TITLE
 extern SetWindowTextA
+%else
+extern SetWindowTextW
+%endif
 
 global ?progressInit@vk@@YAXPEAX@Z
 global ?progressUpdate@vk@@YAXXZ
@@ -44,7 +49,11 @@ progress_sixty: dq 60.0
 progress_ten:   dq 10.0
 
 progress_elapsed_format: db "%02d:%02d.%d", 0
+progress_production_title:
+        VOODKA_EMIT_WINDOW_TITLE_W
+%if VOODKA_DEBUG_TITLE
 progress_title_format: db 'VOODKA (Absence) - Scene %d/8  %s  [%s]  t=%s  scene#%ld', 0
+%endif
 progress_log_format: db '[scene] part=%d/8 scene="%s" effect="%s" elapsed=%s modpos=0x%x scene_index=%ld', 10, 0
 
 scene_modpos: dd 0x0000, 0x0100, 0x0200, 0x0300
@@ -105,6 +114,15 @@ section .text
         mov     [rel progress_hwnd], rcx
         mov     dword [rel progress_last_scene], -1
         mov     dword [rel progress_transition_count], 0
+%if !VOODKA_DEBUG_TITLE
+        test    rcx, rcx
+        jz      .init_done
+        sub     rsp, 0x28
+        lea     rdx, [rel progress_production_title]
+        call    SetWindowTextW
+        add     rsp, 0x28
+.init_done:
+%endif
         ret
 
 ; void vk::progressUpdate(void)
@@ -191,6 +209,7 @@ section .text
         lea     r9, [rsp + PROG_ELAPSED_VA]
         call    asm_log_vformat
 
+%if VOODKA_DEBUG_TITLE
         mov     eax, [rsp + PROG_SCENE_ID]
         mov     [rsp + PROG_TITLE_VA], rax
         mov     rax, [rsp + PROG_SCENE_PTR]
@@ -213,6 +232,7 @@ section .text
         lea     rdx, [rsp + PROG_TITLE]
         call    SetWindowTextA
 .no_title:
+%endif
         ; Six log arguments: the first four use registers and the final two
         ; use the caller's Win64 stack slots.
         lea     rcx, [rel progress_log_format]

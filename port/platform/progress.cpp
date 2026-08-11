@@ -10,6 +10,7 @@
 
 #include "platform_abi.h"
 #include "scene_names.h"
+#include "window_title.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstdarg>
@@ -97,6 +98,7 @@ void progressUpdate() {
     char tbuf[32];
     formatElapsed(tbuf, sizeof tbuf, audioElapsedSec());
 
+#if defined(VOODKA_DEBUG_TITLE)
     char title[256];
 #if defined(VOODKA_ASSEMBLY_PLATFORM)
     formatAssembly(title, sizeof title,
@@ -108,6 +110,9 @@ void progressUpdate() {
              scenePart(s.id), s.scene, s.effect, tbuf, g_transitionCount);
 #endif
     if (g_hwnd) SetWindowTextA(g_hwnd, title);
+#else
+    if (g_hwnd) SetWindowTextW(g_hwnd, kProductionWindowTitle);
+#endif
 
     logPrint("[scene] part=%d/8 scene=\"%s\" effect=\"%s\" elapsed=%s "
              "modpos=0x%x scene_index=%ld\n",

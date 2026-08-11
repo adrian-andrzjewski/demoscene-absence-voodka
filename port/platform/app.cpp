@@ -9,6 +9,7 @@
 #include "platform_abi.h"
 #include "demo_entry.h"
 #include "scene_names.h"
+#include "window_title.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -421,7 +422,11 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     }
 
     HWND hwnd = CreateWindowExW(WS_EX_TOPMOST, kWinClass,
-                                L"VOODKA (Absence 1996x - Windows x64 port)",
+#if defined(VOODKA_DEBUG_TITLE)
+                                vk::kDebugWindowTitle,
+#else
+                                vk::kProductionWindowTitle,
+#endif
                                 WS_OVERLAPPEDWINDOW,
                                 rc.left, rc.top, winW, winH,
                                 nullptr, nullptr, hInst, nullptr);

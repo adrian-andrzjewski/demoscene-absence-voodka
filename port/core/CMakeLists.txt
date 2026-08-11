@@ -60,6 +60,8 @@ set(VOODKA_CORE_ASM
   )
 
 add_library(voodka_core STATIC ${VOODKA_CORE_ASM})
+target_compile_options(voodka_core PRIVATE
+    ${VOODKA_DEBUG_TITLE_ASM_OPTION})
 
 # NASM does not emit dependency edges for INCBIN payloads. Keep processorek Nevosolek (P4)'s embedded
 # palette inputs visible to the build graph so a palette correction is picked

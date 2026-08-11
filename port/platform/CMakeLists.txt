@@ -71,7 +71,14 @@ if(MSVC)
     # Keep C++ warning flags off NASM sources.  CMake otherwise appends /W4
     # to the NASM command line, where it is parsed as another input file.
     target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4>)
-    target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_options(${target} PRIVATE
+        ${VOODKA_DEBUG_TITLE_ASM_OPTION})
+    target_compile_definitions(${target} PRIVATE
+        NOMINMAX
+        WIN32_LEAN_AND_MEAN
+        # This is intentionally a positive Debug-only opt-in.  All other
+        # configurations, including Release, compile the production title.
+        ${VOODKA_DEBUG_TITLE_DEFINITION})
 endif()
 
 # Win32 subsystem + link libs

@@ -7,6 +7,7 @@ BITS 64
 DEFAULT REL
 
 %include "win64_abi.inc"
+%include "window_title.inc"
 
 %define CS_HREDRAW                  0x0002
 %define CS_VREDRAW                  0x0001
@@ -68,7 +69,8 @@ app_monitor_info:   resb 40
 section .data
 align 2
 app_class_name:     dw 'V','O','O','D','K','A',0
-app_window_title:   dw 'V','O','O','D','K','A',' ','(','A','b','s','e','n','c','e',' ','1','9','9','6','x',' ','-',' ','W','i','n','d','o','w','s',' ','x','6','4',' ','p','o','r','t',')',0
+app_window_title:
+        VOODKA_EMIT_WINDOW_TITLE_W
 
 section .text
 

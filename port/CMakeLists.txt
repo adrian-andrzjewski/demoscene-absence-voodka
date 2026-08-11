@@ -12,6 +12,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Build-selected window-title policy shared by the production ASM core and
+# platform bridge, plus the C++ reference executable. Release is the implicit
+# default; only Debug opts into runtime scene information.
+set(VOODKA_DEBUG_TITLE_DEFINITION
+    "$<$<CONFIG:Debug>:VOODKA_DEBUG_TITLE=1>")
+set(VOODKA_DEBUG_TITLE_ASM_OPTION
+    "$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANGUAGE:ASM_NASM>>:-dVOODKA_DEBUG_TITLE=1>")
+
 # Tests are registered throughout this file; enable before the first add_test.
 enable_testing()
 
