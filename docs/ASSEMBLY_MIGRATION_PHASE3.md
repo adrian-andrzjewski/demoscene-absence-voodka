@@ -1467,6 +1467,45 @@ a **GO** for the input boundary, with the full matrix serving as the release
 gate. The remaining shipped C++ platform sources are now concentrated in
 pause/progress and the application bridge wrappers.
 
+## Phase 3B.6.7C.6.3 pause namespace boundary
+
+The shipped target no longer compiles `pause.cpp`. `bridge_pause.asm` now owns
+the decorated `vk::isPaused` and `vk::pauseToggle` ABI, the atomically
+published pause state, the transition counter, the exact PAUSED/RESUMED
+diagnostics, and the audio-pump handoff. The timer and audio worker continue
+to consume the same `vk::isPaused` symbol; the reference target retains the
+C++ implementation as its oracle.
+
+### Assembly interfaces and dependencies
+
+```text
+vk::isPaused
+vk::pauseToggle
+```
+
+The implementation samples the existing assembly audio-clock services,
+duplicates the returned Win64 `double` into the integer varargs slot required
+by `vk_log_printf`, and uses interlocked state/count updates before pumping
+the audio controller. `win32_pause_abi_probe` stubs those audio services and
+checks both transitions, exact formatted bytes, counter values, and pump
+ordering.
+
+### Phase 3B.6.7C.6.3 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM decorated pause ABI probe                               1/1 passed
+focused arena/input/pause + P1/pause/close gates             6/6 passed; 56.33 s
+full regression suite                                      84/84 passed; 107.04 s
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. The shipped pause state and synchronization handoff are now
+native x64 assembly without visual, soundtrack, timing, or lifecycle drift.
+The remaining shipped C++ platform logic is concentrated in progress reporting
+and the application bridge wrappers.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1477,7 +1516,7 @@ remaining boundary:
 | `production_entry.cpp` | CRT `WinMain` transfer to `asm_voodka_winmain` | Small code footprint, but it retains CRT initialization and the last CRT imports | Final host gate after C++ global/runtime dependencies are gone |
 | `arena.cpp` | Reference/VIRTUAL namespace implementation | Shipped target now uses `bridge_arena.asm`; C++ remains only as the behavioral/tool oracle | Reference/tool targets only |
 | `input.cpp` | Reference-only namespace implementation | Shipped target now uses decorated ABI exports from `win32_input.asm`; reference retains C++ watcher/state oracle | Reference target only |
-| `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
+| `pause.cpp` | Reference-only pause namespace implementation | Shipped target now uses `bridge_pause.asm`; reference retains C++ state/logging oracle | Reference target only |
 | `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
 | `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, and logging services are now in assembly; remaining application/startup adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
 
@@ -1490,11 +1529,11 @@ remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
 objects and must be removed or deliberately retained before a custom `/ENTRY`
 claim.
 
-## Next gate: Phase 3B.6.7C.6.3 pause, progress, and application adapters
+## Next gate: Phase 3B.6.7C.6.4 progress and application adapters
 
 The next risk-first slice must map and migrate the remaining production
-application/startup namespace wrappers in `bridge.cpp`, `progress.cpp`,
-and `pause.cpp`. It must preserve command-line modes,
+progress and application/startup namespace wrappers in `progress.cpp` and
+`bridge.cpp`. It must preserve command-line modes,
 window title/progress output, pause/audio pumping, input state, archive
 ownership, and failure rollback while keeping the reference target unchanged.
 The C++ bridge must not be deleted and custom `/ENTRY` must not be attempted

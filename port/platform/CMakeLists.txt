@@ -10,7 +10,6 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
     audio_sync.asm
     audio_workers.asm
     progress.cpp
-    pause.cpp
     bridge.cpp
 )
 
@@ -18,6 +17,7 @@ set(VOODKA_PLATFORM_SOURCES
     production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     bridge_arena.asm
+    bridge_pause.asm
     timer.asm
     audio_dispatch.asm
     win32_platform_abi.asm
@@ -37,6 +37,7 @@ set(VOODKA_REFERENCE_SOURCES
     timer.cpp
     arena.cpp
     input.cpp
+    pause.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_present.cpp
     audio.cpp

@@ -118,7 +118,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-83 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+84 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -174,6 +174,8 @@ quit publication. `bridge.shutdown` validates the ten native
 assembly teardown forwarders and their exact coordinator order. `bridge.log`
 validates the native variadic bridge with register and stack-passed arguments
 through the production formatter and sink.
+`win32.pause_abi` validates the decorated `vk::` pause namespace ABI, atomic
+state transitions, exact diagnostics, and audio-pump handoff.
 `audio.wasapi_asm_probe` performs the complete 44.1 kHz stereo PCM WASAPI
 activation, event, buffer, stop/reset, and COM teardown sequence in NASM; the
 C++ executable only validates its fixed-width report.
@@ -226,6 +228,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_timeline_probe` | Phase 3B.6.6 byte-level production NASM timeline formatter/file-sink witness (CTest `win32.timeline_sink`) |
 | `win32_arena_probe` | Phase 3B.6.7A/C.6.1 production NASM arena/archive discovery, decorated `vk::` namespace ABI, copy, alignment, and teardown witness (CTest `win32.arena_service`) |
 | `win32_input_abi_probe` | Phase 3B.6.7C.6.2 production decorated `vk::` input ABI, worker, key-map, ESC, and quit-state witness (CTest `win32.input_abi`) |
+| `win32_pause_abi_probe` | Phase 3B.6.7C.6.3 production decorated `vk::` pause ABI, atomic transitions, logging, and audio-pump witness (CTest `win32.pause_abi`) |
 | `win32_music_path_probe` | Phase 3B.6.7B.1 production NASM soundtrack-path override, executable-directory, and fallback witness (CTest `win32.music_path`) |
 | `win32_app_modes_probe` | Phase 3B.6.7B.2 production NASM seek precedence, part-start, self-test, audio-check, and result ABI witness (CTest `win32.app_modes`) |
 | `win32_app_startup_probe` | Phase 3B.6.7B.3 production NASM subsystem order, Win64 POD arguments, quit checkpoints, and rollback witness (CTest `win32.app_startup`) |
