@@ -130,6 +130,20 @@ void vk_request_quit() {
     vk::requestQuit();
 }
 
+// Production shutdown coordinator ABI. The order is owned by
+// win32_shutdown.asm; these wrappers keep each existing subsystem teardown
+// implementation unchanged and independently testable.
+void vk_shutdown_input()       { vk::inputShutdown(); }
+void vk_shutdown_audio()       { vk::audioShutdown(); }
+void vk_shutdown_recording()   { vk::recClose(); }
+void vk_shutdown_diagnostics() { vk::diagReadbackShutdown(); }
+void vk_shutdown_timeline()    { vk::timelineClose(); }
+void vk_shutdown_present()     { vk::shutdownPresent(); }
+void vk_shutdown_selectors()   { vk::resetSelectors(); }
+void vk_shutdown_platform()    { vk::platformShutdown(); }
+void vk_shutdown_log_flush()   { vk::logFlush(); }
+void vk_shutdown_log_shutdown() { vk::logShutdown(); }
+
 // trace hook from NASM (simple %s/%x/%d formatting via platform logger)
 void vk_log_printf(const char* fmt, ...) {
     char buf[512];

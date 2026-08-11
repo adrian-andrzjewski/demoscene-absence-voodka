@@ -151,10 +151,12 @@ void logFlush();
 void logShutdown();                    // flush, close file, delete lock
 
 // ---- shutdown / exit ---------------------------------------------------------
-// Deterministic wind-down, identical to the end-of-demo path in app.cpp:
-// input/audio workers stopped and joined, recording/readback outputs closed,
-// D3D11/selector/arena state released, the window destroyed, and the log
-// closed. shutdownAndExit() additionally terminates the process so nothing
+// Deterministic wind-down, identical to the end-of-demo path. The shipped
+// target owns the coordinator and quit handoff in win32_shutdown.asm; the
+// reference target retains the C++ implementation as the differential oracle.
+// Both paths stop and join input/audio workers, close recording/readback
+// outputs, release D3D11/selector/arena state, destroy the window, and close
+// the log. shutdownAndExit() additionally terminates the process so nothing
 // outlives the closed window or assembly demo stack.
 void shutdownAll();          // release all subsystems (safe on normal exit)
 void shutdownAndExit();      // shutdownAll() then terminate the process

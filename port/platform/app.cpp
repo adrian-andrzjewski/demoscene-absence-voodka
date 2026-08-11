@@ -56,7 +56,9 @@ extern "C" int32_t asm_voodka_arg_audiocheck(void);
 extern "C" int32_t asm_voodka_arg_audiocheck_seconds(void);
 #if !defined(VOODKA_REFERENCE_BUILD)
 extern "C" int asm_lifecycle_start(void* hwnd, int32_t pauseMs, int32_t closeMs);
-extern "C" void asm_lifecycle_stop(void);
+extern "C" void asm_shutdown_set_window(HWND, HINSTANCE);
+extern "C" void asm_shutdown_all(void);
+extern "C" void asm_shutdown_and_exit(void);
 #endif
 
 namespace {
@@ -65,9 +67,11 @@ constexpr const wchar_t* kWinClass = L"VOODKA";
 // (nearest-neighbour, no filtering), so each source texel is a clean 4x4 block.
 constexpr int kWinW = 1280;
 constexpr int kWinH = 800;
+#if defined(VOODKA_REFERENCE_BUILD)
 HWND g_hwnd = nullptr;
 HINSTANCE g_hInst = nullptr;
 volatile LONG g_shutdownStarted = 0;
+#endif
 
 // Opt-in lifecycle automation used by the runtime gates.  It injects the
 // same window messages a user would generate, so pause/resume and close are
@@ -159,9 +163,6 @@ bool startAutomation(HWND hwnd, long pauseAtMs, long closeAtMs) {
     return true;
 }
 
-void stopAutomation() {
-    asm_lifecycle_stop();
-}
 #endif
 }
 
@@ -247,7 +248,9 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 }
 
 extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
+#if defined(VOODKA_REFERENCE_BUILD)
     g_hInst = hInst;
+#endif
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
 
@@ -441,7 +444,11 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         return 1;
     }
 #endif
+#if defined(VOODKA_REFERENCE_BUILD)
     g_hwnd = hwnd;
+#else
+    asm_shutdown_set_window(hwnd, hInst);
+#endif
     vk::progressInit(hwnd);
 
     // Start before any archive/module/scene loading. The assembly core can
@@ -638,9 +645,14 @@ int WINAPI WinMain(HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpCmd, int nCmdShow) 
 namespace vk {
 
 // Full deterministic wind-down; the single teardown sequence shared by the
-// normal end-of-demo path and the ESC/window-close exit path. It is idempotent
-// because startup failures and the normal tail can both reach it.
+// normal end-of-demo path and the ESC/window-close exit path. The shipped
+// target routes the coordinator through win32_shutdown.asm; the reference
+// target retains this C++ implementation as the differential oracle.
 void shutdownAll() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_shutdown_all();
+    return;
+#else
     if (InterlockedExchange(&g_shutdownStarted, 1) != 0)
         return;
 
@@ -672,6 +684,7 @@ void shutdownAll() {
     }
     vk::logFlush();
     vk::logShutdown();
+#endif
 }
 
 // Window closed mid-demo: called from the per-frame choke points (waitVbl /
@@ -679,9 +692,13 @@ void shutdownAll() {
 // teardown as the end-of-demo path, then terminates the process so no demo
 // loop, audio thread or other background activity outlives the closed window.
 void shutdownAndExit() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_shutdown_and_exit();
+#else
     vk::logPrint("[app] quit requested (ESC/window close) - shutting down\n");
     vk::shutdownAll();
     ExitProcess(0);
+#endif
 }
 
 }  // namespace vk

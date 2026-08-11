@@ -283,9 +283,55 @@ shutdown boundary, but not a claim that application lifecycle ownership is yet
 assembly-only: C++ still coordinates subsystem initialization, logging, and
 the global teardown sequence.
 
-## Next gate: Phase 3B.6.1
+## Phase 3B.6.1 scope
 
-Phase 3B.6.1 should migrate the idempotent shutdown coordinator and its quit
-handoff behind an assembly-owned lifecycle interface. It must preserve worker
-join order, resource-release order, window destruction, process termination,
-and the reference target's clean normal/ESC/close behavior.
+Phase 3B.6.1 migrates the idempotent shutdown coordinator and its quit handoff
+behind an assembly-owned lifecycle interface. It must preserve worker join
+order, resource-release order, window destruction, process termination, and the
+reference target's clean normal/ESC/close behavior.
+
+## Phase 3B.6.1 shutdown coordinator
+
+The production shutdown coordinator is now native x64 assembly in
+`win32_shutdown.asm`.
+
+- `asm_shutdown_set_window` receives the production HWND/HINSTANCE after
+  assembly window creation and stores them outside the C++ host state.
+- `asm_shutdown_all` performs an atomic one-shot claim, logs the transition,
+  stops lifecycle automation, joins input/audio workers, closes recording and
+  diagnostics, closes the timeline, releases the D3D11 presenter, clears
+  selectors, releases the arena/archive, destroys/unregisters the window, and
+  finally flushes and closes the log.
+- `asm_shutdown_and_exit` logs the quit cause, invokes the same idempotent
+  sequence, and calls `ExitProcess(0)` so no demo stack or worker can outlive a
+  close-triggered termination.
+- `bridge.cpp` exposes one narrow C ABI wrapper per existing platform teardown
+  operation. The wrappers do not change subsystem implementations or their
+  release order; the order is now explicit and reviewable in NASM.
+- `VOODKA_REFERENCE.exe` retains the original C++ coordinator, including its
+  atomic guard and window-state handling, as the differential oracle.
+
+### Phase 3B.6.1 validation
+
+```text
+Release production/reference build                     passed
+focused shutdown/lifecycle gates                       5/5 passed; 58.54 s
+full regression suite                                  54/54 passed; 104.40 s
+production shutdown coordinator                        NASM x64
+reference shutdown coordinator                         C++ differential oracle
+```
+
+The focused gates cover normal production completion, production pause/resume
+cleanup, production close-triggered process exit, reference close, and the
+removed production libxmp rejection path. The full suite retains all existing
+rendering, audio, timing, asset, Win32, D3D11, and dedicated-player coverage.
+This is a **GO** for the next host boundary, but the production executable
+still contains C++ subsystem implementations, formatted logging, crash
+formatting, path resolution, and startup orchestration.
+
+## Next gate: Phase 3B.6.2
+
+Phase 3B.6.2 should migrate the production logging/crash-reporting boundary or
+the remaining startup orchestration, whichever can be isolated with a stable
+C ABI and differential evidence. It must preserve diagnostics, failure-path
+behavior, and the same normal/ESC/close teardown witnesses.
