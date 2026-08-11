@@ -599,6 +599,18 @@ target_link_libraries(win32_log_api_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.log_api COMMAND win32_log_api_probe)
 set_tests_properties(win32.log_api PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.6 feasibility witness: exercise the production NASM timeline
+# formatter and Win32 file handle/write/flush/close boundary byte-for-byte.
+add_executable(win32_timeline_probe
+    tools/validate/win32_timeline_probe.cpp
+    platform/timeline.cpp)
+target_compile_definitions(win32_timeline_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN VOODKA_ASSEMBLY_PLATFORM=1)
+target_include_directories(win32_timeline_probe PRIVATE platform)
+target_link_libraries(win32_timeline_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.timeline_sink COMMAND win32_timeline_probe)
+set_tests_properties(win32.timeline_sink PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

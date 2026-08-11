@@ -464,9 +464,45 @@ formatting. The remaining formatted production output is the timeline/file
 service, while host/startup orchestration and the broader C++ platform layer
 remain unchanged.
 
-## Next gate: Phase 3B.6.6
+## Phase 3B.6.6 production timeline/file sink
 
-Phase 3B.6.6 should migrate the timeline record formatter and its file-output
-boundary, preserving byte-for-byte timestamps, ModPos, audio-clock values,
-flush/close behavior, and failure-path handling. It should then reassess the
-remaining CRT/STL startup dependency before any custom `/ENTRY` work.
+The production timeline service now uses native x64 assembly for both record
+formatting and Win32 file I/O.
+
+- `timeline.cpp` keeps the existing public timeline contract and audio-clock
+  calculation, but production record strings go through `asm_log_vformat` and
+  the file lifecycle goes through `asm_timeline_open`, `asm_timeline_write`,
+  `asm_timeline_flush`, and `asm_timeline_close`.
+- `win32_timeline.asm` owns `CreateFileA`, `WriteFile`,
+  `FlushFileBuffers`, and `CloseHandle`, including the invalid-handle and
+  short-write failure paths. The reference target retains `fopen`/`fprintf`
+  and remains the C++ behavioral oracle.
+- `win32_timeline_probe` reads the generated file back and compares the header
+  plus QPC, ModPos, and audio-elapsed records byte-for-byte. The shipped
+  binary audit continues to report no `vsnprintf`, `snprintf`,
+  `__stdio_common`, or `fprintf` symbol.
+
+### Phase 3B.6.6 validation
+
+```text
+Release production/reference/tools rebuild               passed
+assembly timeline sink probe                             1/1 passed; 0.15 s
+full regression suite                                    59/59 passed; 104.89 s
+production timeline formatting/file sink                 NASM x64
+reference/VIRTUAL timeline paths                         C++ differential paths
+production formatted-output symbol audit                 no printf/file-format symbols
+```
+
+This is a **GO** for the final Phase 3B.6 host boundary. All currently live
+production formatted output and low-level Win32 file sinks are assembly-owned.
+The remaining production C++ surface is now concentrated in host orchestration,
+CRT/STL startup, path/asset service boundaries, and the higher-level platform
+wrappers. Those must be reassessed before attempting custom `/ENTRY` startup.
+
+## Next gate: Phase 3B.6.7
+
+Phase 3B.6.7 should inventory the remaining production CRT/STL and host
+orchestration ownership, then define the smallest ABI needed to remove each
+surviving C++ object. It is a feasibility gate, not a license to start a broad
+mechanical rewrite: the production executable must remain buildable and the
+reference target must continue to provide differential behavior throughout.
