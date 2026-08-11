@@ -8,6 +8,7 @@
 
 #include "platform_abi.h"
 #include "demo_entry.h"
+#include "scene_names.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstring>
@@ -35,8 +36,8 @@ extern "C" LONG WINAPI vk_crash_report(EXCEPTION_POINTERS* ep) {
 #include <vector>
 #endif
 
-// bridge symbols (extern "C"): select which part the assembly core runs
-extern "C" void vk_set_entry_part(int part);
+// bridge symbols (extern "C"): select which scene the assembly core runs
+extern "C" void vk_set_entry_scene(int scenePart);
 extern "C" LRESULT CALLBACK asm_voodka_wndproc(HWND, UINT, WPARAM, LPARAM);
 extern "C" HWND asm_create_voodka_window(HINSTANCE);
 extern "C" void asm_destroy_voodka_window(HWND, HINSTANCE);
@@ -531,7 +532,8 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     //   --modpos N  absolute ModPos ((order<<8)|row; the demo's timeline)
     //   --ms N      milliseconds from the start of the module
     //   --order N   order-list index (pattern start, row 0)
-    //   --part N    scene/part index (maps to a ModPos, see table below)
+    //   --scene NAME canonical scene slug (for example torus-ustep-village)
+    //   --part N    historical numeric scene selector (maps to a ModPos)
     // At most one seek selector is honored; the first present wins.
     {
 #if !defined(VOODKA_REFERENCE_BUILD)
@@ -547,18 +549,14 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
             if (st == std::string::npos) return -1;
             return (long)strtoul(rest.c_str() + st, nullptr, 0);
         };
-        // Scene start ModPos (calibration): part N begins where part N-1 ends.
-        // Values follow the parts' own exit thresholds in the assembly.
-        static const uint32_t kPartStartModPos[9] = {
-            0x0000,  // part 1
-            0x0400,  // part 2
-            0x0B40,  // part 3
-            0x0D40,  // part 4 (restored 2026-08-06)
-            0x1400,  // part 5
-            0x1B40,  // part 6
-            0x1C40,  // part 7
-            0x2040,  // part 8
-            0x2640,  // end
+        auto tokenAfter = [&](const char* flag) -> std::string {
+            auto p = cmd.find(flag);
+            if (p == std::string::npos) return std::string();
+            std::string rest = cmd.substr(p + std::strlen(flag));
+            size_t st = rest.find_first_not_of(" \t\"=");
+            if (st == std::string::npos) return std::string();
+            size_t end = rest.find_first_of(" \t\"", st);
+            return rest.substr(st, end == std::string::npos ? std::string::npos : end - st);
         };
         long v;
         if ((v = numAfter("--modpos")) >= 0) {
@@ -570,11 +568,26 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         } else if ((v = numAfter("--order")) >= 0) {
             uint32_t reached = vk::audioSeekOrder((int)v);
             vk::logPrint("[app] seek --order %ld -> reached ModPos %u\n", v, reached);
+        } else if (cmd.find("--scene") != std::string::npos) {
+            std::string token = tokenAfter("--scene");
+            int scenePart = vk::scenePartFromToken(token.c_str());
+            if (scenePart >= 1 && scenePart <= 8) {
+                vk::SceneId id = static_cast<vk::SceneId>(scenePart);
+                uint32_t start = vk::sceneStartModPos(id);
+                uint32_t reached = vk::audioSeekRows(start);
+                vk::logPrint("[app] seek --scene %s (%s) -> ModPos 0x%x reached %u\n",
+                             token.c_str(), vk::sceneName(id), start, reached);
+                vk_set_entry_scene(scenePart);
+            } else {
+                vk::logPrint("[app] invalid --scene selector '%s'\n", token.c_str());
+            }
         } else if ((v = numAfter("--part")) >= 1 && v <= 8) {
-            uint32_t reached = vk::audioSeekRows(kPartStartModPos[v - 1]);
-            vk::logPrint("[app] seek --part %ld -> ModPos 0x%x reached %u\n", v,
-                         kPartStartModPos[v - 1], reached);
-            vk_set_entry_part((int)v);
+            vk::SceneId id = static_cast<vk::SceneId>(v);
+            uint32_t start = vk::sceneStartModPos(id);
+            uint32_t reached = vk::audioSeekRows(start);
+            vk::logPrint("[app] seek --part %ld (%s) -> ModPos 0x%x reached %u\n", v,
+                         vk::sceneName(id), start, reached);
+            vk_set_entry_scene((int)v);
         } else {
             vk::logPrint("[app] no entry seek (module starts at beginning)\n");
         }

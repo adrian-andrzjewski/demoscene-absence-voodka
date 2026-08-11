@@ -11,7 +11,7 @@ This repository contains both the modern port and the original source and
 release as archival material. The original trees are provenance, not build
 scratch space; all active development happens under `port/` and `docs/`.
 
-![The original and ported VOODKA P5 torus scene](reference/captures/port_p5_torus.png)
+![The original and ported VOODKA torus ustep village scene](reference/captures/port_p5_torus.png)
 
 ## The short version
 
@@ -67,15 +67,15 @@ The most interesting discoveries included:
 - `.V3D` and `.V3M` are custom virtual-reality mesh formats. Their headers,
   vertex data, UV blocks, face records, Phong modes, and morph targets were
   reconstructed from the loader and validated against the real assets.
-- The P2 stadium and P5 colosseum are authored world tables with object
+- The swiatynia city and torus ustep village scenes are authored world tables with object
   records, camera paths, painter sorting, back-face tests, and texture
   selectors—not pre-rendered scenes.
-- P5's torus is a morphing 3D object over a render-to-texture water polygon.
+- torus ustep village's torus is a morphing 3D object over a render-to-texture water polygon.
   The reflection pass has its own precise object composition, mirror step,
   ripple tables, palette behavior, and 16-bit wraparound rules.
 - Several palettes lived inside assembled OMF object files rather than as
   obvious standalone assets. They were recovered byte-for-byte, including the
-  distinct P4/P8 material palettes.
+  distinct processorek Nevosolek and nad czerwonym lampa material palettes.
 - The original modifies instruction immediates for water, bump maps, fades,
   and animation. Since executable code is read-only under modern DEP, those
   sites became explicit state variables with the same widths and wraparound.
@@ -83,7 +83,7 @@ The most interesting discoveries included:
 Then came the less glamorous archaeology: a 64-bit load that swallowed a
 neighboring dword, a missing painter sort, an x64 ABI stack alignment error, a
 selector that could no longer be represented by `fs`, and a single extra
-word in a P5 water reset that corrupted the reflection composition. Each bug
+word in a torus ustep village water reset that corrupted the reflection composition. Each bug
 looked like an artistic problem until the assembly, the memory layout, and the
 reference frame were compared together. That is the satisfying part of this
 project: the strange image on screen is usually a precise clue about a tiny
@@ -91,16 +91,17 @@ piece of old machine code.
 
 ## What is preserved
 
-The port retains the original P1–P8 structure and its music-driven progression:
+The port retains the original eight-scene structure and its music-driven progression.
+The parenthesized `P1`–`P8` labels below are historical source/build identifiers:
 
-1. P1 — the head, texture work, logos, and palette fades
-2. P2 — the stadium virtual-reality scene and reflective water
-3. P3 — the twisted toonel and its textured hero object
-4. P4 — the morphing plate/world sequence and picture outro
-5. P5 — the torus, colosseum ring, sun sprite, morph animation, and water
-6. P6 — 2D bump mapping
-7. P7 — the multi-phase water effect
-8. P8 — the rotating object viewer and final outro
+1. oko + szklo (P1) — the head, texture work, logos, and palette fades
+2. swiatynia city — the stadium virtual-reality scene and reflective water (`P2`)
+3. tunel + wygibasy (P3) — the twisted toonel and its textured hero object
+4. processorek Nevosolek — the morphing plate/world sequence and picture outro (`P4`)
+5. torus ustep village — the torus, colosseum ring, sun sprite, morph animation, and water (`P5`)
+6. gratki (P6) — 2D bump mapping
+7. gratki + woda (P7) — the multi-phase water effect
+8. nad czerwonym lampa — the rotating object viewer and final outro (`P8`)
 
 The port's video path is deliberately simple and faithful: the assembly draws
 indexed pixels into a 320×200 backbuffer, the platform layer presents that
@@ -224,7 +225,8 @@ From `port`:
 Useful entry and diagnostic options:
 
 ```text
-VOODKA.exe --part N             start at part N (1..8), seeking the music
+VOODKA.exe --scene <name>       start by canonical scene slug
+VOODKA.exe --part N             historical numeric scene selector (1..8)
 VOODKA.exe --modpos N           start at an absolute (order<<8)|row position
 VOODKA.exe --order N            start at a module order
 VOODKA.exe --ms N               start at a millisecond offset
@@ -267,8 +269,9 @@ turning it into a black box:
   and the `*_selftest.exe` programs expose the data and format pipeline used
   during reconstruction.
 
-The most useful debugging loop is often: run a single part with `--part N`,
-record a short sequence, convert it with `frames2img`, and compare it with the
+The most useful debugging loop is often: run a single scene with
+`--scene torus-ustep-village`, record a short sequence, convert it with
+`frames2img`, and compare it with the
 matching DOSBox capture under [`reference/captures/`](reference/captures/).
 The raw indexed frame and palette are more informative than a screenshot when
 the question is whether an old DAC effect, texture index, or rasterizer branch
@@ -283,7 +286,7 @@ port/platform/   C++17 Win32 layer: window, D3D11, WASAPI, timer, input,
         | MS x64 ABI, through the vk_* bridge
         v
 port/core/       NASM x64 port of the demo: boot/EOS replacement, engine,
-                 rasterizers, VR worlds, P1..P8, tables, and data includes
+                 rasterizers, VR worlds, the eight canonical scenes, tables, and data includes
         |
         v
 original source  TASM-era assembly, includes, assets, linker manifests,
@@ -316,9 +319,11 @@ For the source-level details, see:
   invariants
 - [`docs/ASSET_FORMATS.md`](docs/ASSET_FORMATS.md) — reconstructed binary
   formats and color pipeline
-- [`docs/WORLD_ARCHITECTURE.md`](docs/WORLD_ARCHITECTURE.md) — P2/P5 worlds,
+- [`docs/WORLD_ARCHITECTURE.md`](docs/WORLD_ARCHITECTURE.md) — swiatynia city and
+  torus ustep village worlds,
   camera paths, sorting, morphs, and water
-- [`docs/P4_P8_SCENES.md`](docs/P4_P8_SCENES.md) — detailed P4/P8 scene
+- [`docs/P4_P8_SCENES.md`](docs/P4_P8_SCENES.md) — detailed processorek Nevosolek
+  and nad czerwonym lampa scene
   reconstruction
 - [`docs/ASSETS.md`](docs/ASSETS.md) — the 76-entry archive inventory
 - [`docs/KNOWN_DIFFERENCES.md`](docs/KNOWN_DIFFERENCES.md) — measured port
@@ -340,9 +345,9 @@ be the same hardware:
   `ModPos`.
 - The original's FPU precalculation creates a visible startup pause in DOSBox;
   the port performs the same required work much faster.
-- A few extreme out-of-grid water samples in the P2/P7 effects read undefined
+- A few extreme out-of-grid water samples in the swiatynia city/gratki + woda effects read undefined
   DOS memory in the original. The port clamps those edge reads for safety;
-  P5 retains its original 16-bit sample wrap.
+torus ustep village retains its original 16-bit sample wrap.
 - The regenerated sine table uses the mathematically equivalent port table
   where the original source table is absent; the measured deviation is small
   and documented.

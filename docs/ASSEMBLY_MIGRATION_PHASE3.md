@@ -131,7 +131,7 @@ production bootstrap                               NASM x64
 reference bootstrap                                C++ differential oracle
 ```
 
-The focused gates covered production P1 playback, production pause/resume,
+The focused gates covered production oko + szklo (P1) playback, production pause/resume,
 production close, and reference close. No rendering, audio, timing, or
 shutdown regressions were observed.
 
@@ -162,7 +162,7 @@ production handoff                                 NASM x64
 reference handoff                                  C++ direct path
 ```
 
-The production tests exercised raw command-line acquisition, P1 startup,
+The production tests exercised raw command-line acquisition, oko + szklo (P1) startup,
 clean close, and normal host/subsystem sequencing. The complete suite retained
 all rendering, audio, timing, asset, Win32, D3D11, and assembly-audio checks.
 
@@ -543,7 +543,7 @@ owners:
 | Component | Current production ownership | Migration risk |
 |---|---|---|
 | `app.cpp` / `production_entry.cpp` | `app.cpp` is now reference-only; production retains only the minimal CRT `WinMain` shim, while `win32_app_host.asm` owns host configuration, logging, window failure, startup, seek, run, and final return | Medium-high: the remaining shim still requires CRT entry initialization; C++ platform services and the bridge remain live owners |
-| `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
+| `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, processorek Nevosolek (P4) software triangle rasterizer | High: wrappers are simple, but processorek Nevosolek (P4) uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
 | `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
 | `d3d11_dispatch.cpp` | Reference-only historical presenter adapter; production recording/readback service is now `win32_d3d_dispatch.asm` | Closed for production; the C++ implementation remains an oracle |
 | `timer.cpp` | QPC calibration, 70 Hz wait, pause/quit choke point | Medium-high: timing changes can alter every scene and A/V boundary |
@@ -600,8 +600,9 @@ The production host's mode-control branch is now native x64 assembly in
 `win32_app_modes.asm`.
 
 - `asm_voodka_apply_entry_seek` preserves selector precedence exactly as
-  `--modpos`, `--ms`, `--order`, then `--part`, including the valid `1..8`
-  part range and the calibrated part-start ModPos table.
+  `--modpos`, `--ms`, `--order`, then canonical `--scene`, including all eight
+  scene slugs and the calibrated scene-start ModPos table; numeric `--part`
+  remains the historical compatibility selector.
 - `asm_voodka_run_mode` preserves self-test priority, the 60-frame diagnostic
   loop, the default 20-second audio-check duration, crash-filter installation,
   `DemoStart32` arguments, and result-code propagation.
@@ -740,11 +741,11 @@ implementation objects are now assembly-owned. The remaining substantial
 production C++ boundary is bridge/render-service orchestration, followed by
 the smaller timing/input/progress/resource wrappers and the CRT/STL imports.
 
-## Phase 3B.6.7B.6 P4 rasterizer bridge
+## Phase 3B.6.7B.6 processorek Nevosolek (P4) rasterizer bridge
 
-The shipped target no longer compiles the C++ `P4DrawArgs` scan converter in
+The shipped target no longer compiles the C++ `ProcessorekNevosolekDrawArgs` scan converter in
 `bridge.cpp`. `p4_raster.asm` now exports the production
-`vk_p4_draw_triangle` ABI used by `parts/p4.asm` and a probe alias for direct
+`vk_processorek_nevosolek_draw_triangle` ABI used by `parts/p4.asm` and a probe alias for direct
 comparison. It preserves the C++ oracle's vertex-Y ordering, double-precision
 edge interpolation, integer ceil/floor clipping, zero-area behavior, packed
 8-bit UV extraction, 16-bit texture wrapping, and palette-color addition.
@@ -754,19 +755,19 @@ layout record and the texture/framebuffer pointers.
 
 The focused probe compares complete 320x200 framebuffer results for normal,
 reversed, clipped, horizontal, degenerate, fully off-screen, and UV-wrapping
-triangles. This is the rasterizer equivalence gate; a generic direct `--part
+triangles. This is the rasterizer equivalence gate; a generic direct `--scene
 4` host smoke is not counted as visual proof until the existing entry-seek
-trace produces a reliable P4 scene boundary.
+trace produces a reliable processorek Nevosolek (P4) scene boundary.
 
 ### Phase 3B.6.7B.6 validation
 
 ```text
 Release production/reference/tools rebuild                 passed
-NASM-vs-C++ P4 raster probe                                1/1 passed; 0.10 s
-production P1 playback gate                                passed; 26.29 s
+NASM-vs-C++ processorek Nevosolek (P4) raster probe                                1/1 passed; 0.10 s
+production oko + szklo (P1) playback gate                                passed; 26.29 s
 full regression suite                                      66/66 passed; 104.65 s
-production P4 bridge implementation                        NASM x64
-reference P4 bridge implementation                          C++ oracle
+production processorek Nevosolek (P4) bridge implementation                        NASM x64
+reference processorek Nevosolek (P4) bridge implementation                          C++ oracle
 ```
 
 This is a **GO** for the next boundary. The highest-risk algorithmic render
@@ -815,7 +816,7 @@ reference D3D11 presenter                                  C++ oracle
 ```
 
 This is a **GO** for the next boundary. The production render path is now
-assembly from P4 rasterization through COM presentation and host-side frame/
+assembly from processorek Nevosolek (P4) rasterization through COM presentation and host-side frame/
 diagnostic output. Remaining production C++ is concentrated in the bridge's
 service wrappers, timing/input/pause/progress, audio dispatch, and the minimal
 CRT entry boundary.

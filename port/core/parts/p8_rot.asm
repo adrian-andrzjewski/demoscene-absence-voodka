@@ -1,4 +1,4 @@
-; p8_rot.asm - P8 rotation / transform routines (included by p8.asm before p8_more).
+; nad_czerwonym_lampa_rot.asm - nad czerwonym lampa (P8) rotation / transform routines (included by p8.asm before nad_czerwonym_lampa_more).
 
 section .text
 

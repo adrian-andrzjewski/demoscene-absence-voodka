@@ -1,16 +1,16 @@
 ; water.p5.inc - NASM x64 port of CODE/P5/water.pm (the 128x128 ripple sim that
-; feeds the reflective 256x256 waterWorld used under P5's 3D world).
+; feeds the reflective 256x256 waterWorld used under torus ustep village (P5)'s 3D world).
 ;
-; Different from the P7 water (inc/water.inc) which upscales a 160x100 picture
-; to the screen: this one runs the pure 128x128 page ripple (calculateWaterP5)
+; Different from the gratki + woda (P7) water (inc/water.inc) which upscales a 160x100 picture
+; to the screen: this one runs the pure 128x128 page ripple (calculateWaterTorusUstepVillage)
 ; and renders each cell as a 2x2 block into the 256x256 _waterWorld buffer
-; (drawWaterP5) by sampling _obrazek.
+; (drawWaterTorusUstepVillage) by sampling _obrazek.
 ;
 ; Self-modifying immediates (WaterX/WaterY/innerWater/DESTINY) are replaced by
 ; explicit state vars with identical arithmetic.
 
-%ifndef WATER_P5_INC
-%define WATER_P5_INC
+%ifndef WATER_TORUS_USTEP_VILLAGE_INC
+%define WATER_TORUS_USTEP_VILLAGE_INC
 
 %include "eos.inc"
 
@@ -21,22 +21,22 @@ extern _obrazek
 extern _waterWorld
 
 section .bss
-p5_water_x:  resw 1
-p5_water_y:  resw 1
-p5_inner:    resb 1
-p5_page:     resd 1
-p5_licznikwat: resd 1               ; RIP drop cursor (P5/RIP licznikWat)
+torus_ustep_village_water_x:  resw 1
+torus_ustep_village_water_y:  resw 1
+torus_ustep_village_inner:    resb 1
+torus_ustep_village_page:     resd 1
+torus_ustep_village_licznikwat: resd 1               ; RIP drop cursor (P5/RIP licznikWat)
 
 section .text
 
-; ----------------------------------------------------- calculateWaterP5 ----
+; ----------------------------------------------------- calculateWaterTorusUstepVillage ----
 ; 128x128 16-bit page ripple. edi = write page, esi = read page (page parity).
 ; The original opens with `INCLUDE rip` (P5/RIP): a drop injection into
 ; _bufor1 on EVERY call, crawling the P5/TABLICA3 drop path. Faithfully
 ; reproduced here, including the original's duplicated `[esi+256]` poke (the
 ; fourth poke was presumably meant to be +257) and the odd byte offsets
 ; (+1 = high byte of word 0, +256 = low byte of word 128).
-calculateWaterP5:
+calculateWaterTorusUstepVillage:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -48,7 +48,7 @@ calculateWaterP5:
         sub     rsp, 0x28
 
         ; ---- rip (drop injection, always into _bufor1) ----
-        mov     eax, [rel p5_licznikwat]
+        mov     eax, [rel torus_ustep_village_licznikwat]
         and     eax, 127
         lea     rbx, [rel tablica3]
         mov     ebx, [rbx + rax*4]
@@ -59,9 +59,9 @@ calculateWaterP5:
         mov     byte [rsi+1], 0xff
         mov     byte [rsi+256], 0xff
         mov     byte [rsi+256], 0xff    ; duplicate offset, as the original
-        inc     dword [rel p5_licznikwat]
+        inc     dword [rel torus_ustep_village_licznikwat]
 
-        mov     eax, [rel p5_page]
+        mov     eax, [rel torus_ustep_village_page]
         and     eax, 1
         test    eax, eax
         jnz     .ches1
@@ -76,7 +76,7 @@ calculateWaterP5:
         add     rsi, qword [rel Code32_addr]
         add     rsi, 129*2
         add     rdi, 129*2
-        inc     dword [rel p5_page]
+        inc     dword [rel torus_ustep_village_page]
 
         mov     r12d, 126                 ; outer (x Count)
 .outer:
@@ -85,7 +85,7 @@ calculateWaterP5:
         ; 16-bit signed ripple arithmetic, faithful to the original TASM:
         ; the field values are signed int16 oscillating around zero; movzx/
         ; 32-bit ops would zero-extend negatives and corrupt the sim. Use
-        ; ax/dx exactly as P5's water.pm does (DESTINY = 6).
+        ; ax/dx exactly as torus ustep village (P5)'s water.pm does (DESTINY = 6).
         mov     ax, [rdi + 128*2]
         add     ax, [rdi - 128*2]
         add     ax, [rdi + 1*2]
@@ -115,10 +115,10 @@ calculateWaterP5:
         pop     rbp
         ret
 
-; --------------------------------------------------------- drawWaterP5 ----
+; --------------------------------------------------------- drawWaterTorusUstepVillage ----
 ; r13 = _obrazek (160x100 picture), rdi = _waterWorld (256x256).
 ; For each 128x128 cell writes a 2x2 block into _waterWorld.
-drawWaterP5:
+drawWaterTorusUstepVillage:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -136,7 +136,7 @@ drawWaterP5:
         add     rdi, qword [rel Code32_addr]
 
         ; rsi = read page
-        mov     eax, [rel p5_page]
+        mov     eax, [rel torus_ustep_village_page]
         and     eax, 1
         test    eax, eax
         jz      .vamp1
@@ -147,12 +147,12 @@ drawWaterP5:
 .drw:
         add     rsi, qword [rel Code32_addr]
 
-        mov     word [rel p5_water_y], 0
+        mov     word [rel torus_ustep_village_water_y], 0
         mov     rcx, -128*65536
 .loop0:
         ; low 16 of ecx = 128 (columns); count rows via high word sign.
         mov     cx, 128
-        mov     word [rel p5_water_x], 0
+        mov     word [rel torus_ustep_village_water_x], 0
 .loop1:
         movzx   eax, word [rsi]
         movzx   edx, word [rsi + 128*2]
@@ -174,19 +174,19 @@ drawWaterP5:
         mov     ebx, 128
         sub     bx, ax
         and     ebx, 0xFFFF
-        mov     [rel p5_inner], bl
+        mov     [rel torus_ustep_village_inner], bl
 
-        ; P5's self-modifying WaterY/WaterX immediates are reset to zero at
+        ; torus ustep village (P5)'s self-modifying WaterY/WaterX immediates are reset to zero at
         ; the start of each row/line, then incremented; these are the runtime
         ; offsets (the source's literal 0101h is only the patch-site default).
         ; bx = (vdiff>>3) + water_y ; dx = (hdiff>>3) + water_x
         movsx   r9d, ax
         sar     r9d, 3
-        movzx   r10d, word [rel p5_water_y]
+        movzx   r10d, word [rel torus_ustep_village_water_y]
         add     r9d, r10d
         movsx   r10d, r8w
         sar     r10d, 3
-        movzx   r11d, word [rel p5_water_x]
+        movzx   r11d, word [rel torus_ustep_village_water_x]
         add     r10d, r11d
 
         ; sample = _obrazek[ row*128 + col ]  (base 0101h style: +1,+1)
@@ -201,7 +201,7 @@ drawWaterP5:
         movzx   eax, byte [r13 + rax]
 
         ; ah = (sample * inner) & 31
-        movzx   ebx, byte [rel p5_inner]
+        movzx   ebx, byte [rel torus_ustep_village_inner]
         imul    ax, bx
         movzx   eax, ax
         shr     eax, 8
@@ -213,12 +213,12 @@ drawWaterP5:
 
         add     rdi, 2
         add     rsi, 2
-        inc     word [rel p5_water_x]
+        inc     word [rel torus_ustep_village_water_x]
         dec     cx
         jnz     .loop1
 
         add     rdi, 256
-        inc     word [rel p5_water_y]
+        inc     word [rel torus_ustep_village_water_y]
         add     rcx, 0x10000
         js      .loop0
 
@@ -235,4 +235,4 @@ drawWaterP5:
 section .data align=16
 %include "p5_tablica3.asm"   ; P5/TABLICA3: RIP drop path (label tablica3), 128-wide buffer offsets
 
-%endif ; WATER_P5_INC
+%endif ; WATER_TORUS_USTEP_VILLAGE_INC

@@ -8,7 +8,7 @@
 ;   - _file_addr = LoadFile "voodka.dat"   (packed archive arena offset)
 ;   - _scr_Addr  = backbuffer arena offset (== platform kBackbufferOffset)
 ;   - framebuffer_off = platform framebuffer offset
-;   - run part sequence (today: part6 bump map, then part7 water)
+;   - run the complete scene sequence (gratki, then gratki + woda)
 ;   - return 0
 ;
 ; Framebuffer/backbuffer offsets come from the platform via the bridge.
@@ -43,14 +43,14 @@ _tableToonel: resd 1
 section .text
 extern vk_make_toonel
 
-extern part1
-extern part2
-extern part3
-extern part4
-extern part5
-extern part6
-extern part7
-extern part8
+extern scene_oko_szklo
+extern scene_swiatynia_city
+extern scene_tunel_wygibasy
+extern scene_processorek_nevosolek
+extern scene_torus_ustep_village
+extern scene_gratki
+extern scene_gratki_woda
+extern scene_nad_czerwonym_lampa
 
 global DemoStart32
 DemoStart32:
@@ -82,8 +82,8 @@ DemoStart32:
         mov     [rel _scr_Addr], eax
 
         ; _scrSel = selector over the backbuffer (DEMO.AS^ allocates the
-        ; screen selector at Start32; P1/P5/P8 read _scrSel for gs_sel).
-        ; Without this, standalone parts (--part N) inherit gs_sel=0 and
+        ; screen selector at Start32; the tunnel and object scenes read _scrSel
+        ; for gs_sel). Without this, standalone scene runs (--scene NAME, or legacy --part N) inherit
         ; tm_face writes to a null screen base.
         mov     eax, EOS_ALLOCATE_SELECTOR
         mov     esi, [rel _scr_Addr]
@@ -103,73 +103,73 @@ DemoStart32:
         call    vk_make_toonel
 
         ; ---- run the selected scene ----------------------------------------
-        ; vk_get_entry_part(): 0 = full part1..part8 sequence (default),
-        ; 1..8 = run only that part. Parts present are driven by the audio
-        ; timeline (GetModPos), which the app has already seeked to the part's
-        ; start via --part / --modpos / --ms / --order.
-        extern vk_get_entry_part
-        call    vk_get_entry_part
+        ; vk_get_entry_scene(): 0 = full sequence (default), 1..8 = run only
+        ; that scene. The audio timeline was seeked by --scene or its numeric
+        ; --part compatibility alias.
+        extern vk_get_entry_scene
+        call    vk_get_entry_scene
 
         cmp     eax, 0
         je      .full_sequence
         cmp     eax, 1
-        je      .single_p1
+        je      .single_oko_szklo
         cmp     eax, 2
-        je      .single_p2
+        je      .single_swiatynia_city
         cmp     eax, 3
-        je      .single_p3
+        je      .single_tunel_wygibasy
         cmp     eax, 4
-        je      .single_p4
+        je      .single_processorek_nevosolek
         cmp     eax, 5
-        je      .single_p5
+        je      .single_torus_ustep_village
         cmp     eax, 6
-        je      .single_p6
+        je      .single_gratki
         cmp     eax, 7
-        je      .single_p7
+        je      .single_gratki_woda
         cmp     eax, 8
-        je      .single_p8
+        je      .single_nad_czerwonym_lampa
         ; unknown single part: default to the full slice
         jmp     .full_sequence
 
-.single_p1:
-        call    part1
+.single_oko_szklo:
+        call    scene_oko_szklo
         jmp     .done
-.single_p2:
-        call    part2
+.single_swiatynia_city:
+        call    scene_swiatynia_city
         jmp     .done
-.single_p3:
-        call    part3
+.single_tunel_wygibasy:
+        call    scene_tunel_wygibasy
         jmp     .done
-.single_p4:
-        call    part4
+.single_processorek_nevosolek:
+        call    scene_processorek_nevosolek
         jmp     .done
-.single_p5:
-        call    part5
+.single_torus_ustep_village:
+        call    scene_torus_ustep_village
         jmp     .done
-.single_p6:
-        call    part6
+.single_gratki:
+        call    scene_gratki
         jmp     .done
-.single_p7:
-        call    part7
+.single_gratki_woda:
+        call    scene_gratki_woda
         jmp     .done
-.single_p8:
-        call    part8
+.single_nad_czerwonym_lampa:
+        call    scene_nad_czerwonym_lampa
         jmp     .done
 
 .full_sequence:
-        ; current implemented slice: P1..P8 in order. P4 (multi-object 3D
-        ; viewer) runs the full scene from its own ModPos window
-        ; (0x0D40..0x1400) and hands off to P5 at 0x1400.
+        ; current implemented slice: the eight scenes in order. processorek
+        ; Nevosolek (multi-object 3D viewer) runs the full scene from its own
+        ; ModPos window
+        ; (0x0D40..0x1400) and hands off to torus ustep village (P5) at 0x1400.
         ; (run progress is reported centrally by the platform via the ModPos
         ; timeline; see port/platform/progress.cpp)
-        call    part1
-        call    part2
-        call    part3
-        call    part4
-        call    part5
-        call    part6
-        call    part7
-        call    part8
+        call    scene_oko_szklo
+        call    scene_swiatynia_city
+        call    scene_tunel_wygibasy
+        call    scene_processorek_nevosolek
+        call    scene_torus_ustep_village
+        call    scene_gratki
+        call    scene_gratki_woda
+        call    scene_nad_czerwonym_lampa
 
 .done:
         xor     eax, eax

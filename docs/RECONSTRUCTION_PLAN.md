@@ -1,7 +1,7 @@
 # Reconstruction plan & decision log
 
 Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). Updated
-2026-08-06: P4 removed, then restored (see Phase 3 note). Updated
+2026-08-06: processorek Nevosolek (P4) removed, then restored (see Phase 3 note). Updated
 2026-08-08: Phase 10 world-architecture analysis complete
 (`docs/WORLD_ARCHITECTURE.md`). This
 document records the audit, the decisions taken, and the remaining work.
@@ -38,7 +38,7 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 |---|---|---|
 | Core language | **Keep the faithful NASM x64 core**; C++ references in the cross-check tests are the portable fallback | ~50 commits of validated work; byte-exact tests; zero regression risk. A full C++ retranslation was explicitly declined. |
 | Platform layer | Custom Win32 + D3D11 + WASAPI (no SDL) | Already complete and dependency-free; the brief allows this ("unless the repository already suggests a more suitable architecture"). |
-| VIRTUAL viewer | **Port at the end**, as a bonus exe | Not linked into the demo, not part of the shipped production; its VR engine is already ported (P2/P5/P8 reuse it). |
+| VIRTUAL viewer | **Port at the end**, as a bonus exe | Not linked into the demo, not part of the shipped production; its VR engine is already ported (swiatynia city/torus ustep village (P2/P5)/P8 reuse it). |
 | Reference validation | **Scene-level DOSBox comparison + ModPos calibration** | Frame-exact automated diffing is unrealistic across different MOD players and timing bases; tolerance documented instead. |
 | Original files | Untouched (archival) | Cleanup limited to the port's own debris. |
 
@@ -62,19 +62,20 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
   measured at ~0.95x libxmp (documented); `docs/KNOWN_DIFFERENCES.md` +
   `reference/captures/` written. The validation pass found and fixed 10 port
   bugs (see KNOWN_DIFFERENCES "Fixed divergences"), ending with a clean full
-  playthrough (exit 0, all 8 parts, ~66-70 fps). **P4 was removed from the
+  playthrough (exit 0, all 8 parts, ~66-70 fps). **processorek Nevosolek (P4) was removed from the
   port on 2026-08-06 and restored the same day**: `port/core/parts/p4.asm`
   (full NASM x64 port with the custom `face` rasterizer, ob/ca Euler
   matrices, 2,964-node camera path (swing-clamp `ruchow`=2,951; see
   ASSET_FORMATS.md §4.6), logo overlay, tull outro) is back,
-  `--part 4` seeks to 0x0D40 again, and the sequence runs P1-P8 end to end
+  `--scene processorek-nevosolek` seeks to 0x0D40 again (`--part 4` remains a
+  historical alias), and the sequence runs all eight scenes end to end
   (exit 0, ~66-70 fps, frame-recorded; v_txr1.pal + proc.pal recovered
   byte-identical from P4.OBJ).
 - [x] **Phase 4 - test additions**: `v3d.crosscheck` (real .V3D/.V3M decode
   via the ported loader), `tablica3.crosscheck` (generated NASM tables vs
   original TASM text), `pal.integrity` + `pal.repro` (OBJ-extraction
   reproducibility; the extract_pals metal/v_txr1/proc offsets were verified
-  against P4/P8.OBJ and corrected), `build.addr32` (COFF reloc hygiene as a
+  against processorek Nevosolek/nad czerwonym lampa (P4/P8).OBJ and corrected), `build.addr32` (COFF reloc hygiene as a
   CTest). A `--record` determinism test was considered and dropped: the demo
   is content-deterministic but the audio/video clock sampling phase is not
   (one-frame jitter at scene edges is expected, not a bug).
@@ -87,10 +88,10 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 - [x] **Phase 7 - asset-format audit (2026-08-05)**: every runtime format
   reverse-engineered and documented (`docs/ASSET_FORMATS.md`), original vs
   port compared at each decode stage, presentation color/scaling pipeline
-  analyzed. Fixed 10 port bugs found along the way (P3 make_pal 8-bit clamp,
-  P2 water faithful re-port + absence.pal, P5 sun load + RIP drops, P4/P8
+  analyzed. Fixed 10 port bugs found along the way (tunel + wygibasy (P3) make_pal 8-bit clamp,
+  swiatynia city (P2) water faithful re-port + absence.pal, torus ustep village (P5) sun load + RIP drops, processorek Nevosolek/nad czerwonym lampa (P4/P8)
   outro presents, water 99-row loop, palette 6->8 rounding, part-5 boundary,
-  P6 word-cmp) - all frame-record-verified; 25/25 tests + full playthrough
+  gratki (P6) word-cmp) - all frame-record-verified; 25/25 tests + full playthrough
   exit 0.
 - [x] **Phase 9 - asset viewer (2026-08-06)**: `port/tools/asset_viewer/`
   standalone Win32+D3D11 viewer loads and renders **all 27 original 3D
@@ -103,26 +104,26 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
   `asset_viewer_selftest` (CTest `v3d.viewer_parse`) validates all 27
   against known-good values. 27/27 tests green.
 - [x] **Phase 10 - world architecture analysis (2026-08-08)**: reverse
-  engineered the complete VR scene engine - the demo's two 3D worlds (P2
-  stadium, P5 colosseum + VIRTUAL harness): 48-byte world records
+  engineered the complete VR scene engine - the demo's two 3D worlds (swiatynia city (P2)
+  stadium, torus ustep village (P5) colosseum + VIRTUAL harness): 48-byte world records
   (flat instancing), the 21-dword object struct / `.V3D`, camera paths
   (`TRASA.!` / `WIDOKI`), `MakeCameraMatrix`, `CalculateVisiblating` +
-  `VirSort` (far->near on low-16 of zet; P5 adds `sar bx,4`), per-face
-  BITSORT, `tm_face`, and P5's render-to-texture water plane. Documented in
-  `docs/WORLD_ARCHITECTURE.md`; data parity verified (P2 world 212/212,
-  P5 world 45/45, trasa/widoki byte-identical). Corrections: `WORLD.V3D`
-  is a dev snapshot of the P5 world (44/45 records match; record 0 adders
+  `VirSort` (far->near on low-16 of zet; torus ustep village (P5) adds `sar bx,4`), per-face
+  BITSORT, `tm_face`, and torus ustep village (P5)'s render-to-texture water plane. Documented in
+  `docs/WORLD_ARCHITECTURE.md`; data parity verified (swiatynia city (P2) world 212/212,
+  torus ustep village (P5) world 45/45, trasa/widoki byte-identical). Corrections: `WORLD.V3D`
+  is a dev snapshot of the torus ustep village (P5) world (44/45 records match; record 0 adders
   (8,5,0)); world field `+44` is a texture-slot index, not a "type";
   `+56 adders-to-color` is allocated-but-unused (no VR lighting). 27/27
   tests green (fresh rebuild 2026-08-08).
-- [x] **Phase 8 - P3 hero-object geometry/rotation audit (2026-08-05)**: the
-  P3 tunnel's hero 3D object looked "hole-y / missing faces / not like the
+- [x] **Phase 8 - tunel + wygibasy (P3) hero-object geometry/rotation audit (2026-08-05)**: the
+  tunel + wygibasy (P3) tunnel's hero 3D object looked "hole-y / missing faces / not like the
   original cog". Runtime instrumentation (arena dumps + per-face/per-row
   traces) proved the whole pipeline faithful (shape/con, plane, cull
-  646/646, zet sort, face() rasterizer) and found the real cause: P3's main
+  646/646, zet sort, face() rasterizer) and found the real cause: tunel + wygibasy (P3)'s main
   loop waited on TWO 70 Hz VBLs per frame (~35 fps), halving the object's
   rotation rate so it never reached the solid-cog pose within P3. Removed the
-  redundant v_sync wait (P3 now ~65-70 fps, reaches the cog pose mid-scene),
+  redundant v_sync wait (tunel + wygibasy (P3) now ~65-70 fps, reaches the cog pose mid-scene),
   plus two texture bugs: p3_slope span-step packing and the n_rot arena
   under-allocation. 26/26 tests + full-playthrough-frame verification.
 
@@ -138,5 +139,5 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 - **Odd-sized `.INC` blobs**: resolved by the Phase 7 audit - dimensions
   derived from consumer code for every blob (ASSET_FORMATS.md 3.3);
   `t002.dat` carries no header (256-wide, ~128 content rows, zero tail).
-- **P5 `vodka 45` (1-byte `voodka.dat`)**: loaded but effectively unused;
+- **torus ustep village (P5) `vodka 45` (1-byte `voodka.dat`)**: loaded but effectively unused;
   behavior preserved as-is.

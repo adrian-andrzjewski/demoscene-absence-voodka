@@ -11,7 +11,7 @@
 ;     orderOut[0] = farthest record and the WorldKol walk draws it first.
 ;     Matches the original VirSort's radix bucket gather 15->0
 ;     (INC/VIRSORT.PM, P5/VIRSORT.PM). The key first passes through
-;     virsort_shift (global dword set by the part: 0=P2, 4=P5):
+;     virsort_shift (global dword set by the part: 0=swiatynia city (P2), 4=torus ustep village (P5)):
 ;     key = (uint16)((int16)low16(zet) >> shift)  -- P5/VIRSORT.PM's sar bx,4.
 
 BITS 64
@@ -22,7 +22,7 @@ vvis_order: resd 4096
 
 section .data align=4
 global virsort_shift
-virsort_shift: dd 0             ; sort-key shift: 0 = P2 (INC/VIRSORT.PM), 4 = P5
+virsort_shift: dd 0             ; sort-key shift: 0 = swiatynia city (P2) (INC/VIRSORT.PM), 4 = torus ustep village (P5)
 
 section .text
 extern cam_cameraX
@@ -96,7 +96,7 @@ vk_virsort:
         mov     r12, rcx            ; zet
         lea     r13, [rel vvis_order]
         mov     r14d, edx           ; n
-        mov     r9b, [rel virsort_shift] ; key shift (0=P2, 4=P5)
+        mov     r9b, [rel virsort_shift] ; key shift (0=swiatynia city (P2), 4=torus ustep village (P5))
         ; order[i] = i
         xor     ecx, ecx
 .init:

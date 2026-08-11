@@ -22,6 +22,7 @@ DEFAULT REL
 %define ARG_MS                     0x00000400
 %define ARG_ORDER                  0x00000800
 %define ARG_PART                   0x00001000
+%define ARG_SCENE                  0x00002000
 
 extern asm_find_command_flag
 extern asm_copy_command_value
@@ -40,6 +41,7 @@ global asm_voodka_arg_modpos
 global asm_voodka_arg_ms
 global asm_voodka_arg_order
 global asm_voodka_arg_part
+global asm_voodka_arg_scene
 global asm_voodka_arg_audiocheck_seconds
 
 section .bss
@@ -51,6 +53,7 @@ asm_arg_modpos_v:       resd 1
 asm_arg_ms_v:           resd 1
 asm_arg_order_v:        resd 1
 asm_arg_part_v:         resd 1
+asm_arg_scene_buf:      resb 1024
 asm_arg_audiocheck_v:   resd 1
 asm_arg_record_buf:     resb 1024
 asm_arg_diag_buf:       resb 1024
@@ -71,6 +74,7 @@ arg_modpos_s:       db "--modpos", 0
 arg_ms_s:           db "--ms", 0
 arg_order_s:        db "--order", 0
 arg_part_s:         db "--part", 0
+arg_scene_s:        db "--scene", 0
 
 section .text
 
@@ -90,6 +94,7 @@ asm_parse_command_line:
         mov     dword [rel asm_arg_ms_v], -1
         mov     dword [rel asm_arg_order_v], -1
         mov     dword [rel asm_arg_part_v], -1
+        mov     byte [rel asm_arg_scene_buf], 0
         mov     dword [rel asm_arg_audiocheck_v], -1
         mov     byte [rel asm_arg_record_buf], 0
         mov     byte [rel asm_arg_diag_buf], 0
@@ -235,13 +240,26 @@ asm_parse_command_line:
         lea     rdx, [rel arg_order_s]
         call    asm_find_command_flag
         test    rax, rax
-        jz      .part
+        jz      .scene
         mov     rcx, rax
         call    asm_parse_command_value
         test    edx, edx
-        jz      .part
+        jz      .scene
         mov     [rel asm_arg_order_v], eax
         or      dword [rel asm_arg_flags], ARG_ORDER
+
+.scene:
+        mov     rcx, r12
+        lea     rdx, [rel arg_scene_s]
+        call    asm_find_command_flag
+        test    rax, rax
+        jz      .part
+        mov     rcx, rax
+        lea     rdx, [rel asm_arg_scene_buf]
+        call    asm_copy_command_value
+        test    eax, eax
+        jz      .part
+        or      dword [rel asm_arg_flags], ARG_SCENE
 
 .part:
         mov     rcx, r12
@@ -475,5 +493,15 @@ ARG_VALUE_GETTER asm_voodka_arg_ms,                  asm_arg_ms_v
 ARG_VALUE_GETTER asm_voodka_arg_order,               asm_arg_order_v
 ARG_VALUE_GETTER asm_voodka_arg_part,                asm_arg_part_v
 ARG_VALUE_GETTER asm_voodka_arg_audiocheck_seconds,  asm_arg_audiocheck_v
+
+asm_voodka_arg_scene:
+        mov     eax, [rel asm_arg_flags]
+        test    eax, ARG_SCENE
+        jz      .scene_none
+        lea     rax, [rel asm_arg_scene_buf]
+        ret
+.scene_none:
+        xor     eax, eax
+        ret
 
 section .note.GNU-stack noalloc noexec nowrite progbits

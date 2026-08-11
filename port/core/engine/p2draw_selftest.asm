@@ -1,4 +1,4 @@
-; p2draw_selftest.asm - link-only support for the p2draw CTest.
+; vr_object_draw_selftest.asm - link-only support for the p2draw CTest.
 ;
 ; p2draw.asm is exercised in TRACE mode (vk_draw_object_trace), which never
 ; calls tm_face / pixel2d, but those are still referenced (relocations) so the
@@ -17,7 +17,7 @@ section .data
 global sel_base_table
 sel_base_table: times 512 dq 0
 
-; bucket base pointers (built by ts_p2draw_set_base, mirroring prep_sort)
+; bucket base pointers (built by ts_vr_object_draw_set_base, mirroring prep_sort)
 global addr_tab
 addr_tab: times 16 dq 0
 
@@ -27,12 +27,12 @@ Code32_addr: resq 1
 pz_sort_scratch: resd 1200*16        ; engine drawers=1200 capacity
 
 section .text
-; void ts_p2draw_set_base(uint8_t* base): point Code32_addr and the sort
+; void ts_vr_object_draw_set_base(uint8_t* base): point Code32_addr and the sort
 ; buckets at the test arena. Call before every vk_draw_object_trace.
 ; NOTE: rdi is NON-VOLATILE in the MS x64 ABI - preserve it (the caller keeps
 ; the record pointer there across this call).
-global ts_p2draw_set_base
-ts_p2draw_set_base:
+global ts_vr_object_draw_set_base
+ts_vr_object_draw_set_base:
         push    rdi
         mov     [rel Code32_addr], rcx
         lea     rax, [rel pz_sort_scratch]

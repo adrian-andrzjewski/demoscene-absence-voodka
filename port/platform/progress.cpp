@@ -9,6 +9,7 @@
 // logging stays sparse and correlates cleanly with what is on screen.
 
 #include "platform_abi.h"
+#include "scene_names.h"
 #include <windows.h>
 #include <cstdio>
 #include <cstdarg>
@@ -23,7 +24,7 @@ namespace {
 
 struct Scene {
     uint32_t modpos;     // first ModPos at which this scene is active
-    int      part;       // 1..8
+    SceneId  id;         // canonical scene identity
     const char* scene;   // scene name
     const char* effect;  // major effect within the scene (may be element)
 };
@@ -31,17 +32,17 @@ struct Scene {
 // Ascending by modpos. The boundary values come from the same timeline the
 // parts use (see app.cpp kPartStartModPos + per-part ModPos thresholds).
 const Scene kScenes[] = {
-    { 0x0000, 1, "P1 Head",        "Znik fade-in"          },
-    { 0x0100, 1, "P1 Head",        "Texture-mapped head"   },
-    { 0x0200, 1, "P1 Head",        "Logo overlay"          },
-    { 0x0300, 1, "P1 Head",        "Palette fade"          },
-    { 0x0400, 2, "P2 Stadium",     "Camera fly-through"    },
-    { 0x0730, 2, "P2 Water",       "Reflective water"      },
-    { 0x0B40, 3, "P3 Tunnel",      "Twisted landscape"     },
-    { 0x1400, 5, "P5 Torus",       "Torus over water"      },
-    { 0x1B40, 6, "P6 Bump",        "2D bump mapping"       },
-    { 0x1C40, 7, "P7 Water",       "7-phase water"         },
-    { 0x2040, 8, "P8 Viewer",      "Rotating object view"  },
+    { 0x0000, SceneId::OkoSzklo,             kOkoSzkloName,             "Znik fade-in"          },
+    { 0x0100, SceneId::OkoSzklo,             kOkoSzkloName,             "Texture-mapped head"   },
+    { 0x0200, SceneId::OkoSzklo,             kOkoSzkloName,             "Logo overlay"          },
+    { 0x0300, SceneId::OkoSzklo,             kOkoSzkloName,             "Palette fade"          },
+    { 0x0400, SceneId::SwiatyniaCity,       kSwiatyniaCityName,        "Camera fly-through"    },
+    { 0x0730, SceneId::SwiatyniaCity,       kSwiatyniaCityName,        "Reflective water"      },
+    { 0x0B40, SceneId::TunelWygibasy,       kTunelWygibasyName,        "Twisted landscape"     },
+    { 0x1400, SceneId::TorusUstepVillage,   kTorusUstepVillageName,    "Torus over water"      },
+    { 0x1B40, SceneId::Gratki,              kGratkiName,               "2D bump mapping"       },
+    { 0x1C40, SceneId::GratkiWoda,          kGratkiWodaName,           "7-phase water"         },
+    { 0x2040, SceneId::NadCzerwonymLampa,   kNadCzerwonymLampaName,    "Rotating object view"  },
 };
 const int kSceneCount = (int)(sizeof(kScenes) / sizeof(kScenes[0]));
 
@@ -99,18 +100,18 @@ void progressUpdate() {
     char title[256];
 #if defined(VOODKA_ASSEMBLY_PLATFORM)
     formatAssembly(title, sizeof title,
-                   "VOODKA (Absence) - Part %d/8  %s  [%s]  t=%s  scene#%ld",
-                   s.part, s.scene, s.effect, tbuf, g_transitionCount);
+                   "VOODKA (Absence) - Scene %d/8  %s  [%s]  t=%s  scene#%ld",
+                   scenePart(s.id), s.scene, s.effect, tbuf, g_transitionCount);
 #else
     snprintf(title, sizeof title,
-             "VOODKA (Absence) - Part %d/8  %s  [%s]  t=%s  scene#%ld",
-             s.part, s.scene, s.effect, tbuf, g_transitionCount);
+             "VOODKA (Absence) - Scene %d/8  %s  [%s]  t=%s  scene#%ld",
+             scenePart(s.id), s.scene, s.effect, tbuf, g_transitionCount);
 #endif
     if (g_hwnd) SetWindowTextA(g_hwnd, title);
 
     logPrint("[scene] part=%d/8 scene=\"%s\" effect=\"%s\" elapsed=%s "
              "modpos=0x%x scene_index=%ld\n",
-             s.part, s.scene, s.effect, tbuf, mp, g_transitionCount);
+             scenePart(s.id), s.scene, s.effect, tbuf, mp, g_transitionCount);
 }
 
 } // namespace vk

@@ -69,8 +69,8 @@ int main() {
     check(ref + "/P2/TABLICA3", gen + "/p2_tablica3.asm", "P2/TABLICA3");
     check(ref + "/P6/TABLICA3", gen + "/p6_tablica3.asm", "P6/TABLICA3");
     check(ref + "/P7/TABLICA3", gen + "/p7_tablica3.asm", "P7/TABLICA3");
-    // the table P2's production water actually used (WATER.PM:106 `include
-    // water\tab`) and the P5 RIP drop path (P5/WATER.PM:6 -> P5/RIP -> TABLICA3)
+    // the table swiatynia city (P2)'s production water actually used (WATER.PM:106 `include
+    // water\tab`) and the torus ustep village (P5) RIP drop path (P5/WATER.PM:6 -> P5/RIP -> TABLICA3)
     check(ref + "/P2/WATER/TAB", gen + "/p2_watertab.asm", "P2/WATER/TAB");
     check(ref + "/P5/TABLICA3", gen + "/p5_tablica3.asm", "P5/TABLICA3");
     if (failures == 0) { std::printf("tablica3.crosscheck: OK\n"); return 0; }

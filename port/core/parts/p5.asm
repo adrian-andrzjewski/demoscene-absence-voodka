@@ -1,11 +1,11 @@
 ; p5.asm - NASM x64 port of CODE/P5/P5.AS^ (part 5: morphing torus over a
 ; reflective water world with stone-ring/floor objects on a long camera path).
 ;
-; Faithful port. Reuses the ported VR/objects layer used by P2:
-;   - vk_p2_render_frame   : visibility + VirSort + WorldKol walk + prepare+draw
+; Faithful port. Reuses the ported VR/objects layer used by swiatynia city (P2):
+;   - vk_vr_world_render_frame   : visibility + VirSort + WorldKol walk + prepare+draw
 ;   - vk_prepare_object / vk_draw_object : single-object render (rysujCiulusa)
 ;   - vk_make_camera_matrix + cam_* globals, vk_load_object into lo_objects,
-;     shared `textury` (P2), water.p5.inc (P5 128x128 ripple -> 256x256 water).
+;     shared `textury` (swiatynia city (P2)), water.p5.inc (torus ustep village (P5) 128x128 ripple -> 256x256 water).
 ;
 ; Timeline (ModPos): 4 intro czensc overlay scenes (ends 0x141f/0x143f/0x151f/
 ; 0x153f), then Main (morph + world + water) until >0x1b3f.
@@ -32,7 +32,7 @@ extern Code32_addr
 extern eos_dispatch
 extern white
 
-; shared VR objects/selectors (P2 / loader / cammat)
+; shared VR objects/selectors (swiatynia city (P2) / loader / cammat)
 extern textury
 extern lo_objects
 extern lo_bump
@@ -41,7 +41,7 @@ extern cam_cameraX, cam_cameraY, cam_cameraZ
 extern cam_eyeAX, cam_eyeAY, cam_eyeAZ
 extern vk_make_camera_matrix
 extern vk_load_object
-extern vk_p2_render_frame
+extern vk_vr_world_render_frame
 extern vk_prepare_object
 extern vk_draw_object
 extern gs_sel
@@ -74,9 +74,9 @@ ruchow  EQU 3859
 %endmacro
 
 section .data align=16
-global part5
+global scene_torus_ustep_village
 
-p5_sun:      dd 0
+torus_ustep_village_sun:      dd 0
 sun_step:    dd 0
 _pal:        dd 0
 fn:          dd 0
@@ -139,8 +139,8 @@ _obidx:    dd 0
 
 section .text
 
-; =================================================================== part5 ===
-part5:
+; =================================================================== scene_torus_ustep_village ===
+scene_torus_ustep_village:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -165,7 +165,7 @@ part5:
         extern prep_sort
         call    prep_sort
 
-        ; VirSort key shift: P5's VIRSORT.PM applies sar bx,4 to low16(zet)
+        ; VirSort key shift: torus ustep village (P5)'s VIRSORT.PM applies sar bx,4 to low16(zet)
         extern virsort_shift
         mov     dword [rel virsort_shift], 4
 
@@ -188,7 +188,7 @@ part5:
         vodkasel 40, fn, textury+4
         vodkasel 38, fn, textury+6
         vodka   37, _pal
-        vodka   72, p5_sun              ; 2world.inc: 19-frame 64x64 sun sprite
+        vodka   72, torus_ustep_village_sun              ; 2world.inc: 19-frame 64x64 sun sprite
                                         ; (P5.AS^:156 `vodka 72,sun`)
 
         ; ---- load objects 31..34 into lo_objects ----
@@ -363,9 +363,9 @@ part5:
         jl      .oob
         mov     dword [rel przelot], 1
         mov     eax, [rel ramki]
-        add     [rel p5_world+20], eax
+        add     [rel torus_ustep_village_world+20], eax
         shl     eax, 1
-        add     [rel p5_world+20], eax
+        add     [rel torus_ustep_village_world+20], eax
         mov     ebx, [rel add_morph]
         mov     eax, [rel ktory_morph]
         cmp     eax, 62
@@ -397,7 +397,7 @@ part5:
 .udu:
         mov     ebx, 24
         mul     ebx
-        lea     rsi, [rel p5_trasa]
+        lea     rsi, [rel torus_ustep_village_trasa]
         mov     ebx, [rsi + rax + 0]
         mov     [rel cam_cameraX], ebx
         mov     ebx, [rsi + rax + 4]
@@ -447,8 +447,8 @@ part5:
         call    vk_make_camera_matrix
 
         ; world angle adders
-        lea     r12, [rel p5_world]
-        mov     r13d, [rel p5_worldsobjects]
+        lea     r12, [rel torus_ustep_village_world]
+        mov     r13d, [rel torus_ustep_village_worldsobjects]
         xor     ecx, ecx
 .katys:
         cmp     ecx, r13d
@@ -471,7 +471,7 @@ part5:
         lea     rax, [rel textury]
         mov     [rel r_tmp_tex], rax
 
-        ; vk_p2_render_frame(base, world, count, zet, kol, objects, textury, trace=0)
+        ; vk_vr_world_render_frame(base, world, count, zet, kol, objects, textury, trace=0)
         ; MS ABI stack args: [rsp+0x20]=kol [rsp+0x28]=objects [rsp+0x30]=textury
         ; [rsp+0x38]=trace (the callee reads them at [rbp+0x30..0x48]).
         ; (An earlier +8-shifted layout made the callee see trace=textury:
@@ -485,14 +485,14 @@ part5:
         mov     [rsp+0x30], rax
         mov     qword [rsp+0x38], 0
         mov     rcx, [rel Code32_addr]
-        lea     rdx, [rel p5_world]
-        mov     r8d, [rel p5_worldsobjects]
+        lea     rdx, [rel torus_ustep_village_world]
+        mov     r8d, [rel torus_ustep_village_worldsobjects]
         lea     r9, [rel worldzet]
-        call    vk_p2_render_frame
+        call    vk_vr_world_render_frame
         add     rsp, 0x40
 
-        call    drawWaterP5
-        call    calculateWaterP5
+        call    drawWaterTorusUstepVillage
+        call    calculateWaterTorusUstepVillage
 
         mov     eax, [rel ramki]
         add     [rel trasa_ruch], eax
@@ -556,7 +556,7 @@ rysujCiulusa:
         mov     r8d, [rel cam_eyeAZ]
         call    vk_make_camera_matrix
 
-        lea     rbx, [rel p5_world]
+        lea     rbx, [rel torus_ustep_village_world]
         cmp     dword [rbx], 0
         je      .noVis
         mov     eax, [rbx + 44]
@@ -797,7 +797,7 @@ sloneczko:
         and     eax, 0x3f
         mov     [rel sun_step], eax
         shl     eax, 12
-        mov     esi, [rel p5_sun]
+        mov     esi, [rel torus_ustep_village_sun]
         add     esi, eax
         add     rsi, qword [rel Code32_addr]
         mov     edi, [rel _screen]
@@ -886,7 +886,7 @@ intro_fade:
         movzx   ebx, al
         mov     ecx, 1
         call    pal_flash_brighten
-        ; P5's source does three restore pal_set calls after the brightening
+        ; torus ustep village (P5)'s source does three restore pal_set calls after the brightening
         ; pal_fadein10 (one white retrace + two unchanged restore retraces).
         v_sync
         v_sync
@@ -895,4 +895,3 @@ intro_fade:
         pop     rbx
         pop     rbp
         ret
-

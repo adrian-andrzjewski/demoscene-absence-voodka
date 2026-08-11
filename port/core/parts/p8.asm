@@ -1,6 +1,6 @@
 ; p8.asm - NASM x64 port of CODE/P8/P8.ASM  (part 8: viewer/object demo).
 ;
-; Faithful port of P8: user-driveable camera + auto-rotating fusing of the
+; Faithful port of nad czerwonym lampa (P8): user-driveable camera + auto-rotating fusing of the
 ; "sw" + "ob" meshes into one object (p_len verts, f_len faces), textured with
 ; sw.inc/metal.inc via a custom fs/es texmapper, plus an animated sun sprite
 ; and a picture outtro with palette fades.
@@ -95,7 +95,7 @@ KEY_F12 EQU 0x58
 
 ; --------------------------------------------------------------------- .bss
 section .bss align=16
-global part8
+global scene_nad_czerwonym_lampa
 
 scr_addr:   resd 1
 scr_sel:    resw 1
@@ -212,14 +212,14 @@ nazwa: db "p8.pal", 0
 
 ; bialy = "white" (Polish) - the original's dedicated all-brightness palette
 ; (768 x 0x3F), distinct from the `white` buffer that `fade`/`lopa`/`hopla`
-; overwrite with stepped values. The original uses bialy for the part-start
+; overwrite with stepped values. The original uses bialy for the scene-start
 ; white screen, the outro picture reveals and the brum flash; the port
 ; formerly reused the (stale) `white` buffer there, so those states didn't
 ; actually go white.
 bialy:  times 768 db 63
 
-; P8's sw palette is a full 256-entry base palette. It has an explicit black
-; entry at index 0; it is not the 64-entry P4 spal1 payload.
+; nad czerwonym lampa (P8)'s sw palette is a full 256-entry base palette. It has an explicit black
+; entry at index 0; it is not the 64-entry processorek Nevosolek (P4) spal1 payload.
 pal:    incbin "p8_sw.pal"
         times 768-($-pal) db 0
 mpal:   incbin "metal.pal"
@@ -372,9 +372,9 @@ tablica:
 ; --------------------------------------------------------------------- .text
 section .text
 
-; ------------------------------------------------------------------- part8 --
-global part8
-part8:
+; ------------------------------------------------------------------- scene_nad_czerwonym_lampa --
+global scene_nad_czerwonym_lampa
+scene_nad_czerwonym_lampa:
         push    rbp
         mov     rbp, rsp
         push    rbx

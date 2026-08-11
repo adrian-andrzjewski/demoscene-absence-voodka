@@ -1,11 +1,11 @@
 
 ;ten pierwszy swiat
 
-vk_p2_worldsobjects: dd (EndWorld - vk_p2_world)/48
+vk_swiatynia_city_worldsobjects: dd (EndWorld - vk_swiatynia_city_world)/48
 
 ;-----------------------------------------------------------------------------;
-global vk_p2_world
-vk_p2_world:
+global vk_swiatynia_city_world
+vk_swiatynia_city_world:
 	dd 0,   150*16, -650*16,2150*16,   3,  256,0,0,   0,0,0, 5 ;do_punktu
 
 	;podloga do sciany

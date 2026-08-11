@@ -1,4 +1,4 @@
-// p2world_selftest.cpp - CTest for the P2 World domain (p2world.asm).
+// p2world_selftest.cpp - CTest for the swiatynia city (P2) World domain (p2world.asm).
 //
 // Parses the reference INC/WORLD descriptor table and cross-checks the NASM
 // World data byte-exact (plus the record count), then drives a few World
@@ -14,9 +14,9 @@
 #include <vector>
 #include <string>
 
-extern "C" int32_t vk_p2_world[];
-extern "C" int32_t vk_p2_worldsobjects;
-extern "C" int32_t vk_p2_worldmax;
+extern "C" int32_t vk_swiatynia_city_world[];
+extern "C" int32_t vk_swiatynia_city_worldsobjects;
+extern "C" int32_t vk_swiatynia_city_worldmax;
 extern "C" void vk_make_camera_matrix(int ax,int ay,int az);
 extern "C" int32_t cam_matrix[16];
 extern "C" int32_t cam_cameraX, cam_cameraY, cam_cameraZ;
@@ -67,10 +67,10 @@ int main(){
     std::vector<int> wd = parseWorld(VOODKA_REPO_ROOT "/reference/source/demoscene-absence-voodka-master/CODE/inc/WORLD");
     std::printf("B parsed %d ints\n", (int)wd.size()); std::fflush(stdout);
     int recs = (int)wd.size()/12;
-    ck("worldmax", vk_p2_worldmax, 255);
-    ck("worldsobjects", vk_p2_worldsobjects, recs);
-    for(int i=0;i<(int)wd.size();i++) ck("world", vk_p2_world[i], wd[i]);
-    if(failures==0){ std::printf("p2world.crosscheck: OK (%d World records byte-exact)\n",recs); return 0; }
-    std::printf("p2world.crosscheck: %d failures\n",failures);
+    ck("worldmax", vk_swiatynia_city_worldmax, 255);
+    ck("worldsobjects", vk_swiatynia_city_worldsobjects, recs);
+    for(int i=0;i<(int)wd.size();i++) ck("world", vk_swiatynia_city_world[i], wd[i]);
+    if(failures==0){ std::printf("swiatynia_city.world.crosscheck: OK (%d World records byte-exact)\n",recs); return 0; }
+    std::printf("swiatynia_city.world.crosscheck: %d failures\n",failures);
     return 1;
 }

@@ -1,4 +1,4 @@
-; p2loop.asm - native x64 port of the P2 per-frame render loop
+; p2loop.asm - native x64 port of the swiatynia city (P2) per-frame render loop
 ; (P2.AS^ Main / Main2): CalculateVisiblating -> VirSort -> WorldKol walk ->
 ; prepareObjectVirtual + drawObject.
 ;
@@ -14,7 +14,7 @@
 ;     vk_draw_object(base, objects[obj]).
 ;
 ; Win64 C ABI:
-;   void vk_p2_render_frame(
+;   void vk_vr_world_render_frame(
 ;       uint8_t* base,                [rcx]    arena base
 ;       const int32_t* world,         [rdx]    World records (48B each, real ptr)
 ;       int count,                    [r8d]    number of records
@@ -63,8 +63,8 @@ pl_typ:     resd 1           ; type for the current record
 
 section .text
 
-global vk_p2_render_frame
-vk_p2_render_frame:
+global vk_vr_world_render_frame
+vk_vr_world_render_frame:
         push    rbp
         mov     rbp, rsp
         push    rbx

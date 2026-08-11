@@ -8,7 +8,7 @@
 //         then nov*12B vertices (x,y,z i32), nof*12B faces (i0,i1,i2 i32
 //         vertex indices), then an optional nov*8B per-vertex UV block
 //         (exporter leftover; present in every shipped file).
-//   V3M:  the same vertex/face/UV block WITHOUT the 36-byte header (P5 morph
+//   V3M:  the same vertex/face/UV block WITHOUT the 36-byte header (torus ustep village (P5) morph
 //         target). Detected by the .v3m extension / invalid type prefix and
 //         parsed with externally-supplied nov/nof counts.
 //

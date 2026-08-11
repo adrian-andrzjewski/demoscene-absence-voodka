@@ -4,7 +4,7 @@ Validation is scene-level: the original 1996 release running in DOSBox 0.74-3
 (SB16) vs the Windows x64 port, compared by timed screenshots against the
 module's deterministic ModPos timeline. Evidence: `reference/captures/`.
 
-For the complete source-level reconstruction of the P4 and P8 scene
+For the complete source-level reconstruction of the processorek Nevosolek (P4) and nad czerwonym lampa (P8) scene
 composition, geometry buffers, camera paths, palette/material assignments,
 animation, rasterization, and outros, see docs/P4_P8_SCENES.md.
 
@@ -38,28 +38,28 @@ animation, rasterization, and outros, see docs/P4_P8_SCENES.md.
 These were port bugs exposed by the first full playthroughs; all fixed and
 covered by the test suite:
 
-1. P2 entry crash in full runs: 64-bit load of the dword `_file_addr`
-   scooped P1's `len`=81 into the high half (`mov rsi` -> `mov esi`).
-2. P5 mirror pass: 32-bit adds zeroed the upper halves of 64-bit pointers.
-3. P5 water: the sample index is 16-bit in the original (wraps mod 65536);
+1. swiatynia city (P2) entry crash in full runs: 64-bit load of the dword `_file_addr`
+   scooped oko + szklo (P1)'s `len`=81 into the high half (`mov rsi` -> `mov esi`).
+2. torus ustep village (P5) mirror pass: 32-bit adds zeroed the upper halves of 64-bit pointers.
+3. torus ustep village (P5) water: the sample index is 16-bit in the original (wraps mod 65536);
    the port's 32-bit math zero-extended negatives to +4 GB. Now `& 0xffff`,
    exactly the original's wrap.
-4. P5 `vk_p2_render_frame` call site: MS-ABI stack args were shifted +8, so
+4. torus ustep village (P5) `vk_vr_world_render_frame` call site: MS-ABI stack args were shifted +8, so
    the callee saw `trace=textury` and traced into the texture table instead
    of drawing.
-5. P5 `vodkasel`: selector base was the file pointer missing `_file_addr`
+5. torus ustep village (P5) `vodkasel`: selector base was the file pointer missing `_file_addr`
    and truncated to 32 bits -> garbage texture base.
 6. `_scrSel` was never initialized; standalone parts (P5/P8) inherited a null
    screen selector. boot.asm now allocates it at Start32 like DEMO.AS^.
 7. VR face painter sort was missing entirely: `DrawZielonyLudek` calls
    BITSORT's Sort per object per frame (sumZ pack, 4x4-bit radix descending,
    NaGut); now `pz_sort` in p2draw.asm, with `prep_sort` (SortMem) called by
-   P2/P5 init. Cross-checked by p2draw.crosscheck.
+   swiatynia city/torus ustep village (P2/P5) init. Cross-checked by vr_object_draw.crosscheck.
 8. EOS `wait_vbl` returned the absolute counter instead of the EOS delta;
-   broke P8's sun sprite (ran past the 19-frame table) and sped up every
-   delta-driven animation. Dispatcher now returns the delta; P8's sun_step
+   broke nad czerwonym lampa (P8)'s sun sprite (ran past the 19-frame table) and sped up every
+   delta-driven animation. Dispatcher now returns the delta; nad czerwonym lampa (P8)'s sun_step
    clamp wraps robustly (the original's one-shot +-18 relied on ~1 deltas).
-9. P2 texture slots shifted: t[1]/t[2] were obrazek/t001; the original
+9. swiatynia city (P2) texture slots shifted: t[1]/t[2] were obrazek/t001; the original
    CODE/PART2 maps t[1]=t001, t[2..4]=t002, t[5]=env.
 10. Presentation vs 60 Hz vsync (see above).
 
@@ -69,13 +69,13 @@ A full asset-format reverse-engineering pass (docs/ASSET_FORMATS.md) compared
 every loader/decoder against the original sources and found these port bugs,
 all fixed and verified by frame recording (`--record` + palette/pixel diff):
 
-11. **P3 `make_pal` clamp semantics.** The port used a 32-bit `add eax,ebx`,
+11. **tunel + wygibasy (P3) `make_pal` clamp semantics.** The port used a 32-bit `add eax,ebx`,
     so the `jns` negative-clamp tested bit 31 instead of bit 7: wrapped bytes
     128..255 passed through and `&63` mapped them to bright values where the
     original clamps to black (dark ramp levels 6..14). Fixed to the original
     8-bit `add al,bl`; recorded ramp now matches the original semantics for
     all 720 bytes (tn.pal region exact too).
-12. **P2 water stage was a different effect.** The port reused the P7-style
+12. **swiatynia city (P2) water stage was a different effect.** The port reused the gratki + woda (P7)-style
     water engine (160x100 field, 2x2 upscale) sampling `obrazek.dat`, cleared
     the screen to black, and never installed `absence.pal` - ~1.5 s of
     all-white frames. Now a faithful port of `P2/WATER/WATER.PM`
@@ -83,24 +83,24 @@ all fixed and verified by frame recording (`--record` + palette/pixel diff):
     at screen rows 61..140 sampling `absence.dat` over the `water.abc`
     backdrop, `absence.pal` installed via SetPal, drops from the correct
     `P2/WATER/TAB` table (`p2_watertab.asm`; the shared `P2/TABLICA3` copy is
-    unreferenced by the original P2 build). Verified: palette == absence.pal
+    unreferenced by the original swiatynia city (P2) build). Verified: palette == absence.pal
     (768/768), live strip, correct backdrop.
-13. **P4 tull-picture outro was never presented (moot).** The picture blit
+13. **processorek Nevosolek (P4) tull-picture outro was never presented (moot).** The picture blit
     and the 64-step `pic_lo` fade + `brum` flashes ran, but no
-    `vk_present_frame` occurred between the last 3D frame (~0x1200) and P5's
+    `vk_present_frame` occurred between the last 3D frame (~0x1200) and torus ustep village (P5)'s
     first frame (~0x1400). Presents were added (v_sync-paced fade steps,
-    flash loop, wait loop) and verified (P4 was briefly removed and restored
-    2026-08-06 with these presents intact) - the same fix lives on in P8's
+    flash loop, wait loop) and verified (processorek Nevosolek (P4) was briefly removed and restored
+    2026-08-06 with these presents intact) - the same fix lives on in nad czerwonym lampa (P8)'s
     outro.
-14. **P8 end screen was never presented.** Same class: the 3-slice last.dat
+14. **nad czerwonym lampa (P8) end screen was never presented.** Same class: the 3-slice last.dat
     reveal + `lopa`/`hopla` fades only touched the DAC/VGA memory in the
     original. Presents added (fades v_sync-paced, matching the original's
     pal_set retrace pacing); verified: slices -> fade-in -> 274-VBL hold ->
     fade to all-black -> exit 0.
-15. **P5 sun sprite was never loaded.** `vodka 72,sun` (P5.AS^:156) had no
+15. **torus ustep village (P5) sun sprite was never loaded.** `vodka 72,sun` (P5.AS^:156) had no
     port equivalent; the sprite sampled the archive header. Added
     (`p5_sun`); verified animating 19-frame 2world.inc sprite on screen.
-16. **P5 water had no drops.** The original's `RIP` include injects a drop
+16. **torus ustep village (P5) water had no drops.** The original's `RIP` include injects a drop
     into `_bufor1` every `calculateWater` call (crawling `P5/TABLICA3`);
     the port had none, so the water surface was static. Added to
     `water.p5.inc`, including the original's duplicated `[esi+256]` poke bug
@@ -113,10 +113,11 @@ all fixed and verified by frame recording (`--record` + palette/pixel diff):
     on ~half the values and disagreeing with frames2img's rounding. Now
     `round(v*255/63)` exactly (`(v*255+31)/63`) in both - the linear mapping
     the VGA DAC's analog output implements.
-19. **`--part 5` seeked 2 orders early** (`kPartStartModPos[4]` was 0x1200 =
-    P4's outro start; P4 exited at >= 0x1400). Fixed to 0x1400; progress.cpp
-    gained the missing "P4 tull outro" scene row (kept with P4's restore).
-20. **P6 exit compared a dword at the word var `ModPos`** (worked only
+19. **`--scene torus-ustep-village` once seeked 2 orders early** (the historical
+    `--part 5` selector used `kPartStartModPos[4]` = 0x1200 =
+    processorek Nevosolek (P4)'s outro start; processorek Nevosolek (P4) exited at >= 0x1400). Fixed to 0x1400; progress.cpp
+    gained the missing "processorek Nevosolek (P4) tull outro" scene row (kept with processorek Nevosolek (P4)'s restore).
+20. **gratki (P6) exit compared a dword at the word var `ModPos`** (worked only
     because the adjacent `framebuffer_off` low word is 0). Now a word
     compare.
 
@@ -130,26 +131,26 @@ A stage-by-stage audit (assets -> decode -> palette -> present) against the
 DOSBox reference captures and the recording of the current build found four
 port bugs and confirmed two already-faithful static pictures:
 
-21. **P2 world palette was P5's 2WORLD.PAL.** The original `P2.AS^` installs
+21. **swiatynia city (P2) world palette was torus ustep village (P5)'s 2WORLD.PAL.** The original `P2.AS^` installs
     the inline `jjdj` palette (`CODE/P2/WORLD.P!`); the port loaded vodka-37
-    (= `2WORLD.PAL`, which is P5's palette). Under 2WORLD.PAL the P2 stadium
+    (= `2WORLD.PAL`, which is torus ustep village (P5)'s palette). Under 2WORLD.PAL the swiatynia city (P2) stadium
     textures rendered olive/gold/tan instead of the shipped red/maroon/blue
     world (t001 -> olive, env -> gold; the "gold centerpiece" note below).
     Fixed: `port/core/parts/jjdj.pal` copied into the arena at part start
-    (original `_pal dd jjdj` semantics). Frame-recorded: the P2 phase now
+    (original `_pal dd jjdj` semantics). Frame-recorded: the swiatynia city (P2) phase now
     contains the original capture's exact 6-bit colors (e.g. t001's
     (158,8,8),(190,48,32),(206,130,89),(231,166,130)). Guarded by
     `jjdj.repro`.
-22. **P3 face shaded with swapped textures.** P3.ASM fo_1/fo_2 sample
+22. **tunel + wygibasy (P3) face shaded with swapped textures.** P3.ASM fo_1/fo_2 sample
     `al=lgmap[es:bx(edx)]` + `ah=map[fs:bx(ecx)]`; the port sampled
     `map[edx]` + `lgmap[ecx]`, so every shaded tunnel face used the wrong
     texture in each coordinate channel. Fixed p3.asm `.fo_1` to the original
     order. The tunnel's palette (make_pal ramp) was already byte-exact; the
     wrong colors came from this sample swap.
-23. **P3 tunnel scroll offset did not accumulate.** Original tooneling ends
+23. **tunel + wygibasy (P3) tunnel scroll offset did not accumulate.** Original tooneling ends
     `add licznik,ax`; the port used `mov`, freezing the scrolling _yayo
     window. Fixed to `add`.
-24. **P1 flash was presented instead of being a sub-frame transient.**
+24. **oko + szklo (P1) flash was presented instead of being a sub-frame transient.**
     P1.ASM I_nie_znika copies the frame to the VGA first, then does a
     `pal_fadein10` toward white and immediately restores rm_eye, so the wash
     is a DAC-time transient no presented frame samples. The port faded
@@ -159,16 +160,16 @@ port bugs and confirmed two already-faithful static pictures:
     original order (present, then fade, then restore); frame-recorded: the
     flash-window palette is now byte-identical to rm_eye.pal.
 
-Also verified faithful (no change needed): the P8 last.dat
+Also verified faithful (no change needed): the nad czerwonym lampa (P8) last.dat
 end screen is byte-exact (framebuffer AND palette) in the current build (the
-P4 tull outro was verified the same way before P4's removal); the
+processorek Nevosolek (P4) tull outro was verified the same way before processorek Nevosolek (P4)'s removal); the
 stale `reference/captures/port_outro.png` (pre-"presents added" fix) is what
 showed the old broken bright output. The logos blit byte-exactly to the source
 `_logoN.inc` data for every displayed frame.
 
-## Fixed divergences - P3 hero-object geometry/rotation audit (2026-08-05)
+## Fixed divergences - tunel + wygibasy (P3) hero-object geometry/rotation audit (2026-08-05)
 
-A deep pass on the P3 tunnel's hero 3D object ("missing vertices/faces, mesh
+A deep pass on the tunel + wygibasy (P3) tunnel's hero 3D object ("missing vertices/faces, mesh
 full of holes, doesn't resemble the original cog"). Runtime instrumentation
 (arena table dumps + per-face/per-row traces) verified the ENTIRE pipeline is
 faithful: shape/con tables byte-identical after the prepare double, plane
@@ -177,35 +178,35 @@ arithmetic) and the zet sort. The "holes" were a frame-rate/phase mismatch,
 two texture-interpolation bugs, and - found later - the missing draw_2
 rasterizer path (item 28):
 
-25. **P3 main loop waited for TWO VBL ticks per frame (~35 fps, not 70).**
+25. **tunel + wygibasy (P3) main loop waited for TWO VBL ticks per frame (~35 fps, not 70).**
     The ORIGINAL P3.ASM main loop calls EOS `wait_vbl` then `v_sync`; the
     port forwarded BOTH to `EOS_WAIT_VBL` (a full QPC-paced 70 Hz wait). Two
     waits per frame halved the frame rate, so the hero object's rotation
     (advanced by `ramki` once per frame) ran at half the original's rate:
-    over the fixed music timeline P3 produced 433 frames (rotation r 32..465)
+    over the fixed music timeline tunel + wygibasy (P3) produced 433 frames (rotation r 32..465)
     and never reached the solid-cog pose (r~528 at frame ~496), so the mesh
     only ever showed its thin/fragmented/lobed phases while the original
     cycles through the solid cog mid-scene. Since `wait_vbl` at the top of
     the loop already lands on the frame boundary, the port now drops the
     redundant `v_sync` (original `v_sync` is a VGA retrace poll that returns
-    at that same boundary). P3 now runs 860 frames (~65-70 fps); the object's
-    fill cycle peaks at the same ~53-67% of P3 as the original's, reaching
+    at that same boundary). tunel + wygibasy (P3) now runs 860 frames (~65-70 fps); the object's
+    fill cycle peaks at the same ~53-67% of tunel + wygibasy (P3) as the original's, reaching
     hollow cog-ring + central emblem pose.
-26. **P3 `p3_slope` dropped the first slope and ORed garbage into the span
+26. **tunel + wygibasy (P3) `p3_slope` dropped the first slope and ORed garbage into the span
     step.** The original packs `(first_slope<<16)|second_slope`; the port's
     `p3_slope` had an extra `shl esi/ebp,16` + `or ...edi` that shifted away
     the first slope and ORed a stale face offset into the sub-pixel texture
     step for every shaded tunnel face. Removed the extra `shl`/`or` (matches
     the original packing).
-27. **P3 `n_rot` arena block under-allocated (`p_num*2` = 682 B, needs
+27. **tunel + wygibasy (P3) `n_rot` arena block under-allocated (`p_num*2` = 682 B, needs
     `p_num*4` = 1364 B).** `rotate_normals` writes 4 bytes/vertex; the 682-byte
     shortfall overflowed into `n_vert` every frame, corrupting the normals
     (and thus the p/n_rot texture coordinates) of the first ~114 vertices.
     Fixed the allocation size - no more cross-frame n_vert corruption.
 
-## Fixed divergences - P3 dual-texture rasterizer `draw_2` (2026-08-07)
+## Fixed divergences - tunel + wygibasy (P3) dual-texture rasterizer `draw_2` (2026-08-07)
 
-28. **P3 `face` only implemented `draw_1`; the positive-span case never
+28. **tunel + wygibasy (P3) `face` only implemented `draw_1`; the positive-span case never
     rendered.** P3.ASM has TWO raster paths: `draw_1` (middle vertex LEFT of
     the long edge, `x_2 < pom`; span right->left via `dec edi`) and `draw_2`
     (middle vertex RIGHT, `x_2 > pom`; span left->right via `inc edi`, with
@@ -233,14 +234,14 @@ rasterizer path (item 28):
       off-screen-LEFT and is virtually scanned inward (`add_1`/`add_2`)
       instead of `movzx`-wrapping to ~65000 (which both dropped off-left rows
       in draw_1 and would spin the `.add_2` clamp ~65k times per row).
-    Verified: P3 standalone 855 frames, clean exit; hero object solid
+    Verified: tunel + wygibasy (P3) standalone 855 frames, clean exit; hero object solid
     (frame-recorded; port still `reference/captures/port_p3_tunnel_fixed.png`);
     full playthrough 1->5 clean; all 27
     CTests pass.
 
-## Fixed divergences - P4 plate audit (2026-08-09)
+## Fixed divergences - processorek Nevosolek (P4) plate audit (2026-08-09)
 
-The P4 scene after the P3 tunnel was compared against the original P4 source,
+The processorek Nevosolek (P4) scene after the tunel + wygibasy (P3) tunnel was compared against the original processorek Nevosolek (P4) source,
 the recovered texture data, and the DOSBox still. Port-only fidelity bugs
 were fixed:
 
@@ -250,50 +251,50 @@ were fixed:
   and projected vertices. It now rebuilds the same contiguous render view
   after each `make_chip` call; the raw arena block remains available to
   `n_calc` and the morph step.
-- **P4 source copy tail:** the combined 567-vertex block is 3,402 bytes, so
+- **processorek Nevosolek (P4) source copy tail:** the combined 567-vertex block is 3,402 bytes, so
   the previous dword-only copy dropped the final two bytes of `src3`. The
   remainder is now copied explicitly.
-- **P4 string direction state:** the DOS `PART4` entry begins with `cld`;
-  the port now does the same before its asset and framebuffer copies, so P4
+- **processorek Nevosolek (P4) string direction state:** the DOS `PART4` entry begins with `cld`;
+  the port now does the same before its asset and framebuffer copies, so processorek Nevosolek (P4)
   cannot inherit a reversed `rep` direction from a preceding scene.
 
-- **Signed rasterizer edge coordinates:** the P4 face rasterizer used zero-
+- **Signed rasterizer edge coordinates:** the processorek Nevosolek (P4) face rasterizer used zero-
   extended 16-bit edge coordinates. Negative off-screen-left coordinates then
   became ~65K and were rejected instead of being virtually scanned into the
   320-pixel viewport. The four edge loads now sign-extend like the original's
   `mov di`/`mov bp` path (`port/core/parts/p4.asm`).
-- **P4 triangle coverage:** even after the edge fix, the x64 translation of
+- **processorek Nevosolek (P4) triangle coverage:** even after the edge fix, the x64 translation of
   the legacy fixed-point scan converter dropped broad edge spans, leaving the
-  tunnel and plate as disconnected triangles. P4 now marshals the same
+  tunnel and plate as disconnected triangles. processorek Nevosolek (P4) now marshals the same
   projected vertices, packed 8.8 UVs, 16-bit texture addressing, and shade
   offset to a bounded scan converter in `platform/bridge.cpp`; projection,
   culling, and depth order remain in the NASM scene code. A frame-recorded
-  P4 run now restores the continuous concentric environment and solid plate.
-- **P4 `sw` palette placement:** texture index 0 is the black clear/unused
+  processorek Nevosolek (P4) run now restores the continuous concentric environment and solid plate.
+- **processorek Nevosolek (P4) `sw` palette placement:** texture index 0 is the black clear/unused
   value in the captured scene. The meaningful warm `sw` colors begin at
   palette entry 1, while entry 64 remains the generated shaded ramp used by
-  P4's plane faces. The port now installs that layout without changing the
+  processorek Nevosolek (P4)'s plane faces. The port now installs that layout without changing the
   recovered `sw.pal` source asset.
-- **P4 CPU texture palette:** `vws3`/`vwc3` use `proc.inc` with the 33-entry
+- **processorek Nevosolek (P4) CPU texture palette:** `vws3`/`vwc3` use `proc.inc` with the 33-entry
   palette recovered from `P4.OBJ`. The port copy had the final white entry
   rotated to the front, shifting every CPU texel by one palette slot. The
   recovered byte order is restored, so the CPU markings and brown surface
   colors match the original palette contract.
 
-The P4 asset assignments remain unchanged: `sw.inc`, `v_txr1.inc`,
+The processorek Nevosolek (P4) asset assignments remain unchanged: `sw.inc`, `v_txr1.inc`,
 `proc.inc`, `metal.inc`, and camera path `trasa.dat` are the original indices.
 
-## Fixed divergences - P8 palette audit (2026-08-06)
+## Fixed divergences - nad czerwonym lampa (P8) palette audit (2026-08-06)
 
-Verified the full P8 color pipeline end-to-end against the original assembly
+Verified the full nad czerwonym lampa (P8) color pipeline end-to-end against the original assembly
 and shipped OBJs; all color data/math is byte-faithful except the two `white`
 vs `bialy` substitutions below, now fixed:
 
-- P4 and P8 use distinct `sw` palette includes. P4's `sw.pal` is the 64-entry
-  `spal1` payload beginning at P4.OBJ 0x4a7; P8's `p8_sw.pal` is the 768-byte
+- processorek Nevosolek (P4) and nad czerwonym lampa (P8) use distinct `sw` palette includes. processorek Nevosolek (P4)'s `sw.pal` is the 64-entry
+  `spal1` payload beginning at P4.OBJ 0x4a7; nad czerwonym lampa (P8)'s `p8_sw.pal` is the 768-byte
   `pal` payload beginning three bytes before P8.OBJ 0x524, with explicit black
   entry 0 and the warm colors shifted to entries 1..54. The earlier extractor
-  incorrectly reused P4's payload for P8, making every P8 `sw.inc` texel use
+  incorrectly reused processorek Nevosolek (P4)'s payload for nad czerwonym lampa (P8), making every nad czerwonym lampa (P8) `sw.inc` texel use
   the next color. `metal.pal` remains the 192-byte ramp at P8.OBJ 0x821 and
   P4.OBJ 0xdb2. `pal.repro` now guards all three copies. The working palette
   is built exactly as the original (`make_pal` 8-bit signed clamps, regions
@@ -315,27 +316,27 @@ vs `bialy` substitutions below, now fixed:
 
 ## Remaining known differences
 
-- **P8 tone**: fixed 2026-08-06. The port's P8/P4 `metal.pal` had been a
+- **nad czerwonym lampa (P8) tone**: fixed 2026-08-06. The port's P8/P4 `metal.pal` had been a
   white placeholder (extract_pals pinned P8.OBJ 0x8fb = the all-0x3f `bialy`
-  table), which rendered the P8 hero torus as a flat pure-white blob. The real
+  table), which rendered the nad czerwonym lampa (P8) hero torus as a flat pure-white blob. The real
   chrome/silver-blue ramp (64 entries, (5,6,7)->(63,63,63)) is now recovered
-  byte-identical from P8.OBJ 0x821 and P4.OBJ 0xdb2; the port copy (P8's) was
+  byte-identical from P8.OBJ 0x821 and P4.OBJ 0xdb2; the port copy (nad czerwonym lampa (P8)'s) was
   updated and the extracter offset/assert fixed, so `pal.repro` regenerates
   the same data; the torus now shows the original's metallic gradient
-  shading. (P4's copy of metal.pal is back with P4.)
+  shading. (processorek Nevosolek (P4)'s copy of metal.pal is back with P4.)
 - **Sine table variant**: `INC/SIN` is `round(32766*sin(2pi*i/1023))` (a
   1023-interval table, hex-verified); the port generates a true 1024-step
   `round(32767*sin(2pi*i/1024))`. Max deviation 201 Q15 units (~0.6%); the
   word-format `sinus.inc` is missing from the repo entirely, so a
   reconstruction was required regardless (the port's 2048-word two-period
   table also safely covers the engine's cos over-reads up to word 1279).
-- **Out-of-grid water samples**: the P2/P7 water draw clamps the sample
+- **Out-of-grid water samples**: the swiatynia city/gratki + woda (P2/P7) water draw clamps the sample
   row/col where the original's 16-bit index wrapped into adjacent DOS memory
-  (undefined bytes). Only extreme-gradient edge cells differ; the P5 final
+  (undefined bytes). Only extreme-gradient edge cells differ; the torus ustep village (P5) final
   offset keeps the exact 16-bit wrap (arena-safe).
 - **Transient first-frame deltas:** after a part stall the EOS delta is
   large for one frame; the original shows a momentary animation jump (and in
-  P8's case read harmless garbage in DOS). The port wraps the sprite index
+  nad czerwonym lampa (P8)'s case read harmless garbage in DOS). The port wraps the sprite index
   instead — visually cleaner, same steady state.
 - **Windowed 1280x800 D3D11 vs fullscreen mode 13h**; integer 4x upscale,
   point-sampled, 6-bit palette DAC behavior reproduced (round(v*255/63),
@@ -352,8 +353,8 @@ vs `bialy` substitutions below, now fixed:
   are retrace-paced VGA-DAC palette replacements over the already displayed
   indexed frame, not alpha overlays.  The port now presents the flash palette,
   waits the source-equivalent retrace interval, restores the previous/target
-  palette, and presents again.  This covers P1/P2/P3/P4/P5/P7/P8, including
-  P2's `WIDOKI` flash flags and P3's exact `flesze` mask; see
+  palette, and presents again.  This covers oko + szklo/swiatynia city/tunel + wygibasy/processorek Nevosolek/torus ustep village/gratki + woda/nad czerwonym lampa (P1/P2/P3/P4/P5/P7/P8), including
+  swiatynia city (P2)'s `WIDOKI` flash flags and tunel + wygibasy (P3)'s exact `flesze` mask; see
   `docs/FLASH_EFFECTS.md` for the trigger table and durations.
 - **Input:** Esc skips parts in the original; the port maps PC scancodes
   identically. Space = pause (port addition).
@@ -364,12 +365,12 @@ vs `bialy` substitutions below, now fixed:
   (SHA-256 golden test).
 - Engine math (sqrt, rotate, n_calc, radix sort), the tm_face rasterizer,
   MROTATE matrices, camera matrix, projection, normals, object loader, VR
-  visibility/sort/prepare, the P2 camera path and world data, and the toonel
+  visibility/sort/prepare, the swiatynia city (P2) camera path and world data, and the toonel
   table: byte-exact vs C++ references re-deriving the original arithmetic
   (27 CTests, incl. all five water drop tables, the V3D/V3M decode, and the
   asset viewer's own v3d.viewer_parse).
-- Asset-level runtime checks (2026-08-05, frame-recorded): P3 palette ramp
-  matches the original's 8-bit make_pal semantics for all 720 bytes; the P2
-  water installs absence.pal exactly (768/768); the P8 end screen equals
-  last.dat/last.pal and fades to all-black. (The P4 outro's tull.pal
-  convergence was verified the same way before P4's removal.)
+- Asset-level runtime checks (2026-08-05, frame-recorded): tunel + wygibasy (P3) palette ramp
+  matches the original's 8-bit make_pal semantics for all 720 bytes; the swiatynia city (P2)
+  water installs absence.pal exactly (768/768); the nad czerwonym lampa (P8) end screen equals
+  last.dat/last.pal and fades to all-black. (The processorek Nevosolek (P4) outro's tull.pal
+  convergence was verified the same way before processorek Nevosolek (P4)'s removal.)

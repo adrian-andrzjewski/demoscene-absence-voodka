@@ -1,7 +1,7 @@
 ; win32_app_modes.asm - production assembly mode and entry-seek dispatcher.
 ;
 ; The argument parser already owns the raw command-line interpretation. This
-; layer owns the former app.cpp branch order, part-start table, self-test loop,
+; layer owns the former app.cpp branch order, scene-start table, self-test loop,
 ; audio-check default, crash-filter handoff, and DemoStart32 result return.
 ; Namespace-vk calls remain explicit C ABI adapters until those services are
 ; migrated independently.
@@ -15,6 +15,7 @@ extern asm_voodka_arg_modpos
 extern asm_voodka_arg_ms
 extern asm_voodka_arg_order
 extern asm_voodka_arg_part
+extern asm_voodka_arg_scene
 extern asm_voodka_arg_selftest
 extern asm_voodka_arg_audiocheck
 extern asm_voodka_arg_audiocheck_seconds
@@ -23,7 +24,9 @@ extern vk_app_seek_modpos
 extern vk_app_seek_ms
 extern vk_app_seek_order
 extern vk_app_seek_part
+extern vk_app_seek_scene
 extern vk_app_no_entry_seek
+extern vk_scene_part_from_name
 
 extern vk_app_log_selftest
 extern vk_app_selftest_pattern
@@ -41,7 +44,7 @@ global asm_voodka_run_mode
 
 section .data
 align 4
-part_start_modpos:
+scene_start_modpos:
         dd      0x0000, 0x0400, 0x0B40, 0x0D40
         dd      0x1400, 0x1B40, 0x1C40, 0x2040
 
@@ -55,7 +58,7 @@ asm_voodka_apply_entry_seek:
         push    r12
         sub     rsp, 0x28                    ; RSP%16 == 0 at every CALL
 
-        ; Existing C++ precedence: modpos, ms, order, part.
+        ; Existing precedence: modpos, ms, order, canonical scene, --part.
         call    asm_voodka_arg_modpos
         test    eax, eax
         js      .try_ms
@@ -76,9 +79,27 @@ asm_voodka_apply_entry_seek:
 .try_order:
         call    asm_voodka_arg_order
         test    eax, eax
-        js      .try_part
+        js      .try_scene
         mov     ecx, eax
         call    vk_app_seek_order
+        mov     eax, 1
+        jmp     .done
+
+.try_scene:
+        call    asm_voodka_arg_scene
+        test    rax, rax
+        jz      .try_part
+        mov     r12, rax
+        mov     rcx, r12
+        call    vk_scene_part_from_name
+        test    eax, eax
+        jz      .none
+        mov     r12d, eax
+        dec     eax
+        lea     rdx, [rel scene_start_modpos]
+        mov     edx, [rdx + rax * 4]
+        mov     ecx, r12d
+        call    vk_app_seek_scene
         mov     eax, 1
         jmp     .done
 
@@ -90,7 +111,7 @@ asm_voodka_apply_entry_seek:
         jg      .none
         mov     r12d, eax
         dec     eax
-        lea     rdx, [rel part_start_modpos]
+        lea     rdx, [rel scene_start_modpos]
         mov     edx, [rdx + rax * 4]
         mov     ecx, r12d
         call    vk_app_seek_part

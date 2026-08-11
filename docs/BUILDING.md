@@ -90,8 +90,10 @@ C++ for the current gate.
 ## Running
 
 ```
-VOODKA.exe                     full demo, all 8 parts (~70 fps, 1280x800 window)
-VOODKA.exe --part N            start at part N (1..8), music seeked to match
+VOODKA.exe                     full demo, all eight scenes (~70 fps, 1280x800 window)
+VOODKA.exe --scene <name>      start by canonical scene slug
+VOODKA.exe --scene <slug>      canonical scene selector (for example, gratki-woda)
+VOODKA.exe --part N             historical numeric scene selector alias (1..8)
 VOODKA.exe --modpos N          start at ModPos N  ((order<<8)|row)
 VOODKA.exe --order N           start at order N
 VOODKA.exe --ms N              start N milliseconds into the module
@@ -117,7 +119,7 @@ ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
 72 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
-P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
+swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
 TASM text), `pal.integrity` + `pal.repro` (palette copies + OBJ-extraction
@@ -204,7 +206,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_app_startup_probe` | Phase 3B.6.7B.3 production NASM subsystem order, Win64 POD arguments, quit checkpoints, and rollback witness (CTest `win32.app_startup`) |
 | `win32_app_host_probe` | Phase 3B.6.7B.4 production NASM host configuration, window/startup failure, seek/run, arena-size, and final-shutdown witness (CTest `win32.app_host`) |
 | `win32_platform_abi_probe` | Phase 3B.6.7B.5 exact MSVC-decorated `vk::log*`/`vk::timeline*` assembly ABI, variadic logger forwarding, timeline formatting, audio-clock sampling, flush, and close witness (CTest `win32.platform_abi`) |
-| `p4_raster_probe` | Phase 3B.6.7B.6 deterministic NASM-vs-C++ P4 textured-triangle scan-conversion comparison across sorting, clipping, degenerate, horizontal, and wrapped-UV cases (CTest `p4.raster`) |
+| `processorek_nevosolek_raster_probe` | Phase 3B.6.7B.6 deterministic NASM-vs-C++ processorek Nevosolek (P4) textured-triangle scan-conversion comparison across sorting, clipping, degenerate, horizontal, and wrapped-UV cases (CTest `processorek_nevosolek.raster`) |
 | `win32_d3d_dispatch_probe` | Phase 3B.6.7B.7 production NASM D3D11 service ABI, palette/frame recording, readback diagnostics, Win32 file handles, and lifecycle witness (CTest `win32.d3d_dispatch`) |
 | `audio_dispatch_probe` | Phase 3B.6.7B.8 production NASM namespace-vk audio forwarding, disabled-mode defaults, log ABI, and shutdown witness (CTest `audio.dispatch`) |
 | `audio_lookup_probe` | Phase 3B.6.7B.9.1 NASM lower-bound seek-index primitive vs `std::lower_bound` over duplicate and boundary tables (CTest `audio.lookup`) |
@@ -224,21 +226,21 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` soundtrack path service | Phase 3B.6.7B.1 production NASM module-path resolution and stable `const char*` audio handoff; reference retains the C++ resolver |
 | `VOODKA` mode/entry dispatcher | Phase 3B.6.7B.2 production NASM selector precedence, part-start ModPos table, self-test/audio-check modes, crash-filter handoff, and DemoStart32 result propagation |
 | `VOODKA` startup coordinator | Phase 3B.6.7B.3 production NASM progress/input/arena/timing/audio/presenter/diagnostic/automation order and ordinary-failure rollback; reference retains C++ behavior |
-| `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
+| `VOODKA --scene nad-czerwonym-lampa --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 3B.6.7B.7 reference-only historical dispatch; production uses `win32_d3d_dispatch.asm` |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |
-| `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
+| `VOODKA --asm-audio --scene oko-szklo` | Phase 2R real demo oko + szklo (P1) integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_oko_szklo`) |
 | `VOODKA --asm-audio` | Phase 2T full eight-part assembly producer service witness: scene progression, seek/timeline behavior, and clean WASAPI teardown |
-| `VOODKA --part 1` | Phase 2W production-default assembly-audio P1 integration and clean shutdown (CTest `audio.assembly_demo_p1`) |
-| `VOODKA_REFERENCE --libxmp-audio --part 1 --auto-close-ms 2000` | Phase 2X non-shipped C++/libxmp reference-path initialization and teardown (CTest `audio.reference_demo_close`) |
-| `VOODKA --libxmp-audio --part 1` | Phase 2X production dependency-boundary rejection (CTest `audio.production_reference_rejected`) |
+| `VOODKA --scene oko-szklo` | Phase 2W production-default assembly-audio oko + szklo (P1) integration and clean shutdown (CTest `audio.assembly_demo_oko_szklo`) |
+| `VOODKA_REFERENCE --libxmp-audio --scene oko-szklo --auto-close-ms 2000` | Phase 2X non-shipped C++/libxmp reference-path initialization and teardown (CTest `audio.reference_demo_close`) |
+| `VOODKA --libxmp-audio --scene oko-szklo` | Phase 2X production dependency-boundary rejection (CTest `audio.production_reference_rejected`) |
 | `audio_dispatch.asm` | Phase 3B.6.7B.8 production namespace-vk audio ABI dispatch into the dedicated assembly player |
 | `VOODKA_REFERENCE` | Phase 2X non-shipped host target retaining `audio.cpp` and `xmp_static` for differential validation |
 | `asm_audio_ring_thread_entry` | Phase 2U assembly-owned CreateThread entry for the live WASAPI worker (exercised by the production assembly-audio CTests) |
 | `asm_audio_service_storage_init` | Phase 2V assembly-owned MOD loading, fixed tracker/timeline storage, PCM ring buffers, producer scratch, and mixer history initialization |
-| `VOODKA --asm-audio --part 1 --auto-pause-ms 1000` | Phase 2S real Win32 Space pause/resume injection through the assembly audio service (CTest `audio.assembly_demo_pause`) |
-| `VOODKA --asm-audio --part 1 --auto-close-ms 2000` | Phase 2S real WM_CLOSE teardown during playback (CTest `audio.assembly_demo_close`) |
-| `VOODKA_ASM_AUDIO_FAIL_DEVICE=1 VOODKA --asm-audio --part 1` | Phase 2S deterministic assembly-device initialization failure and cleanup (CTest `audio.assembly_audio_fail_device`) |
+| `VOODKA --asm-audio --scene oko-szklo --auto-pause-ms 1000` | Phase 2S real Win32 Space pause/resume injection through the assembly audio service (CTest `audio.assembly_demo_pause`) |
+| `VOODKA --asm-audio --scene oko-szklo --auto-close-ms 2000` | Phase 2S real WM_CLOSE teardown during playback (CTest `audio.assembly_demo_close`) |
+| `VOODKA_ASM_AUDIO_FAIL_DEVICE=1 VOODKA --asm-audio --scene oko-szklo` | Phase 2S deterministic assembly-device initialization failure and cleanup (CTest `audio.assembly_audio_fail_device`) |
 
 ## Troubleshooting
 

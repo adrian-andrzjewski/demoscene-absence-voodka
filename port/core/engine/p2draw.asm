@@ -1,5 +1,5 @@
 ; p2draw.asm - native x64 port of OBJECTS.PM DrawObject / DrawZielonyLudek,
-; the per-object rasterizer used by the P2 (and P5) render loop.
+; the per-object rasterizer used by the swiatynia city (P2) (and torus ustep village (P5)) render loop.
 ;
 ; Object struct (21 dwords, base-relative) matches loader.asm:
 ;   +0 type +4 nov +8 nof ... +36 vertexes +40 faces +44 textures
@@ -236,7 +236,7 @@ pz_walk:
         mov     [pz_rec], rdi
         jmp     .next
 .dotm:
-        ; NOTE: fs_sel was already set by the caller (vk_p2_render_frame sets it
+        ; NOTE: fs_sel was already set by the caller (vk_vr_world_render_frame sets it
         ; from the world record's type -> textury[type]). The original
         ; DrawObject does not set fs here; the render loop does, per object.
         ; We must NOT override it with the object's own +72 tex-sel, or the

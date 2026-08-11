@@ -134,8 +134,8 @@ mieszanie:
         cmp     eax, [rel phase_exit]
         jle     %%.frame_loop
 %endmacro
-global part7
-part7:
+global scene_gratki_woda
+scene_gratki_woda:
         push    rbp
         mov     rbp, rsp
         push    rbx

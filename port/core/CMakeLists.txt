@@ -61,7 +61,7 @@ set(VOODKA_CORE_ASM
 
 add_library(voodka_core STATIC ${VOODKA_CORE_ASM})
 
-# NASM does not emit dependency edges for INCBIN payloads. Keep P4's embedded
+# NASM does not emit dependency edges for INCBIN payloads. Keep processorek Nevosolek (P4)'s embedded
 # palette inputs visible to the build graph so a palette correction is picked
 # up by an incremental build as well as a clean rebuild.
 set_source_files_properties(parts/p4.asm PROPERTIES

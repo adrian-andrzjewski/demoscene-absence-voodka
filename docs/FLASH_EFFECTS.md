@@ -3,7 +3,7 @@
 This document is the source and port reference for VOODKA's full-screen flash
 effects. It records the original DOS implementation, the soundtrack timeline
 conditions, the palette data involved, and the Windows/D3D11 translation. The
-word `lampa` ("lamp") is the explicit name used by P2 for one of the flashes;
+word `lampa` ("lamp") is the explicit name used by swiatynia city (P2) for one of the flashes;
 the production uses the same visual technique in several other parts under
 names such as `flesze`, `tablica`, and `brum`.
 
@@ -89,29 +89,29 @@ assembly and its included data tables.
 
 | Part | Source routine/data | Trigger | Flash palette and duration | Restore and side effects |
 |---|---|---|---|---|
-| P1 | `CODE/P1/P1.ASM`, `main_loop` | `0300h <= ModPos <= 0400h`; part exits when `ModPos > 0400h` | Current DAC palette brightened toward `white` by `ModPos & 3Fh`; one `pal_fadein10` palette interval | Restore `pal` (`rm_eye.pal`) on the next palette write |
-| P2 | `CODE/P2/P2.AS^`, `ruchamy`; `lampa db 0` | First loop with `ModPos > 0500h` while still in the `trasa` camera path (`ModPos <= 063Fh`) | Full `white`, one retrace | Restore `_pal`; set `lampa` to 1, so the event is one-shot |
-| P2 | `CODE/P2/P2.AS^`, WIDOKI branch; `CODE/P2/WIDOKI` | `ModPos > 063Fh`, selected WIDOKI record has dword 7 = 1, and `ModPos != plum` | Full `white`, one retrace-scale palette interval | The normal world palette is restored by the surrounding P2 palette path; negate `bolek` |
-| P2 water | `CODE/P2/P2.AS^`, `wodda`; `CODE/P2/WATER/WATER` | Water transition after the P2 main loop passes `ModPos > 0730h`; WATER's final transition is gated at `073Fh` | Full `white` over the saved pre-water picture, one retrace | Restore `_pal`; enter the Main2 water scene |
-| P3 | `CODE/P3/P3.ASM`, `flesze` | `0D19h < ModPos <= 0D3Eh`, low-six-bit table entry is flagged and its second dword is zero | Full `white`, one retrace | Restore the full `pal` and the final 16 entries from `tunel_pal` |
-| P4 | `CODE/P4/P4.ASM`, `brum`; `tablica` | After `ModPos >= 1338h`, flagged low-six-bit indices 58, 59, 60, or 62 | Full `white` for two retrace intervals | Restore `pic_pal`; each table entry is latched so it fires once |
-| P5 | `CODE/P5/P5.AS^`, scene-3/scene-4 `intro_fade` | Every iteration of the scene-3 and scene-4 loops | Current palette brightened toward white by the low byte of `ModPos`; one bright-palette interval | Restore `_pal`; source performs three restore `pal_set` calls, so two additional unchanged retrace waits remain after the visible bright interval |
-| P6 | `CODE/P6/P6.AS^`, `Keye` | Part start, not a discrete flash | Set full `white`, then fade toward loaded `_pal` with `znika = 1..63`, once per frame | Gradual palette transition; deliberately not routed through the flash primitive |
-| P7 | `CODE/P7/P7.AS^`, `FFirst` and phase setup blocks | Initial phase, then first frame after `1D1Fh`, `1D3Fh`, `1E1Fh`, `1E3Fh`, `1F1Fh`, and `1F3Fh` | Full `white`, one retrace | Restore newly mixed `_paleta`; load the next pulse/palette assets |
-| P8 | `CODE/P8/P8.ASM`, `brum`; `tablica` | `2630h <= ModPos < 2700h`, flagged low-six-bit entry whose latch is not set | `bialy` full-white palette, one retrace | Restore mutable `white`; set the table latch to 1 |
+| oko + szklo (P1) | `CODE/P1/P1.ASM`, `main_loop` | `0300h <= ModPos <= 0400h`; part exits when `ModPos > 0400h` | Current DAC palette brightened toward `white` by `ModPos & 3Fh`; one `pal_fadein10` palette interval | Restore `pal` (`rm_eye.pal`) on the next palette write |
+| swiatynia city (P2) | `CODE/P2/P2.AS^`, `ruchamy`; `lampa db 0` | First loop with `ModPos > 0500h` while still in the `trasa` camera path (`ModPos <= 063Fh`) | Full `white`, one retrace | Restore `_pal`; set `lampa` to 1, so the event is one-shot |
+| swiatynia city (P2) | `CODE/P2/P2.AS^`, WIDOKI branch; `CODE/P2/WIDOKI` | `ModPos > 063Fh`, selected WIDOKI record has dword 7 = 1, and `ModPos != plum` | Full `white`, one retrace-scale palette interval | The normal world palette is restored by the surrounding swiatynia city (P2) palette path; negate `bolek` |
+| swiatynia city (P2) water | `CODE/P2/P2.AS^`, `wodda`; `CODE/P2/WATER/WATER` | Water transition after the swiatynia city (P2) main loop passes `ModPos > 0730h`; WATER's final transition is gated at `073Fh` | Full `white` over the saved pre-water picture, one retrace | Restore `_pal`; enter the Main2 water scene |
+| tunel + wygibasy (P3) | `CODE/P3/P3.ASM`, `flesze` | `0D19h < ModPos <= 0D3Eh`, low-six-bit table entry is flagged and its second dword is zero | Full `white`, one retrace | Restore the full `pal` and the final 16 entries from `tunel_pal` |
+| processorek Nevosolek (P4) | `CODE/P4/P4.ASM`, `brum`; `tablica` | After `ModPos >= 1338h`, flagged low-six-bit indices 58, 59, 60, or 62 | Full `white` for two retrace intervals | Restore `pic_pal`; each table entry is latched so it fires once |
+| torus ustep village (P5) | `CODE/P5/P5.AS^`, scene-3/scene-4 `intro_fade` | Every iteration of the scene-3 and scene-4 loops | Current palette brightened toward white by the low byte of `ModPos`; one bright-palette interval | Restore `_pal`; source performs three restore `pal_set` calls, so two additional unchanged retrace waits remain after the visible bright interval |
+| gratki (P6) | `CODE/P6/P6.AS^`, `Keye` | Part start, not a discrete flash | Set full `white`, then fade toward loaded `_pal` with `znika = 1..63`, once per frame | Gradual palette transition; deliberately not routed through the flash primitive |
+| gratki + woda (P7) | `CODE/P7/P7.AS^`, `FFirst` and phase setup blocks | Initial phase, then first frame after `1D1Fh`, `1D3Fh`, `1E1Fh`, `1E3Fh`, `1F1Fh`, and `1F3Fh` | Full `white`, one retrace | Restore newly mixed `_paleta`; load the next pulse/palette assets |
+| nad czerwonym lampa (P8) | `CODE/P8/P8.ASM`, `brum`; `tablica` | `2630h <= ModPos < 2700h`, flagged low-six-bit entry whose latch is not set | `bialy` full-white palette, one retrace | Restore mutable `white`; set the table latch to 1 |
 
-### P1 brighten window
+### oko + szklo (P1) brighten window
 
-P1 first copies the rendered image to the displayed VGA target. In the
+oko + szklo (P1) first copies the rendered image to the displayed VGA target. In the
 `0300h..0400h` window it calls `pal_fadein10` toward the all-white palette,
 using `BL = ModPos & 63`, then writes `pal`. This is a repeated per-loop
 brightening event, not a one-time state transition. The low row value controls
 intensity: 0 has no visible brightening and 63 moves every component to full
 brightness, subject to the source clamp.
 
-### P2 `lampa` and WIDOKI camera flashes
+### swiatynia city (P2) `lampa` and WIDOKI camera flashes
 
-P2 has two camera-transition mechanisms:
+swiatynia city (P2) has two camera-transition mechanisms:
 
 1. In `ruchamy`, once the trasa position passes `0500h`, the byte `lampa`
    guards one `white -> _pal` flash. This is the explicit `lampa` event.
@@ -124,17 +124,17 @@ P2 has two camera-transition mechanisms:
    prevents retriggering while the audio position is held on the same row.
 
 The WIDOKI source calls `pal_set white` at the camera cut and flips `bolek`.
-The surrounding P2 loop later restores `_pal`. The port carries the seventh
-dword through a dedicated `vk_p2_camera_flash_flag` global because the public
+The surrounding swiatynia city (P2) loop later restores `_pal`. The port carries the seventh
+dword through a dedicated `vk_swiatynia_city_camera_flash_flag` global because the public
 camera output remains the original six-dword `{x,y,z,ax,ay,az}` structure.
 
-P2's water transition is special because the source intentionally flashes the
+swiatynia city (P2)'s water transition is special because the source intentionally flashes the
 saved pre-water picture. The source copies `stary` back to VGA memory while
 the palette is white. The port therefore copies `stary` to
 `framebuffer_off`—the presented framebuffer—not merely to the offscreen render
 buffer before invoking the flash primitive.
 
-### P3 `flesze` table
+### tunel + wygibasy (P3) `flesze` table
 
 `flesze` is 64 pairs of dwords `{flash, latch}`. The first dword is 1 at:
 
@@ -153,31 +153,31 @@ the active range. The port preserves this unusual repeated-flash behavior.
 The source restores the first 256 palette entries from `pal` and the final 16
 entries from `tunel_pal`. The port's `pal_flash_current` restores the complete
 current 768-byte palette, which is equivalent when the current palette has
-been maintained by the normal P3 `set_pal` calls.
+been maintained by the normal tunel + wygibasy (P3) `set_pal` calls.
 
-### P4 and P8 latched tables
+### processorek Nevosolek (P4) and nad czerwonym lampa (P8) latched tables
 
-P4's table is:
+processorek Nevosolek (P4)'s table is:
 
 ```text
 64-6 pairs of {0,0}, then:
 {1,0}, {1,0}, {1,0}, {0,0}, {1,0}, {0,0}
 ```
 
-Therefore the flagged indices are 58, 59, 60, and 62. P4 sets the second
+Therefore the flagged indices are 58, 59, 60, and 62. processorek Nevosolek (P4) sets the second
 dword to 1 after firing. It calls `pal_set white` twice and then
 `pal_set pic_pal`, giving two white retrace intervals.
 
-P8's last 15 table pairs, at indices 49..63, are:
+nad czerwonym lampa (P8)'s last 15 table pairs, at indices 49..63, are:
 
 ```text
 49:1  50:0  51:1  52:1  53:1  54:0  55:1  56:1
 57:1  58:0  59:1  60:1  61:1  62:0  63:1
 ```
 
-P8 calls `brum` after `ModPos >= 2630h`; it tests the flag and latch, sets the
+nad czerwonym lampa (P8) calls `brum` after `ModPos >= 2630h`; it tests the flag and latch, sets the
 latch to 1, then calls `pal_set bialy` followed by `pal_set white`. `bialy`
-is the dedicated all-63 palette. P8's `white` buffer is mutable and is also
+is the dedicated all-63 palette. nad czerwonym lampa (P8)'s `white` buffer is mutable and is also
 used by `fade`, `lopa`, and `hopla`, so confusing `bialy` and `white` loses
 the true-white flash or restores the wrong fade state.
 
@@ -232,7 +232,7 @@ vk_present_frame()
 
 The indexed data in `framebuffer_off` is unchanged. Both palette states are
 explicitly presented over that same indexed image. `EBX = 1` models one white
-retrace interval; P4 uses `EBX = 2` for its two-white-write sequence.
+retrace interval; processorek Nevosolek (P4) uses `EBX = 2` for its two-white-write sequence.
 
 `pal_flash_current` first calls `vk_get_palette` into a 768-byte local save
 buffer, then uses `pal_flash`. It is used where the source restores a palette
@@ -246,15 +246,15 @@ palette with:
 bright[i] = min(63, current[i] + delta)
 ```
 
-and flashes that palette before restoring the saved state. P1 passes
-`delta = ModPos & 63`; P5 passes `delta = low_byte(ModPos)` as the original
-`intro_fade` does. The P5 caller then performs two additional `v_sync` calls
+and flashes that palette before restoring the saved state. oko + szklo (P1) passes
+`delta = ModPos & 63`; torus ustep village (P5) passes `delta = low_byte(ModPos)` as the original
+`intro_fade` does. The torus ustep village (P5) caller then performs two additional `v_sync` calls
 to preserve the source's three unchanged restore `pal_set` waits.
 
 The primitives call the platform bridge directly rather than `pal_set`, since
 the latter does not present. Their prologues also preserve the Windows x64
 ABI rule that every NASM-to-C++ call has `RSP % 16 == 0`; this matters in
-particular for P8's one-register `brum` helper.
+particular for nad czerwonym lampa (P8)'s one-register `brum` helper.
 
 ### D3D11 palette conversion
 
@@ -286,27 +286,27 @@ would reduce the effective rate and change scene/audio timing.
 |---|---|---|
 | `CODE/INC/PAL`, `pal_set`/DAC write | `port/core/inc/pal.inc:pal_set` | Uploads the 768-byte raw palette without presenting; normal palette behavior |
 | `CODE/INC/PAL`, retrace sequencing | `port/core/inc/pal.inc:pal_flash` | Explicit flash present, EOS retrace hold, restore present |
-| P1 `pal_fadein10` toward `white` then `pal` | `port/core/parts/p1.asm` | `pal_flash_brighten`, one retrace, restore current `pal` |
-| P2 WIDOKI seventh dword | `port/core/engine/p2path.asm` | Six camera dwords still go to `p2_cam_out`; dword seven goes to `vk_p2_camera_flash_flag` |
-| P2 WIDOKI camera flash | `port/core/parts/p2.asm` | `pal_flash_current`, then `bolek` negation and `plum` guard |
-| P2 `lampa` | `port/core/parts/p2.asm` | `pal_flash(white, _pal, 1)` under the original `lampa` one-shot condition |
-| P2 water `stary` transition | `port/core/parts/p2.asm` | Copy `stary` to `framebuffer_off`, then `pal_flash(white, _pal, 1)` |
-| P3 `flesze` | `port/core/parts/p3.asm` | Exact static 64-pair mask and source's zero-write behavior; `pal_flash_current` |
-| P4 `brum`/`tablica` | `port/core/parts/p4.asm` | `pal_flash(white, pic_pal, 2)` after the source table/latch tests |
-| P5 scene-3/4 `intro_fade` | `port/core/parts/p5.asm:intro_fade` | `pal_flash_brighten` plus two restore-only `v_sync` calls |
-| P7 phase setup | `port/core/parts/p7.asm:PHASE_BODY` and phase 7 | `pal_flash(white, _paleta, 1)` at each source phase setup |
-| P8 `brum`/`tablica` | `port/core/parts/p8_more.asm:brum` | `pal_flash(bialy, white, 1)` after the one-shot latch test |
+| oko + szklo (P1) `pal_fadein10` toward `white` then `pal` | `port/core/parts/p1.asm` | `pal_flash_brighten`, one retrace, restore current `pal` |
+| swiatynia city (P2) WIDOKI seventh dword | `port/core/engine/p2path.asm` | Six camera dwords still go to `p2_cam_out`; dword seven goes to `vk_swiatynia_city_camera_flash_flag` |
+| swiatynia city (P2) WIDOKI camera flash | `port/core/parts/p2.asm` | `pal_flash_current`, then `bolek` negation and `plum` guard |
+| swiatynia city (P2) `lampa` | `port/core/parts/p2.asm` | `pal_flash(white, _pal, 1)` under the original `lampa` one-shot condition |
+| swiatynia city (P2) water `stary` transition | `port/core/parts/p2.asm` | Copy `stary` to `framebuffer_off`, then `pal_flash(white, _pal, 1)` |
+| tunel + wygibasy (P3) `flesze` | `port/core/parts/p3.asm` | Exact static 64-pair mask and source's zero-write behavior; `pal_flash_current` |
+| processorek Nevosolek (P4) `brum`/`tablica` | `port/core/parts/p4.asm` | `pal_flash(white, pic_pal, 2)` after the source table/latch tests |
+| torus ustep village (P5) scene-3/4 `intro_fade` | `port/core/parts/p5.asm:intro_fade` | `pal_flash_brighten` plus two restore-only `v_sync` calls |
+| gratki + woda (P7) phase setup | `port/core/parts/p7.asm:PHASE_BODY` and phase 7 | `pal_flash(white, _paleta, 1)` at each source phase setup |
+| nad czerwonym lampa (P8) `brum`/`tablica` | `port/core/parts/p8_more.asm:brum` | `pal_flash(bialy, white, 1)` after the one-shot latch test |
 
 The source palette names are not interchangeable:
 
-- P1 `pal` is the `rm_eye.pal` normal palette.
-- P2 `_pal` is the P2 world palette; the port reconstructs the source's
-  inline `jjdj` palette rather than using P5's similarly indexed asset.
-- P3 restores `pal` plus the `tunel_pal` tail.
-- P4 restores `pic_pal` for the outro picture.
-- P5 restores `_pal` after its brightening intervals.
-- P7 restores the newly mixed `_paleta` for each water phase.
-- P8 uses `bialy` for true white and mutable `white` for the normal/fade
+- oko + szklo (P1) `pal` is the `rm_eye.pal` normal palette.
+- swiatynia city (P2) `_pal` is the swiatynia city (P2) world palette; the port reconstructs the source's
+  inline `jjdj` palette rather than using torus ustep village (P5)'s similarly indexed asset.
+- tunel + wygibasy (P3) restores `pal` plus the `tunel_pal` tail.
+- processorek Nevosolek (P4) restores `pic_pal` for the outro picture.
+- torus ustep village (P5) restores `_pal` after its brightening intervals.
+- gratki + woda (P7) restores the newly mixed `_paleta` for each water phase.
+- nad czerwonym lampa (P8) uses `bialy` for true white and mutable `white` for the normal/fade
   palette.
 
 ## 6. Differences and intentional compromises
@@ -327,13 +327,13 @@ unknown trigger behavior:
    could remain white while the next frame was being drawn. The visual event,
    palette state, and soundtrack trigger are preserved; the exact sub-retrace
    choice of indexed frame is a consequence of the modern copy/present split.
-4. **P2 water is handled explicitly.** Because that source transition flashes
+4. **swiatynia city (P2) water is handled explicitly.** Because that source transition flashes
    `stary`, the port copies it to the presented framebuffer before flashing;
    copying only to `_screen` would show the wrong image.
-5. **P3 restores a complete palette.** The source restores two ranges. The
+5. **tunel + wygibasy (P3) restores a complete palette.** The source restores two ranges. The
    port's full current-palette restore is equivalent only if no unrelated
    palette mutation has been inserted between the source range updates and
-   the flash. Keep P3 palette ownership unchanged when modifying that part.
+   the flash. Keep tunel + wygibasy (P3) palette ownership unchanged when modifying that part.
 6. **Audio rate can shift wall-clock time.** The event conditions remain
    `ModPos`-based, but the original DOS module player and libxmp do not have
    identical elapsed-time behavior. Validate by order/row and phase-aligned
@@ -371,7 +371,7 @@ To locate a true-white flash, inspect the palette portion of each record for
 768 bytes equal to `3Fh`. A brightening flash has non-white values but usually
 has a higher per-channel maximum/mean than the surrounding normal palette.
 The record's framebuffer bytes should remain unchanged across a pure palette
-flash unless the caller intentionally copied a different frame, as P2 water
+flash unless the caller intentionally copied a different frame, as swiatynia city (P2) water
 does.
 
 Useful source/port checks when debugging a mismatch:
@@ -384,11 +384,11 @@ Useful source/port checks when debugging a mismatch:
 - confirm `pal_flash`'s retrace count matches the number of source `pal_set`
   calls that write the flash palette before the restore;
 - confirm the D3D11 point sampler and 6-bit-to-8-bit conversion remain intact;
-- preserve the P3 zero-write quirk and P8/P4 one-shot latches; do not replace
+- preserve the tunel + wygibasy (P3) zero-write quirk and P8/P4 one-shot latches; do not replace
   them with a generic edge detector.
 
 The source-of-truth files are the original `CODE/P1` through `CODE/P8` files,
-`CODE/INC/PAL`, and the included P2 `WIDOKI`/water tables. The modern effect
+`CODE/INC/PAL`, and the included swiatynia city (P2) `WIDOKI`/water tables. The modern effect
 implementation is concentrated in `port/core/inc/pal.inc` plus the part call
 sites listed above. `docs/KNOWN_DIFFERENCES.md` records the historical port
 bug where palette-only flashes were uploaded and immediately overwritten
@@ -399,12 +399,12 @@ before presentation; that issue is resolved by this design.
 The current implementation was validated on 2026-08-09 as follows:
 
 - `port/build.ps1 -Config Release -Test` completed with all 27 CTests passing.
-- Recorded P3, P7, and P8 runtime smoke paths exited successfully.
-- A bounded P2 recording progressed through the stadium/camera sequence and
-  reached the P2 water transition without a runtime crash.
-- The recorded P2 stream contained single-record full-white palette states;
-  P3 contained repeated white records at the flagged positions, consistent
-  with its source zero-write quirk; and P7 contained the initial white state
+- Recorded tunel + wygibasy (P3), gratki + woda (P7), and nad czerwonym lampa (P8) runtime smoke paths exited successfully.
+- A bounded swiatynia city (P2) recording progressed through the stadium/camera sequence and
+  reached the swiatynia city (P2) water transition without a runtime crash.
+- The recorded swiatynia city (P2) stream contained single-record full-white palette states;
+  tunel + wygibasy (P3) contained repeated white records at the flagged positions, consistent
+  with its source zero-write quirk; and gratki + woda (P7) contained the initial white state
   plus the six phase-boundary white states.
 
 The existing `reference/captures/` material contains useful original/port

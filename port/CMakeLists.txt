@@ -303,64 +303,67 @@ target_include_directories(vprep_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform"
 target_link_libraries(vprep_selftest PRIVATE vprep_core_objects)
 add_test(NAME vprep.crosscheck COMMAND vprep_selftest)
 
-# p2path_selftest: P2 camera-path data (TRASA!/WIDOKI) + selection logic. Parses
-# the reference text tables and cross-checks the NASM data byte-exact + the
-# vk_p2_camera selection over many ModPos / trasa_ruch samples.
-add_library(p2path_core_objects STATIC
+# swiatynia_city_path_selftest: swiatynia city camera-path data
+# (TRASA!/WIDOKI) + selection logic. Parses the reference text tables and
+# cross-checks the NASM data byte-exact + the canonical camera selection over
+# many ModPos / trasa_ruch samples.
+add_library(swiatynia_city_path_core_objects STATIC
     core/engine/p2path.asm
 )
-target_include_directories(p2path_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/data")
-add_executable(p2path_selftest tools/validate/p2path_selftest.cpp)
-target_compile_definitions(p2path_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_include_directories(p2path_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
-target_link_libraries(p2path_selftest PRIVATE p2path_core_objects)
-add_test(NAME p2path.crosscheck COMMAND p2path_selftest)
+target_include_directories(swiatynia_city_path_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/data")
+add_executable(swiatynia_city_path_selftest tools/validate/p2path_selftest.cpp)
+target_compile_definitions(swiatynia_city_path_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(swiatynia_city_path_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(swiatynia_city_path_selftest PRIVATE swiatynia_city_path_core_objects)
+add_test(NAME swiatynia_city.path.crosscheck COMMAND swiatynia_city_path_selftest)
 
-# p2world_selftest: P2 World domain (INC/WORLD data + camera globals).
+# swiatynia_city_world_selftest: swiatynia city World domain
+# (INC/WORLD data + camera globals).
 # Cross-checks the World data byte-exact and drives records through unit-8
 # CalculateVisiblating against a reference (integration).
-add_library(p2world_core_objects STATIC
+add_library(swiatynia_city_world_core_objects STATIC
     core/engine/p2world.asm
     core/engine/vvis.asm
     core/engine/cammat.asm
     core/inc/sin_tables.asm
 )
-add_dependencies(p2world_core_objects voodka_sin)
-target_include_directories(p2world_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/data" "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
-add_executable(p2world_selftest tools/validate/p2world_selftest.cpp)
-target_compile_definitions(p2world_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_include_directories(p2world_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
-target_link_libraries(p2world_selftest PRIVATE p2world_core_objects)
-add_test(NAME p2world.crosscheck COMMAND p2world_selftest)
+add_dependencies(swiatynia_city_world_core_objects voodka_sin)
+target_include_directories(swiatynia_city_world_core_objects PRIVATE "${CMAKE_SOURCE_DIR}/core/data" "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_executable(swiatynia_city_world_selftest tools/validate/p2world_selftest.cpp)
+target_compile_definitions(swiatynia_city_world_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(swiatynia_city_world_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(swiatynia_city_world_selftest PRIVATE swiatynia_city_world_core_objects)
+add_test(NAME swiatynia_city.world.crosscheck COMMAND swiatynia_city_world_selftest)
 
-# p2draw_selftest: P2 object rasterizer (p2draw.asm DrawObject /
+# vr_object_draw_selftest: shared VR object rasterizer (p2draw.asm DrawObject /
 # DrawZielonyLudek, the per-object face walk + cull + texel math). Drives
 # vk_draw_object_trace over synthetic TEXTURE/PHONG objects and cross-checks
 # every record {drawn,x1..y3,p1..p3} against a C++ reference.
-add_library(p2draw_core_objects STATIC
+add_library(vr_object_draw_core_objects STATIC
     core/engine/p2draw.asm
     core/engine/p2draw_selftest.asm
     core/engine/txtr.asm
     core/engine/v2d.asm
     core/engine/persp.asm
 )
-target_include_directories(p2draw_core_objects PRIVATE
+target_include_directories(vr_object_draw_core_objects PRIVATE
     "${CMAKE_SOURCE_DIR}/core/eos_replace"
     "${CMAKE_SOURCE_DIR}/core/inc"
 )
-add_executable(p2draw_selftest tools/validate/p2draw_selftest.cpp)
-target_compile_definitions(p2draw_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_include_directories(p2draw_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
-target_link_libraries(p2draw_selftest PRIVATE p2draw_core_objects)
-add_test(NAME p2draw.crosscheck COMMAND p2draw_selftest)
+add_executable(vr_object_draw_selftest tools/validate/p2draw_selftest.cpp)
+target_compile_definitions(vr_object_draw_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(vr_object_draw_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(vr_object_draw_selftest PRIVATE vr_object_draw_core_objects)
+add_test(NAME vr_object_draw.crosscheck COMMAND vr_object_draw_selftest)
 
-# p2loop_selftest: P2 per-frame render loop (p2loop.asm vk_p2_render_frame =
+# vr_world_loop_selftest: shared VR-world render loop (p2loop.asm
+# vk_vr_world_render_frame =
 # CalculateVisiblating -> VirSort -> WorldKol walk -> prepare/draw dispatch).
 # Drives the loop in TRACE mode over synthetic World records + synthetic
 # object/type tables and cross-checks the emitted {drawn,idx,obj#} stream.
 # (Real-render path links the full prepare/draw dependency set even though the
 # CTest exercises only the trace branch.)
-add_library(p2loop_core_objects STATIC
+add_library(vr_world_loop_core_objects STATIC
     core/engine/p2loop.asm
     core/engine/vvis.asm
     core/engine/cammat.asm
@@ -374,16 +377,16 @@ add_library(p2loop_core_objects STATIC
     core/engine/v2d.asm
     core/engine/persp.asm
 )
-add_dependencies(p2loop_core_objects voodka_sin)
-target_include_directories(p2loop_core_objects PRIVATE
+add_dependencies(vr_world_loop_core_objects voodka_sin)
+target_include_directories(vr_world_loop_core_objects PRIVATE
     "${CMAKE_SOURCE_DIR}/core/eos_replace"
     "${CMAKE_SOURCE_DIR}/core/inc"
 )
-add_executable(p2loop_selftest tools/validate/p2loop_selftest.cpp)
-target_compile_definitions(p2loop_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_include_directories(p2loop_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
-target_link_libraries(p2loop_selftest PRIVATE p2loop_core_objects)
-add_test(NAME p2loop.crosscheck COMMAND p2loop_selftest)
+add_executable(vr_world_loop_selftest tools/validate/p2loop_selftest.cpp)
+target_compile_definitions(vr_world_loop_selftest PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(vr_world_loop_selftest PRIVATE "${CMAKE_SOURCE_DIR}/platform")
+target_link_libraries(vr_world_loop_selftest PRIVATE vr_world_loop_core_objects)
+add_test(NAME vr_world_loop.crosscheck COMMAND vr_world_loop_selftest)
 
 
 # ---- golden test: packed archive must match release EXE archive exactly -----
@@ -414,8 +417,8 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME pal.repro
              COMMAND "${Python3_EXECUTABLE}"
                      "${CMAKE_SOURCE_DIR}/tools/validate/pal_repro_check.py")
-    # P2 world-palette provenance: jjdj.pal == original CODE/P2/WORLD.P!
-    # (guards the P2 palette fix: P2 must install jjdj, not vodka-37 2WORLD.PAL)
+    # swiatynia city (P2) world-palette provenance: jjdj.pal == original CODE/P2/WORLD.P!
+    # (guards the swiatynia city (P2) palette fix: swiatynia city (P2) must install jjdj, not vodka-37 2WORLD.PAL)
     add_test(NAME jjdj.repro
              COMMAND "${Python3_EXECUTABLE}"
                      "${CMAKE_SOURCE_DIR}/tools/validate/pal_jjdj_check.py")
@@ -632,11 +635,13 @@ target_link_libraries(win32_music_path_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.music_path COMMAND win32_music_path_probe)
 set_tests_properties(win32.music_path PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.2 witness: exercise NASM seek precedence, part-start table,
+# Phase 3B.6.7B.2 witness: exercise NASM seek precedence, scene-start table,
 # self-test loop, audio-check default, and demo result propagation with C ABI
 # service stubs; no window, GPU, or audio device is required.
 add_executable(win32_app_modes_probe
     tools/validate/win32_app_modes_probe.cpp)
+target_include_directories(win32_app_modes_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/platform")
 target_compile_definitions(win32_app_modes_probe PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(win32_app_modes_probe PRIVATE voodka_core kernel32)
@@ -680,16 +685,17 @@ target_link_libraries(win32_platform_abi_probe PRIVATE kernel32)
 add_test(NAME win32.platform_abi COMMAND win32_platform_abi_probe)
 set_tests_properties(win32.platform_abi PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.6 witness: compare the production NASM P4 scan converter
+# Phase 3B.6.7B.6 witness: compare the production NASM processorek Nevosolek
+# scan converter
 # against the C++ reference algorithm on deterministic triangle cases.
-add_executable(p4_raster_probe
+add_executable(processorek_nevosolek_raster_probe
     tools/validate/p4_raster_probe.cpp
     platform/p4_raster.asm)
-target_compile_definitions(p4_raster_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
-target_include_directories(p4_raster_probe PRIVATE
+target_compile_definitions(processorek_nevosolek_raster_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(processorek_nevosolek_raster_probe PRIVATE
     platform "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
-add_test(NAME p4.raster COMMAND p4_raster_probe)
-set_tests_properties(p4.raster PROPERTIES TIMEOUT 10)
+add_test(NAME processorek_nevosolek.raster COMMAND processorek_nevosolek_raster_probe)
+set_tests_properties(processorek_nevosolek.raster PROPERTIES TIMEOUT 10)
 
 # Phase 3B.6.7B.7 witness: validate the production NASM D3D11 service ABI,
 # palette/frame recording, readback diagnostics, and lifecycle state.
@@ -850,17 +856,17 @@ add_test(NAME audio.live_wasapi_stress
 add_test(NAME audio.live_wasapi_longrun
          COMMAND audio_live_wasapi_probe
                  "${VOODKA_REPO_ROOT}/music/amnezja2.mod" --longrun)
-add_test(NAME audio.assembly_demo_p1
-         COMMAND VOODKA --part 1)
-set_tests_properties(audio.assembly_demo_p1 PROPERTIES TIMEOUT 90)
+add_test(NAME audio.assembly_demo_oko_szklo
+         COMMAND VOODKA --scene oko-szklo)
+set_tests_properties(audio.assembly_demo_oko_szklo PROPERTIES TIMEOUT 90)
 add_test(NAME audio.assembly_demo_pause
-         COMMAND VOODKA --part 1 --auto-pause-ms 1000)
+         COMMAND VOODKA --scene oko-szklo --auto-pause-ms 1000)
 set_tests_properties(audio.assembly_demo_pause PROPERTIES TIMEOUT 90)
 add_test(NAME audio.assembly_demo_close
-         COMMAND VOODKA --part 1 --auto-close-ms 2000)
+         COMMAND VOODKA --scene oko-szklo --auto-close-ms 2000)
 set_tests_properties(audio.assembly_demo_close PROPERTIES TIMEOUT 30)
 add_test(NAME audio.assembly_audio_fail_device
-         COMMAND VOODKA --part 1)
+         COMMAND VOODKA --scene oko-szklo)
 set_tests_properties(audio.assembly_audio_fail_device PROPERTIES
     TIMEOUT 30
     WILL_FAIL TRUE
@@ -868,11 +874,11 @@ set_tests_properties(audio.assembly_audio_fail_device PROPERTIES
     PASS_REGULAR_EXPRESSION "forced device failure injection;assembly audio initialization failed")
 
 add_test(NAME audio.reference_demo_close
-         COMMAND VOODKA_REFERENCE --libxmp-audio --part 1 --auto-close-ms 2000)
+         COMMAND VOODKA_REFERENCE --libxmp-audio --scene oko-szklo --auto-close-ms 2000)
 set_tests_properties(audio.reference_demo_close PROPERTIES TIMEOUT 30)
 
 add_test(NAME audio.production_reference_rejected
-         COMMAND VOODKA --libxmp-audio --part 1)
+         COMMAND VOODKA --libxmp-audio --scene oko-szklo)
 set_tests_properties(audio.production_reference_rejected PROPERTIES
     TIMEOUT 30
     WILL_FAIL TRUE

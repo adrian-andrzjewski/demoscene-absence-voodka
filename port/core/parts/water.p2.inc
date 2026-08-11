@@ -1,11 +1,11 @@
-; water.p2.inc - NASM x64 port of CODE/P2/WATER/WATER.PM (the P2 stadium's
+; water.p2.inc - NASM x64 port of CODE/P2/WATER/WATER.PM (the swiatynia city (P2) stadium's
 ; reflective-floor water: 320x200 16-bit ripple field, drawn as a 1:1 320x80
 ; strip at screen rows 61..140, sampling absence.dat).
 ;
-; This is a DIFFERENT engine from the P7 water (inc/water.inc, 160x100 field
-; 2x2-upscaled to full screen) and the P5 water (water.p5.inc, 128x128 field
+; This is a DIFFERENT engine from the gratki + woda (P7) water (inc/water.inc, 160x100 field
+; 2x2-upscaled to full screen) and the torus ustep village (P5) water (water.p5.inc, 128x128 field
 ; into the 256x256 waterWorld texture). An earlier revision of the port reused
-; the P7 engine here; this file restores the original P2 behavior.
+; the gratki + woda (P7) engine here; this file restores the original swiatynia city (P2) behavior.
 ;
 ; Translation notes:
 ;   - Self-modifying immediates (WaterX/WaterY at `add bx/dx,0101h`, innerWater
@@ -20,8 +20,8 @@
 ;   - The final picture offset is a 16-bit wrapped value (0..65535), exactly
 ;     like the original; _obrazek2+19200+65535 stays inside the 64MB arena.
 
-%ifndef WATER_P2_INC
-%define WATER_P2_INC
+%ifndef WATER_SWIATYNIA_CITY_INC
+%define WATER_SWIATYNIA_CITY_INC
 
 %include "eos.inc"
 
@@ -33,14 +33,14 @@ extern nPage
 extern _obrazek2                  ; absence.dat arena offset (defined in p2.asm)
 
 section .bss
-p2_water_x:  resw 1
-p2_water_y:  resw 1
-p2_inner:    resb 1
+swiatynia_city_water_x:  resw 1
+swiatynia_city_water_y:  resw 1
+swiatynia_city_inner:    resb 1
 
 section .data align=16
 ; MUL160 LABEL WORD / REPT 200 dw uuu (uuu += 320) - note the original's name
 ; lies: the stride is 320 (the 320-wide absence.dat rows), not 160.
-P2MUL160:
+SWIATYNIA_CITY_MUL160:
         %assign uu 0
         %rep 200
         dw uu
@@ -49,11 +49,11 @@ P2MUL160:
 
 section .text
 
-; ----------------------------------------------------- calculateWaterP2 ----
+; ----------------------------------------------------- calculateWaterSwiatyniaCity ----
 ; 320x200 16-bit page ripple over the interior 318 cols x 80 rows starting at
 ; word 321. edi = write page, esi = read page (nPage parity), then swapped
 ; roles as in the original (edi is the accumulator source, [esi] the target).
-calculateWaterP2:
+calculateWaterSwiatyniaCity:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -113,7 +113,7 @@ calculateWaterP2:
         pop     rbp
         ret
 
-; --------------------------------------------------------- drawWaterP2 -----
+; --------------------------------------------------------- drawWaterSwiatyniaCity -----
 ; r13 = _obrazek2 + 60*320 (absence.dat sampled from its row 60),
 ; rdi = _screen + 60*320. 80 rows x 320 cols, one pixel per field cell written
 ; at [rdi+320] (-> screen rows 61..140).
@@ -123,7 +123,7 @@ calculateWaterP2:
 ;   sample = pic[clamp(row,0,199)*320 + col]  with row=(vgrad>>3)+water_y,
 ;     col=(hgrad>>3)+water_x, final offset wrapped to 16 bits
 ;   out = (sample * bright) >> 8
-drawWaterP2:
+drawWaterSwiatyniaCity:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -151,11 +151,11 @@ drawWaterP2:
 .drw:
         add     rsi, qword [rel Code32_addr]
 
-        mov     word [rel p2_water_y], 0
+        mov     word [rel swiatynia_city_water_y], 0
         mov     r14d, 80                  ; original: ecx = -80 shl 16 sign loop
 .dloop0:
         mov     ecx, 320                  ; original: cx column counter
-        mov     word [rel p2_water_x], 0
+        mov     word [rel swiatynia_city_water_x], 0
 .dloop1:
         movzx   eax, word [rsi]           ; h[i]
         mov     edx, eax
@@ -164,15 +164,15 @@ drawWaterP2:
         movzx   r10d, word [rsi + 2]
         sub     dx, r10w                  ; dx = hgrad (16-bit wrap)
 
-        ; p2_inner = (128 - vgrad) & 0xff
+        ; swiatynia_city_inner = (128 - vgrad) & 0xff
         mov     ebx, 128
         sub     bx, ax
-        mov     [rel p2_inner], bl
+        mov     [rel swiatynia_city_inner], bl
 
         ; row = (vgrad>>3) + water_y, clamped to [0,199] (see header note)
         movsx   eax, ax
         sar     eax, 3
-        movzx   r10d, word [rel p2_water_y]
+        movzx   r10d, word [rel swiatynia_city_water_y]
         add     eax, r10d
         test    eax, eax
         jns     .row_nn
@@ -182,29 +182,29 @@ drawWaterP2:
         jle     .row_ok
         mov     eax, 199
 .row_ok:
-        lea     r10, [rel P2MUL160]
+        lea     r10, [rel SWIATYNIA_CITY_MUL160]
         movzx   eax, word [r10 + rax*2]   ; row * 320
 
         ; col = (hgrad>>3) + water_x; 16-bit wrap of the final picture offset
         movsx   edx, dx
         sar     edx, 3
-        movzx   r10d, word [rel p2_water_x]
+        movzx   r10d, word [rel swiatynia_city_water_x]
         add     edx, r10d
         add     eax, edx
         and     eax, 0xffff
         movzx   eax, byte [r13 + rax]     ; al = picture sample
 
-        movzx   ebx, byte [rel p2_inner]
+        movzx   ebx, byte [rel swiatynia_city_inner]
         mul     bl                        ; ax = al * bl (unsigned, like mul ah)
         mov     [rdi + 320], ah           ; (sample*bright) >> 8
 
         inc     rdi
         add     rsi, 2
-        inc     word [rel p2_water_x]
+        inc     word [rel swiatynia_city_water_x]
         dec     ecx
         jnz     .dloop1
 
-        inc     word [rel p2_water_y]
+        inc     word [rel swiatynia_city_water_y]
         dec     r14d
         jnz     .dloop0
 
@@ -218,4 +218,4 @@ drawWaterP2:
         pop     rbp
         ret
 
-%endif ; WATER_P2_INC
+%endif ; WATER_SWIATYNIA_CITY_INC

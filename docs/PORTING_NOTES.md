@@ -46,8 +46,8 @@ paths, water/bump data, MOD, presentation conversion) see
   like the original's EOS usage pattern (parts allocate, nobody frees mid-part).
 - **There is NO module `.data`/`.bss` capacity limit.** Combined module data
   is ~40 KB and rip-relative `[rel X]` reaches any image offset. The early
-  "arena migration" belief was a misdiagnosis - see the P4 case study below.
-  (P4 itself was removed from the port on 2026-08-06 and restored the same
+  "arena migration" belief was a misdiagnosis - see the processorek Nevosolek (P4) case study below.
+  (processorek Nevosolek (P4) itself was removed from the port on 2026-08-06 and restored the same
   day; the case studies are kept because the ABI/register lessons
   generalize.)
 
@@ -79,7 +79,7 @@ never in the repo). The port reimplements the used services:
 - `wait_vbl` = QPC-paced ~70 Hz retrace emulation (`timer.cpp`), sleep+spin.
 - Audio services (`Load_module`/`Play_module`/`Stop_module`...) are
   deliberate no-ops in the dispatcher: the module is loaded and auto-started
-  by the platform (`audio.cpp`) before `DemoStart32` runs. Only P8's final
+  by the platform (`audio.cpp`) before `DemoStart32` runs. Only nad czerwonym lampa (P8)'s final
   `EOS_STOP_MODULE` reaches the platform.
 - Keyboard: EOS hooked int 09 and exposed a scancode `Key_Map`; the port
   fills the same table from Win32 messages (`input.cpp` maps virtual keys ->
@@ -91,18 +91,18 @@ The original allocates *selectors* for texture data and reads them via
 `fs:[...]`. User-mode x64 forbids arbitrary fs/gs bases, so
 `sel_base_table[512]` in `bridge.cpp` maps `Allocate_Selector` handles to
 base pointers; the texture mappers read the base up front
-(`engine/txtr.asm`, P8's dual mapper).
+(`engine/txtr.asm`, nad czerwonym lampa (P8)'s dual mapper).
 
 ## Self-modifying code -> explicit state
 
 The original patches instruction immediates, which is read-only under DEP.
 These are ported as memory variables with identical arithmetic:
 
-- P6 bump map: `BUMPXXX`/`BUMPYYY` -> `bump_x`/`bump_y` (`parts/p6.asm`)
-- P7 water: `WaterX`/`WaterY`, `innerWater` patch sites (`core/inc/water.inc`);
-  same treatment for the P2 water (`parts/water.p2.inc`, DESTINY=6) and the
-  P5 water (`parts/water.p5.inc`, DESTINY=6, 16-bit index wrap)
-- P8: `DESTINY` immediate
+- gratki (P6) bump map: `BUMPXXX`/`BUMPYYY` -> `bump_x`/`bump_y` (`parts/p6.asm`)
+- gratki + woda (P7) water: `WaterX`/`WaterY`, `innerWater` patch sites (`core/inc/water.inc`);
+  same treatment for the swiatynia city (P2) water (`parts/water.p2.inc`, DESTINY=6) and the
+  torus ustep village (P5) water (`parts/water.p5.inc`, DESTINY=6, 16-bit index wrap)
+- nad czerwonym lampa (P8): `DESTINY` immediate
 - `cammat.asm`: VIRTUAL.INC SMC sites -> bss vars
 
 ## Register-collision case studies (why fidelity beats cleverness)
@@ -110,23 +110,23 @@ These are ported as memory variables with identical arithmetic:
 Two of the nastiest port bugs were *introduced* by "optimizing" the ported
 code. Both are fixed; keep the pattern in mind.
 
-1. **P4 `calc_pts` runaway loop.** The original used a memory-operand
+1. **processorek Nevosolek (P4) `calc_pts` runaway loop.** The original used a memory-operand
    `shape[ebp*2+ebp]` + `loop`, never touching `ecx`. The port rewrote it as
    `lea rcx,[rbp*2+rbp]`, clobbering the `ecx` loop counter; a garbage face
    count (~millions) walked `rsi` past the 64 MB arena. Fix: use a spare
    register (`r8`) for scratch so `ecx` stays the counter.
-2. **P4 `show()` texture selector.** The con3 face index was computed in
+2. **processorek Nevosolek (P4) `show()` texture selector.** The con3 face index was computed in
    `eax`, then `P4AR con3_a, rbx` - and the `P4AR` macro internally does
    `mov eax,[rel con3_a]`, clobbering the live index; the texture handle
    read garbage (mapQ -> 0, crash in `face()`). Fix: keep live values in a
    register the macro never touches (`r8`).
-3. **P8 frame-1 sort crash.** P8's `prepare`/`co_prepare` double con vertex
+3. **nad czerwonym lampa (P8) frame-1 sort crash.** nad czerwonym lampa (P8)'s `prepare`/`co_prepare` double con vertex
    indices into byte-space, so `rotate`'s `rcalc[idx*2]` writes overran
    module .bss into the engine's `addr_tab`. Fixed by moving rcalc/check to
    the arena, using the reference's byte*2 rcalc stride (the port had *4),
    and reading show()'s face vertex index from con (not rcalc).
 
-4. **P5 morph-frame chain (golden-torus flicker).** The original's `CalcRest`
+4. **torus ustep village (P5) morph-frame chain (golden-torus flicker).** The original's `CalcRest`
    restores `esi/edi`/`ebx` to the start of the just-read/written frame with a
    `push`/`pop` before its single `add 1536`; the port dropped the save/restore
    and instead added 1536 to `rsi`/`rdi` on top of the inner 128-vertex walk
@@ -183,7 +183,7 @@ pointer advancement.**
   space (`setPalette` masks `& 63`).
 - **Present rule (audit 2026-08-05):** anything that was directly visible in
   DOS - framebuffer writes *or* palette/DAC changes - needs an explicit
-  `vk_present_frame` to reach the window. The P8 outros (and P4's, before
+  `vk_present_frame` to reach the window. The nad czerwonym lampa (P8) outros (and processorek Nevosolek (P4)'s, before
   its removal) are VGA-memory writes + pal_set fades with no `Ekran` and
   were invisible until presents were added; when porting a new sequence,
   find every `rep movsd`/`pal_set` aimed at the visible screen and ensure a
@@ -202,7 +202,8 @@ pointer advancement.**
   14-channel FastTracker file ("<>Amnezja<>", 42 orders).
 - `ModPos = (order << 8) | row` is the demo's timeline currency; the parts
   poll it via EOS `Get_Info`. `audio.cpp` tracks it with loop handling and
-  supports seeks (`--modpos/--ms/--order/--part`). Scene-start constants
+  supports canonical scene seeks (`--scene`) plus historical numeric
+  `--part`, `--modpos`, `--ms`, and `--order`. Scene-start constants
   (`kPartStartModPos` in `app.cpp`) are calibration-tuned - see
   `docs/KNOWN_DIFFERENCES.md`.
 

@@ -1,8 +1,8 @@
-; p5_trasa.inc - P5 camera path (converted from TRASA.!)
+; torus_ustep_village_trasa.inc - torus ustep village (P5) camera path (converted from TRASA.!)
 ; 3876 records x 6 dwords (x,y,z,ax,ay,az) = 24B each
 ; (3859 = ruchow clamp constant from TRASA.!, not the record count)
-global p5_trasa
-p5_trasa:
+global torus_ustep_village_trasa
+torus_ustep_village_trasa:
 dd 1921,-5763,-30222,0,0,0
 dd 1921,-5764,-29908,0,0,2
 dd 1921,-5766,-29593,0,0,4

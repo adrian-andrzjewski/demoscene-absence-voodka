@@ -725,7 +725,7 @@ player in the real demo process, without changing the production audio path:
 The first synchronized slice passed on the Release build:
 
 ```text
-production P1 timeline                          1,814 frames, clean exit
+production oko + szklo (P1) timeline                          1,814 frames, clean exit
 production ModPos range                         0x0000 -> 0x0400
 production QPC/ModPos monotonicity              clean
 assembly basic live timeline                    64 samples, 0x0009 at ~1.0 s
@@ -762,19 +762,19 @@ without changing the default libxmp path:
 - `VOODKA.exe --asm-audio` selects this service. The normal executable still
   selects C++/libxmp unless the flag is present, so the oracle remains
   available for every comparison.
-- CTest `audio.assembly_demo_p1` exercises the real demo entry path with
-  assembly audio and a complete P1/P2 boundary teardown.
+- CTest `audio.assembly_demo_oko_szklo` exercises the real demo entry path with
+  assembly audio and a complete oko + szklo/swiatynia city (P1/P2) boundary teardown.
 
 The Release integration evidence is:
 
 ```text
-assembly P1 entry                             exit 0, 1,160,271 device frames
-assembly P5 entry                             exit 0, 2,249,100 device frames
-assembly full P1-P8                            exit 0, 252.3 s
+assembly oko + szklo (P1) entry                             exit 0, 1,160,271 device frames
+assembly torus ustep village (P5) entry                             exit 0, 2,249,100 device frames
+assembly full eight-scene run                             exit 0, 252.3 s
 assembly full timeline                         17,584 frames, 12,820 markers
 assembly full underruns                         0
-assembly full scene sequence                    P1, P2, P3, P5, P6, P7, P8
-libxmp full P1-P8                               exit 0, 252.2 s
+assembly full scene sequence                    oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
+libxmp full eight-scene run                                exit 0, 252.2 s
 libxmp full timeline                            17,582 frames
 scene-boundary timing delta                     <= 0.3 s in the sampled run
 ```
@@ -812,8 +812,8 @@ The Phase 2S evidence is:
 
 ```text
 assembly forced device failure                 passed; clean init failure and teardown
-assembly pause/resume P1                       exit 0; PAUSED -> RESUMED; underruns 0
-assembly window close during P1                 exit 0; device frames 106,281; underruns 0
+assembly pause/resume oko + szklo (P1)                       exit 0; PAUSED -> RESUMED; underruns 0
+assembly window close during oko + szklo (P1)                 exit 0; device frames 106,281; underruns 0
 filtered Phase 2S CTest gates                  3/3 passed; 29.90 s
 ```
 
@@ -845,10 +845,10 @@ The Release evidence after the producer extraction is:
 
 ```text
 assembly audio self-check 3 s                 exit 0; 150,822 device frames; underruns 0
-assembly P1/P2 boundary                       exit 0; 1,154,097 device frames; underruns 0
-assembly P5 seek/run                           exit 0; ModPos 0x1400 -> P5; underruns 0
-assembly full P1-P8                            exit 0; 252.2 s; final ModPos 0x2803
-assembly full scene sequence                   P1, P2, P3, P5, P6, P7, P8
+assembly oko + szklo/swiatynia city (P1/P2) boundary            exit 0; 1,154,097 device frames; underruns 0
+assembly torus ustep village (P5) seek/run                           exit 0; ModPos 0x1400 -> torus ustep village (P5); underruns 0
+assembly full eight-scene run                             exit 0; 252.2 s; final ModPos 0x2803
+assembly full scene sequence                   oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
 assembly full device stream                    11,079,684 frames; underruns 0; 12,820 markers
 full Release CTest suite                       51/51 passed; 105.83 s
 ```
@@ -873,8 +873,8 @@ The Phase 2U validation is:
 ```text
 focused lifecycle/integration CTest               4/4 passed; 56.24 s
 full Release CTest suite                          51/51 passed; 102.37 s
-full P1-P8 playback                               exit 0; 252.3 s
-full scene sequence                               P1, P2, P3, P5, P6, P7, P8
+full eight-scene playback                                  exit 0; 252.3 s
+full scene sequence                               oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
 full device stream                                11,079,243 frames; underruns 0; 12,820 markers
 full final ModPos                                 0x2803
 ```
@@ -909,8 +909,8 @@ The Phase 2V validation is:
 ```text
 focused lifecycle/integration CTest               4/4 passed; 56.17 s
 full Release CTest suite                          51/51 passed; 106.49 s
-full P1-P8 playback                               exit 0; 252.1 s
-full scene sequence                               P1, P2, P3, P5, P6, P7, P8
+full eight-scene playback                                  exit 0; 252.1 s
+full scene sequence                               oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
 full device stream                                11,079,243 frames; underruns 0; 12,820 markers
 full final ModPos                                 0x2803
 timeline rows                                     17,592 rendered frames
@@ -939,8 +939,8 @@ down cleanly. The Phase 2W validation is:
 ```text
 focused default/reference lifecycle CTest          5/5 passed; 58.49 s
 full Release CTest suite                            52/52 passed; 103.85 s
-full P1-P8 playback (no audio flag)                 exit 0; 252.1 s
-full scene sequence                                 P1, P2, P3, P5, P6, P7, P8
+full eight-scene playback (no audio flag)                    exit 0; 252.1 s
+full scene sequence                                 oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
 full device stream                                  11,079,243 frames; underruns 0; 12,820 markers
 full final ModPos                                   0x2803
 timeline rows                                       17,592 rendered frames
@@ -974,8 +974,8 @@ The Phase 2X validation is:
 focused production/reference boundary CTests       3/3 passed; 4.93 s
 full Release CTest suite                            53/53 passed; 103.92 s
 production import/symbol audit                     no xmp/libxmp imports or symbols
-full P1-P8 playback (default production path)      exit 0; 252.1 s
-full scene sequence                                 P1, P2, P3, P5, P6, P7, P8
+full eight-scene playback (default production path)           exit 0; 252.1 s
+full scene sequence                                 oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
 full device stream                                  11,079,684 frames; underruns 0
 full marker stream                                  12,820 markers
 full final ModPos                                   0x2803

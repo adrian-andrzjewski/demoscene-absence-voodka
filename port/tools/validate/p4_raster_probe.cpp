@@ -1,4 +1,5 @@
-// p4_raster_probe.cpp - deterministic NASM-vs-C++ P4 rasterizer witness.
+// p4_raster_probe.cpp - deterministic NASM-vs-C++ processorek Nevosolek
+// rasterizer witness.
 
 #include <algorithm>
 #include <array>
@@ -8,7 +9,7 @@
 #include <cstdio>
 #include <cstring>
 
-struct P4DrawArgs {
+struct ProcessorekNevosolekDrawArgs {
     int32_t xy[6];
     uint32_t uv[3];
     const uint8_t* texture;
@@ -16,11 +17,11 @@ struct P4DrawArgs {
     uint32_t color;
 };
 
-static_assert(offsetof(P4DrawArgs, texture) == 40);
-static_assert(offsetof(P4DrawArgs, screen) == 48);
-static_assert(offsetof(P4DrawArgs, color) == 56);
+static_assert(offsetof(ProcessorekNevosolekDrawArgs, texture) == 40);
+static_assert(offsetof(ProcessorekNevosolekDrawArgs, screen) == 48);
+static_assert(offsetof(ProcessorekNevosolekDrawArgs, color) == 56);
 
-extern "C" void vk_p4_draw_triangle_asm(const P4DrawArgs* args);
+extern "C" void vk_processorek_nevosolek_draw_triangle_asm(const ProcessorekNevosolekDrawArgs* args);
 
 namespace {
 
@@ -28,7 +29,7 @@ constexpr int kWidth = 320;
 constexpr int kHeight = 200;
 constexpr size_t kPixels = static_cast<size_t>(kWidth) * kHeight;
 
-void referenceTriangle(const P4DrawArgs* a) {
+void referenceTriangle(const ProcessorekNevosolekDrawArgs* a) {
     struct V { double x, y, u, v; } v[3] = {
         {double(a->xy[0]), double(a->xy[1]),
          double((a->uv[0] >> 8) & 0xff), double((a->uv[0] >> 24) & 0xff)},
@@ -85,7 +86,7 @@ int main() {
     for (size_t i = 0; i < texture.size(); ++i)
         texture[i] = static_cast<uint8_t>((i * 37u + (i >> 8) * 11u) & 0xff);
 
-    const P4DrawArgs cases[] = {
+    const ProcessorekNevosolekDrawArgs cases[] = {
         {{10, 20, 200, 35, 70, 180},
          {packedUv(3, 7), packedUv(211, 19), packedUv(127, 250)}, nullptr, nullptr, 5},
         {{70, 180, 10, 20, 200, 35},
@@ -110,19 +111,19 @@ int main() {
         reference.fill(0xa5);
         assembly.fill(0xa5);
 
-        P4DrawArgs ref = cases[i];
+        ProcessorekNevosolekDrawArgs ref = cases[i];
         ref.texture = texture.data();
         ref.screen = reference.data();
-        P4DrawArgs asmArgs = ref;
+        ProcessorekNevosolekDrawArgs asmArgs = ref;
         asmArgs.screen = assembly.data();
         referenceTriangle(&ref);
-        vk_p4_draw_triangle_asm(&asmArgs);
+        vk_processorek_nevosolek_draw_triangle_asm(&asmArgs);
         if (std::memcmp(reference.data(), assembly.data(), kPixels) != 0) {
             size_t mismatch = 0;
             while (mismatch < kPixels && reference[mismatch] == assembly[mismatch])
                 ++mismatch;
             std::fprintf(stderr,
-                         "P4 raster mismatch case=%zu pixel=%zu ref=%u asm=%u\n",
+                         "processorek Nevosolek (P4) raster mismatch case=%zu pixel=%zu ref=%u asm=%u\n",
                          i, mismatch,
                          static_cast<unsigned>(reference[mismatch]),
                          static_cast<unsigned>(assembly[mismatch]));

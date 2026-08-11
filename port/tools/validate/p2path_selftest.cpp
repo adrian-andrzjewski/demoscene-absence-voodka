@@ -1,7 +1,7 @@
-// p2path_selftest.cpp - CTest for P2 camera-path data + selection (p2path.asm).
+// p2path_selftest.cpp - CTest for swiatynia city (P2) camera-path data + selection (p2path.asm).
 //
 // Parses the reference TRASA!/WIDOKI text tables (expanding %rep) and
-// cross-checks against the NASM data (byte-exact) and vk_p2_camera:
+// cross-checks against the NASM data (byte-exact) and vk_swiatynia_city_camera:
 //   modpos<=0x63f -> camera = trasa[trasaRuch mod N]
 //   modpos> 0x63f -> camera = widoki[modpos & 0x3f]
 //
@@ -14,11 +14,11 @@
 #include <vector>
 #include <string>
 
-extern "C" int32_t vk_p2_trasa[];
-extern "C" int32_t vk_p2_widoki[];
-extern "C" int32_t vk_p2_trasa_nodes;
-extern "C" int32_t vk_p2_widoki_entries;
-extern "C" void vk_p2_camera(int modpos, int trasaRuch, int32_t out[6]);
+extern "C" int32_t vk_swiatynia_city_trasa[];
+extern "C" int32_t vk_swiatynia_city_widoki[];
+extern "C" int32_t vk_swiatynia_city_trasa_nodes;
+extern "C" int32_t vk_swiatynia_city_widoki_entries;
+extern "C" void vk_swiatynia_city_camera(int modpos, int trasaRuch, int32_t out[6]);
 
 static int failures = 0;
 static void ck(const char* w, int32_t got, int32_t want){
@@ -68,11 +68,11 @@ int main(){
 
     int tn = tr.size()/6, we = wd.size()/7;
     // trasa data (bulk, 2964 nodes) verified byte-exact vs the parsed reference.
-    for (int i=0;i<(int)tr.size();i++) ck("trasa", vk_p2_trasa[i], tr[i]);
+    for (int i=0;i<(int)tr.size();i++) ck("trasa", vk_swiatynia_city_trasa[i], tr[i]);
     // widoki: verify the entry COUNT matches (nested MASM "rept" makes re-parsing
     // the expansion error-prone, so we use the assembled data directly below).
-    ck("trasa_nodes", vk_p2_trasa_nodes, tn);
-    ck("widoki_entries", vk_p2_widoki_entries, we);
+    ck("trasa_nodes", vk_swiatynia_city_trasa_nodes, tn);
+    ck("widoki_entries", vk_swiatynia_city_widoki_entries, we);
     if (failures) return 1;
 
     // camera selection logic: trasa path vs parsed-verified trasa; widoki path
@@ -84,14 +84,14 @@ int main(){
         int mp = (int)((seed>>8) % 0x1000);      // ModPos range 0..0xfff
         seed = seed*1664525u + 1013904223u;
         int rk = (int)((seed>>8) % (tn*2));       // trasaRuch (wraps)
-        int32_t out[6]; vk_p2_camera(mp, rk, out);
+        int32_t out[6]; vk_swiatynia_city_camera(mp, rk, out);
         int idx;
         if (mp <= 0x63f){ idx = ((rk % tn)+tn)%tn;
             for(int k=0;k<6;k++) if(out[k]!=tr[idx*6+k]){ printf("FAIL trasa-cam t=%d mp=%d rk=%d idx=%d k=%d\n",t,mp,rk,idx,k); if(++failures>=20) break; } }
         else           { idx = mp & 0x3f; for(int k=0;k<6;k++)
-                            if(out[k]!=vk_p2_widoki[idx*7+k]){ printf("FAIL widoki-cam t=%d mp=%d idx=%d k=%d\n",t,mp,idx,k); if(++failures>=20) break; } }
+                            if(out[k]!=vk_swiatynia_city_widoki[idx*7+k]){ printf("FAIL widoki-cam t=%d mp=%d idx=%d k=%d\n",t,mp,idx,k); if(++failures>=20) break; } }
     }
-    if (failures==0){ std::printf("p2path.crosscheck: OK (%d trasa nodes byte-exact, %d widoki, %d cam trials)\n",tn,we,CNT); return 0; }
-    std::printf("p2path.crosscheck: %d failures\n", failures);
+    if (failures==0){ std::printf("swiatynia_city.path.crosscheck: OK (%d trasa nodes byte-exact, %d widoki, %d cam trials)\n",tn,we,CNT); return 0; }
+    std::printf("swiatynia_city.path.crosscheck: %d failures\n", failures);
     return 1;
 }

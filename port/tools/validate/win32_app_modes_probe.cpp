@@ -1,6 +1,7 @@
 // win32_app_modes_probe.cpp - deterministic NASM app-mode witness.
 
 #include <cstdint>
+#include "scene_names.h"
 
 extern "C" int asm_parse_command_line(const char* commandLine);
 extern "C" int asm_voodka_apply_entry_seek(void);
@@ -55,6 +56,16 @@ extern "C" void vk_app_seek_part(uint32_t part, uint32_t modpos) {
     g.seekKind = 4;
     g.seekPart = part;
     g.seekModPos = modpos;
+}
+
+extern "C" void vk_app_seek_scene(uint32_t part, uint32_t modpos) {
+    g.seekKind = 5;
+    g.seekPart = part;
+    g.seekModPos = modpos;
+}
+
+extern "C" int vk_scene_part_from_name(const char* token) {
+    return vk::scenePartFromToken(token);
 }
 
 extern "C" void vk_app_no_entry_seek() {
@@ -120,6 +131,32 @@ int main() {
     resetState();
     if (asm_voodka_apply_entry_seek() != 1 || g.seekKind != 4 ||
         g.seekPart != 5 || g.seekModPos != 0x1400) return 8;
+
+    if (!parse("--scene torus-ustep-village")) return 21;
+    resetState();
+    if (asm_voodka_apply_entry_seek() != 1 || g.seekKind != 5 ||
+        g.seekPart != 5 || g.seekModPos != 0x1400) return 22;
+
+    const struct {
+        const char* commandLine;
+        uint32_t part;
+        uint32_t modpos;
+    } namedScenes[] = {
+        { "--scene oko-szklo", 1, 0x0000 },
+        { "--scene swiatynia-city", 2, 0x0400 },
+        { "--scene tunel-wygibasy", 3, 0x0B40 },
+        { "--scene processorek-nevosolek", 4, 0x0D40 },
+        { "--scene torus-ustep-village", 5, 0x1400 },
+        { "--scene gratki", 6, 0x1B40 },
+        { "--scene gratki-woda", 7, 0x1C40 },
+        { "--scene nad-czerwonym-lampa", 8, 0x2040 },
+    };
+    for (const auto& scene : namedScenes) {
+        if (!parse(scene.commandLine)) return 23;
+        resetState();
+        if (asm_voodka_apply_entry_seek() != 1 || g.seekKind != 5 ||
+            g.seekPart != scene.part || g.seekModPos != scene.modpos) return 24;
+    }
 
     if (!parse("--part 9")) return 9;
     resetState();

@@ -147,18 +147,18 @@ the Phase 0 C++ baseline:
 | `frame_gpu.raw` | 16,384,000 | `CC4F6810967B97DA7FE22F6FDDB77EBB76F91C2E30B650E82AAA13E746E702BC` |
 
 The first four diagnostic frames of selected real scene runs were compared
-through both presenters for P1, P2, P4, P7, and P8. Every source framebuffer,
+through both presenters for oko + szklo (P1), swiatynia city (P2), processorek Nevosolek (P4), gratki + woda (P7), and P8. Every source framebuffer,
 palette, and 1280x800 GPU capture matched byte-for-byte; all ten selected-part
 runs exited 0.
 
-Finally, the complete P1-P8 application was run with audio enabled and the
+Finally, the complete all eight scenes application was run with audio enabled and the
 assembly presenter selected:
 
 - command: `VOODKA.exe --asm-present --record <dir>`;
 - exit code: 0;
 - recorded frames: 17,611;
 - recording size: 1,140,629,248 bytes;
-- log reached P5, P6, P7, and P8 and ended with normal subsystem shutdown.
+- log reached torus ustep village (P5), gratki (P6), gratki + woda (P7), and nad czerwonym lampa (P8) and ended with normal subsystem shutdown.
 
 This proves the assembly presentation path survives the complete current
 render loop and normal lifecycle. It does not yet prove assembly audio or a
@@ -194,13 +194,13 @@ The Phase 1C validation is:
 ```text
 focused presenter/production/reference CTests      3/3 passed; 28.98 s
 full Release CTest suite                            53/53 passed; 104.19 s
-full P1-P8 playback (no flags)                     exit 0; 252.7 s
-full scene sequence                                 P1, P2, P3, P5, P6, P7, P8
+full eight-scene playback (no flags)                          exit 0; 252.7 s
+full scene sequence                                 oko + szklo (P1), swiatynia city (P2), tunel + wygibasy (P3), torus ustep village (P5), gratki (P6), gratki + woda (P7), nad czerwonym lampa (P8)
 rendered timeline                                  17,590 frames (+ header)
 full device stream                                  11,078,802 frames; underruns 0
 full marker stream                                  12,819 markers
 full final ModPos                                   0x2803
-independent P8 production run                      exit 0; 30 s lifecycle close
+independent nad czerwonym lampa (P8) production run                      exit 0; 30 s lifecycle close
 production D3D imports                              d3d11.dll / D3D11CreateDeviceAndSwapChain only
 reference D3D imports                               d3d11.dll + d3dcompiler_47.dll / D3DCompile
 production VOODKA.exe                              409,088 bytes

@@ -10,6 +10,7 @@
 // pointer from sel_base_table and do base+index addressing.
 
 #include "platform_abi.h"
+#include "scene_names.h"
 #include "pal_range.h"
 #include <cstdint>
 #include <cstdio>
@@ -67,7 +68,7 @@ uint64_t vk_selector_base(uint16_t handle) {
 // frame), not the absolute retrace counter: every part stores the result into
 // ramki/frames and uses it as a per-frame delta multiplier. Returning the
 // absolute counter made camera paths and sprite animations advance
-// quadratically fast (and P8's sun_step ran past its 19-frame sprite table
+// quadratically fast (and nad czerwonym lampa (P8)'s sun_step ran past its 19-frame sprite table
 // and faulted reading past the arena). The absolute counter stays available
 // to the platform via vk::getFrameCounter() (progress reporting).
 uint64_t vk_wait_vbl() {
@@ -123,9 +124,9 @@ uint32_t vk_audio_seek_ms(int ms)           { return vk::audioSeekMs(ms); }
 uint32_t vk_audio_seek_order(int order)     { return vk::audioSeekOrder(order); }
 
 // Production app-mode adapters. The NASM dispatcher owns selector precedence,
-// part-start data, self-test looping, and result propagation; these functions
+// scene-start data, self-test looping, and result propagation; these functions
 // keep the remaining namespace-vk service calls behind explicit C symbols.
-void vk_set_entry_part(int part);
+void vk_set_entry_scene(int scenePart);
 void vk_app_seek_modpos(uint32_t requested) {
     const uint32_t reached = vk::audioSeekRows(requested);
     vk::logPrint("[app] seek --modpos %ld -> reached ModPos %u\n",
@@ -143,9 +144,20 @@ void vk_app_seek_order(int order) {
 }
 void vk_app_seek_part(uint32_t part, uint32_t modpos) {
     const uint32_t reached = vk::audioSeekRows(modpos);
-    vk::logPrint("[app] seek --part %ld -> ModPos 0x%x reached %u\n",
-                 static_cast<long>(part), modpos, reached);
-    vk_set_entry_part(static_cast<int>(part));
+    vk::SceneId id = static_cast<vk::SceneId>(part);
+    vk::logPrint("[app] seek --part %ld (%s) -> ModPos 0x%x reached %u\n",
+                 static_cast<long>(part), vk::sceneName(id), modpos, reached);
+    vk_set_entry_scene(static_cast<int>(part));
+}
+void vk_app_seek_scene(uint32_t part, uint32_t modpos) {
+    const uint32_t reached = vk::audioSeekRows(modpos);
+    vk::SceneId id = static_cast<vk::SceneId>(part);
+    vk::logPrint("[app] seek --scene %s -> ModPos 0x%x reached %u\n",
+                 vk::sceneName(id), modpos, reached);
+    vk_set_entry_scene(static_cast<int>(part));
+}
+int vk_scene_part_from_name(const char* token) {
+    return vk::scenePartFromToken(token);
 }
 void vk_app_no_entry_seek() {
     vk::logPrint("[app] no entry seek (module starts at beginning)\n");
@@ -234,11 +246,11 @@ const char* vk_app_resolve_music_path(const char* overridePath) {
 #endif
 }
 
-// entry-part selector: 0 = run the full part1..part8 sequence (default),
-// 1..8 = run only that part. Set by app.cpp before DemoStart32.
-static int g_entry_part = 0;
-void vk_set_entry_part(int part) { g_entry_part = part; }
-int  vk_get_entry_part()         { return g_entry_part; }
+// entry-scene selector: 0 = run the full sequence (default), 1..8 = run only
+// that scene. Numeric --part remains a compatibility/debugging alias.
+static int g_entry_scene = 0;
+void vk_set_entry_scene(int scenePart) { g_entry_scene = scenePart; }
+int  vk_get_entry_scene()              { return g_entry_scene; }
 
 // Native x64 production WndProc wrappers. The reference executable keeps
 // app.cpp's C++ callback for differential validation; VOODKA's callback calls
@@ -294,21 +306,22 @@ void vk_log_printf(const char* fmt, ...) {
 }
 
 #if !defined(VOODKA_ASSEMBLY_PLATFORM)
-struct P4DrawArgs {
+struct ProcessorekNevosolekDrawArgs {
     int32_t xy[6];
     uint32_t uv[3];
     const uint8_t* texture;
     uint8_t* screen;
     uint32_t color;
 };
-static_assert(offsetof(P4DrawArgs, texture) == 40);
-static_assert(offsetof(P4DrawArgs, screen) == 48);
-static_assert(offsetof(P4DrawArgs, color) == 56);
+static_assert(offsetof(ProcessorekNevosolekDrawArgs, texture) == 40);
+static_assert(offsetof(ProcessorekNevosolekDrawArgs, screen) == 48);
+static_assert(offsetof(ProcessorekNevosolekDrawArgs, color) == 56);
 
-// P4's triangle contract, expressed as a bounded scan conversion. UV values
+// processorek Nevosolek's triangle contract, expressed as a bounded scan
+// conversion. UV values
 // are the original 8.8 packed words; the texture is a 256-byte stride and
 // wraps through the same 16-bit texel index as the DOS mapper.
-void vk_p4_draw_triangle(const P4DrawArgs* a) {
+void vk_processorek_nevosolek_draw_triangle(const ProcessorekNevosolekDrawArgs* a) {
     struct V { double x, y, u, v; } v[3] = {
         {double(a->xy[0]), double(a->xy[1]),
          double((a->uv[0] >> 8) & 0xff), double((a->uv[0] >> 24) & 0xff)},

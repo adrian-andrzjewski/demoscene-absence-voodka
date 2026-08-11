@@ -1,7 +1,7 @@
 ; auto-converted by tabl2nasm from D:\Project\voodka2\demoscene-absence-voodka-master\CODE\P2\WATER\TAB
-; (label renamed tablica3 -> watertab: this is the drop table the original P2
+; (label renamed tablica3 -> watertab: this is the drop table the original swiatynia city (P2)
 ; water actually used - P2/WATER/WATER.PM:106 `include water\tab`; the shared
-; P2/TABLICA3 copy is unreferenced by the original P2 build)
+; P2/TABLICA3 copy is unreferenced by the original swiatynia city (P2) build)
 watertab:
 dd 21240
 dd 21240

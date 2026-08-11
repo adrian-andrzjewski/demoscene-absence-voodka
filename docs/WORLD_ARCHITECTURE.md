@@ -1,7 +1,7 @@
 # VOODKA 3D world architecture — the VR scene engine
 
 This doc reconstructs how the 1996 demo builds and renders its two 3D worlds
-(P2's stadium, P5's colosseum-ring) and the standalone VIRTUAL harness: a flat
+(swiatynia city (P2)'s stadium, torus ustep village (P5)'s colosseum-ring) and the standalone VIRTUAL harness: a flat
 table of 48-byte "instance" records pointing at shared V3D meshes, a global
 camera, and a one-point-perspective raster pipeline with **no z-buffer, no
 frustum and no lighting** — depth comes from two far→near painter sorts and
@@ -17,11 +17,12 @@ the scene-level companion to `ASSET_FORMATS.md` (per-byte formats) and
 and cameras are described, how one frame becomes the 320x200 screen, and how
 the modern port (in `port/`) reproduces it.
 
-Scope: the demo contains **two true 3D worlds** — P2 (a "stadium") and P5
+Scope: the demo contains **two true 3D worlds** — swiatynia city (P2) (a "stadium") and torus ustep village (P5)
 (a "colosseum ring" over water) — plus a third, `VIRTUAL`, a dev harness that
 is **not** linked into the shipped demo. All three are driven by the same
 "VR engine" (`CODE/INC/VIRTUAL.INC` / `VIRTUAL2.INC` + `OBJECTS.PM` +
-`BITSORT.PM` + `MROTATE.PM` + `PERSP.PM`). Parts P1/P3/P4/P6/P7/P8 are not
+`BITSORT.PM` + `MROTATE.PM` + `PERSP.PM`). The oko + szklo, tunel + wygibasy,
+processorek Nevosolek, gratki, gratki + woda, and nad czerwonym lampa scenes (P1/P3/P4/P6/P7/P8) are not
 world-based (see §10.4); they reuse lower-level primitives (rotate/persp/
 sort/normals) but have no `World` table.
 
@@ -29,8 +30,8 @@ Primary sources (all in `demoscene-absence-voodka-master/`):
 
 | File | Role |
 |---|---|
-| `CODE/INC/VIRTUAL.INC` | VR world engine, P2 variant (PrepareObjectVirtual, CalculateVisiblating, MakeCameraMatrix) |
-| `CODE/INC/VIRTUAL2.INC` | same, P5 variant (objects2/world2) |
+| `CODE/INC/VIRTUAL.INC` | VR world engine, swiatynia city (P2) variant (PrepareObjectVirtual, CalculateVisiblating, MakeCameraMatrix) |
+| `CODE/INC/VIRTUAL2.INC` | same, torus ustep village (P5) variant (objects2/world2) |
 | `CODE/INC/OBJECTS.PM` (+`OBJECTS2.PM`) | object loader + `DrawObject`/`DrawZielonyLudek` raster dispatch |
 | `CODE/INC/PLE2` | `Transform` — camera-space matrix multiply |
 | `CODE/INC/MROTATE.PM` | Euler rotation matrix + `mrotate`/`mrotateNormals` |
@@ -43,7 +44,7 @@ Primary sources (all in `demoscene-absence-voodka-master/`):
 | `CODE/INC/SIN`, `MROTATE.PM` sin | Q15 1024-entry sine (angles in units of 1024/rev) |
 | `CODE/P2/P2.AS^`, `CODE/P5/P5.AS^` | per-part scene drivers (timeline, camera, scripts) |
 | `CODE/P2/TRASA.!`, `P5/TRASA.!`, `P2/WIDOKI` | camera path / scripted stills |
-| `CODE/WORLD/WORLD.ASM`, `CODE/WORLD/WORLD.V3D` | object-authoring harness + a dev snapshot of the P5 world |
+| `CODE/WORLD/WORLD.ASM`, `CODE/WORLD/WORLD.V3D` | object-authoring harness + a dev snapshot of the torus ustep village (P5) world |
 | `VIRTUAL/OBJECTS/WORLD.PAS` (+ `WORLD`) | VIRTUAL object archive packer + archive |
 
 Port mirrors (in `port/`): `core/engine/{vprep,vrot,vvis,p2loop,p2draw,
@@ -109,7 +110,7 @@ projects it, and rasterizes it with the texture selected by the record's slot.
 
 Tiny COM-style images: `tasm` source → `tlink /x/3/t` → `.COM` renamed
 `.V3D` (`CODE/WORLD/VC.EXT`), so there is no file header and data starts at
-byte 0. `.V3M` is the same blob **minus the 36-byte header** (P5 morph
+byte 0. `.V3M` is the same blob **minus the 36-byte header** (torus ustep village (P5) morph
 target). Full byte map: `ASSET_FORMATS.md` §4.1.
 
 | Offset | Size | Field |
@@ -124,7 +125,7 @@ target). Full byte map: `ASSET_FORMATS.md` §4.1.
 | … | nov×8 | per-vertex (u,v) `dd` — read only for type 1 |
 
 Assets in the archive: `wall/wall2/wall3` (4 v / 2 f, type 1) and `torus`
-(346 v / 688 f, type 2). P5: `2wall*` (4/2) and `2torus` (128 v / 256 f,
+(346 v / 688 f, type 2). torus ustep village (P5): `2wall*` (4/2) and `2torus` (128 v / 256 f,
 type 2). All geometry is authored around the origin and **centered** (wall
 x∈[−600,600] y∈[−300,300]; torus ±~400; 2torus ±820). The wall variants
 differ in size and in their per-vertex UV window (wall UV (5,5)..(120,120);
@@ -215,7 +216,7 @@ World:         00 (dd) - is visible object      (written per frame, see §7.1)
                44 (dd) - type of virt'object'    (really: TEXTURE-SLOT index into textury[])
 ```
 
-Authoring example (P2 world record 0 — the env-mapped torus):
+Authoring example (swiatynia city (P2) world record 0 — the env-mapped torus):
 
 ```
 dd 0, 150*16, -650*16, 2150*16,   3,  256,0,0,   0,0,0, 5
@@ -285,24 +286,24 @@ called once per frame.
 `P2/TRASA.!` = 2,964 nodes, `P5/TRASA.!` = 3,876 nodes, of 6 `dd`:
 `CameraX, CameraY, CameraZ, EyeAX, EyeAY, EyeAZ` (24 B). The part keeps a
 `trasa_ruch` cursor, reads `trasa[trasa_ruch*24]`, and advances it by the
-frame's `ramki` delta (scaled early in P2; wrapped at `ruchow-2` in P5).
+frame's `ramki` delta (scaled early in swiatynia city (P2); wrapped at `ruchow-2` in torus ustep village (P5)).
 No interpolation — the position is a step function along a pre-baked path.
-(The *binary* `trasa.dat`/`tr2.dat` for P4/P8 are a different 9-dword format:
+(The *binary* `trasa.dat`/`tr2.dat` for processorek Nevosolek/nad czerwonym lampa (P4/P8) are a different 9-dword format:
 `ASSET_FORMATS.md` §4.6.)
 
-### 5.2 Scripted stills — P2 `WIDOKI`
+### 5.2 Scripted stills — swiatynia city (P2) `WIDOKI`
 
 `P2/WIDOKI` expands to 64 entries × 7 dwords: `x,y,z, ax,ay,az, flashFlag`.
 Active when `ModPos > 0x63f`; index = `ModPos & 0x3f`. Each entry pairs a
 flash variant (flag=1 → white palette flash via `plum` guard) with three
-non-flash copies. P2's timeline: camera-path mode (0x400..0x63f, cursor
+non-flash copies. swiatynia city (P2)'s timeline: camera-path mode (0x400..0x63f, cursor
 advance slows and then freezes ≥0x600 per §10.1), then scripted
 still-camera cuts with palette flashes (until the water stage).
 
 ### 5.3 Camera conventions
 
-P2/P5 camera paths place the camera at (typically far-above/around) the
-world; the eye angles aim it. E.g. P5 trasa opens at (1921, −5763, −30222)
+swiatynia city/torus ustep village (P2/P5) camera paths place the camera at (typically far-above/around) the
+world; the eye angles aim it. E.g. torus ustep village (P5) trasa opens at (1921, −5763, −30222)
 with `EyeAZ` ramping 0,2,4,… — a slow scan. Because the engine never clips a
 frustum (see §7), "behind" content is culled only by the object/face near
 tests, and distant content is simply very small.
@@ -329,8 +330,8 @@ flowchart TD
     L --> A
 ```
 
-Both P2.AS^ and P5.AS^ implement exactly this skeleton (P2 in `Main`/`Main2`,
-P5 in `Main`); `port/core/engine/p2loop.asm` is the NASM port of the
+Both P2.AS^ and P5.AS^ implement exactly this skeleton (swiatynia city (P2) in `Main`/`Main2`,
+torus ustep village (P5) in `Main`); `port/core/engine/p2loop.asm` is the NASM port of the
 "calc visibility → world sort → walk" part, with a `trace` mode that records
 the dispatch order for the CTest.
 
@@ -364,11 +365,11 @@ radix bucket sort, gathering buckets **15→0** (descending). Only the **low 16
 bits** of the key are ever touched by the four nibble passes (shifts
 0,4,8,12) — the high bits (record index) never participate in the ordering,
 so effectively **objects are drawn in descending low-16-bit camera-z order
-(far→near)**; the index packing is a harmless vestige. P5's
+(far→near)**; the index packing is a harmless vestige. torus ustep village (P5)'s
 copy (`P5/VIRSORT.PM`) additionally does `sar bx,4` on the key (a 4-bit
 scale). The port (`vvis.asm`) reproduces the same key semantics — a stable
 descending sort of `(int16)low16(zet) >> shift` — with `virsort_shift` = 0
-(P2) / 4 (P5) and documents it as such. Because both shipped worlds are
+(swiatynia city (P2)) / 4 (torus ustep village (P5)) and documents it as such. Because both shipped worlds are
 closed tile-able stadiums of opaque quads, order is largely invisible, but it
 is what the original did and the port matches it.
 
@@ -384,8 +385,8 @@ The per-object face sort (`BITSORT.PM Sort`) is the same construction: key =
 - **`textury[]`** — a demo-global word table of **selectors** (texture
   handles over the arena), `dw 10 dup (?)` (`DEMO.AS^`). Filled by
   `CODE/PART2` (loaded early in `Start32`): `textury[1]=t001`, `textury[2..4]
-  all=t002`, `textury[5]=env`. P2 allocates `textury[0]` over its 256×256
-  water scratch. P5 allocates `textury[0]=waterWorld`, `[1]=2T001`,
+  all=t002`, `textury[5]=env`. swiatynia city (P2) allocates `textury[0]` over its 256×256
+  water scratch. torus ustep village (P5) allocates `textury[0]=waterWorld`, `[1]=2T001`,
   `[2]=2T002`, `[3]=2ENV`.
 - **Per-instance texturing**: the world record's `+44` indexes this table;
   the render loop sets `fs = textury[world+44]` before drawing each record.
@@ -403,15 +404,15 @@ The per-object face sort (`BITSORT.PM Sort`) is the same construction: key =
   lookup baked into the palette.
 - **Lighting: none.** The VR engine performs no shading, no light sources, no
   per-face color. Illumination is *baked*: each texture's colors sit in a
-  tuned palette range (P2's stadium under the inline `jjdj` palette gives the
-  red/maroon/blue look; P5 under `2WORLD.PAL` gives olive/gold/tan). The
+  tuned palette range (swiatynia city (P2)'s stadium under the inline `jjdj` palette gives the
+  red/maroon/blue look; torus ustep village (P5) under `2WORLD.PAL` gives olive/gold/tan). The
   `+56 "adders to color"` field in the object struct is **allocated but never
   written or read** — an unimplemented per-face shading idea. (Per-face
-  additive shading *does* exist in P3/P4/P8, but that is the *other*,
+  additive shading *does* exist in tunel + wygibasy/processorek Nevosolek/nad czerwonym lampa (P3/P4/P8), but that is the *other*,
   non-world object renderer — `ENGINE.ASM`/`face()`/`show` with `add al,cl`
   — not the VR engine.)
 - Alpha/transparency is a per-blitter convention only (index-0 skips in
-  sprite blitters; the P2/P5 water uses `&31` bank tricks), never a texture
+  sprite blitters; the swiatynia city/torus ustep village (P2/P5) water uses `&31` bank tricks), never a texture
   property.
 
 ---
@@ -421,14 +422,14 @@ The per-object face sort (`BITSORT.PM Sort`) is the same construction: key =
 Four mechanisms, all timeline (ModPos) or frame-delta driven:
 
 1. **Spin adders (katys)** — every world record's `+32/36/40` accumulate into
-   `+20/24/28` every frame. Most walls use (0,0,0) (static); the P5 torus
-   record in the *dev* snapshot had (8,5,0); the shipped P5 uses (0,0,0) and
+   `+20/24/28` every frame. Most walls use (0,0,0) (static); the torus ustep village (P5) torus
+   record in the *dev* snapshot had (8,5,0); the shipped torus ustep village (P5) uses (0,0,0) and
    animates by scripting instead.
-2. **P2 torus script** — for ModPos ≥ 0x600, `P2.AS^` reads the inline
+2. **swiatynia city (P2) torus script** — for ModPos ≥ 0x600, `P2.AS^` reads the inline
    `obroty` table (20× 3 dwords of dax/day/daz, indexed `ModPos & 0xf`) into
    `world+20/24/28`, driving a rotating env torus above the stadium.
-3. **P5 morph (`.V3M`)** — `2Torus.V3M` is `2Torus.V3D` minus its header.
-   P5 scales it ×16, then `MakeMorphTable` precomputes **64 chained lerp
+3. **torus ustep village (P5) morph (`.V3M`)** — `2Torus.V3M` is `2Torus.V3D` minus its header.
+   torus ustep village (P5) scales it ×16, then `MakeMorphTable` precomputes **64 chained lerp
    frames** (16.16 delta `((target−source)<<16)>>6`, each frame 128 verts ×
    12 B = 1536 B) into `_tabMorph`, with `MorphAddreses[0..63]` pointing at
    each frame. During the fly-over the part patches `objects[3]+36` (the
@@ -438,24 +439,24 @@ Four mechanisms, all timeline (ModPos) or frame-delta driven:
 4. **Sprite overlays** — the "sun" eye animations:
    `klatki.dat`/`2world.inc`/`log.inc` 64×64 frame stacks blitted
    (index-0 transparent) to the backbuffer each frame at (254,141), with
-   frame index advancing by `ramki/4 · bolek` (±1 direction in P2/P5). These
+   frame index advancing by `ramki/4 · bolek` (±1 direction in swiatynia city/torus ustep village (P2/P5)). These
    are 2D overlays, not part of the 3D world.
 
 ---
 
 ## 10. The two shipped worlds
 
-### 10.1 P2 — the stadium (212 records)
+### 10.1 swiatynia city (P2) — the stadium (212 records)
 
 Loaded objects: `wall` (obj 0), `wall2` (1), `wall3` (2), `torus` (3).
 `textury[1]=t001, [2..4]=t002, [5]=env`. 212 records build: a long central
 floor (t001), two rows of columns/pillars (wall2/wall3, t001/t002), a distant
 "altar of Satan" structure, temple side walls, a rectangular **pool
 ("basen")** of t002 walls, and record 0 = the env torus at (150,−650,2150).
-Palette: the inline `jjdj` (`WORLD.P!`) — *not* `2WORLD.PAL` (that is P5's),
+Palette: the inline `jjdj` (`WORLD.P!`) — *not* `2WORLD.PAL` (that is torus ustep village (P5)'s),
 a historically significant mis-identification (KNOWN_DIFFERENCES #21).
 
-Timeline inside P2's `Main`:
+Timeline inside swiatynia city (P2)'s `Main`:
 - 0x400–0x63f: camera path mode; the `trasa_ruch` cursor advances slowly
   (≤0x500: 1 or `ramki/4`), then by `ramki` (0x500–0x600). At 0x500 a
   one-shot `lampa` white flash→restore; 0x500–0x600 also bumps world records
@@ -470,7 +471,7 @@ Timeline inside P2's `Main`:
   `pole` sunlight fade-ins, `sun_step` reversible sun sprite.
 - >0xb3f: fade out, deallocate, return.
 
-### 10.2 P5 — the colosseum ring over water (45 records)
+### 10.2 torus ustep village (P5) — the colosseum ring over water (45 records)
 
 Loaded: `2wall` (0), `2wall2` (1), `2wall3` (2), `2torus` (3);
 `textury[1]=2T001, [2]=2T002, [3]=2ENV, [0]=waterWorld`. 45 records: record 0
@@ -480,7 +481,7 @@ lowered "gates" (with `256+(1024−64)` angled t002 walls), and record
 `"tu bedzie woda"` — obj 0 (`2wall`) at (0, 1450·16, 0), **texture slot 0 =
 the water render target** (below).
 
-**P5's water is a render-to-texture world polygon**, not a screen effect:
+**torus ustep village (P5)'s water is a render-to-texture world polygon**, not a screen effect:
 
 ```mermaid
 flowchart LR
@@ -503,7 +504,7 @@ down to the 32-color water bank via `&31`), then the *actual* world pass
 renders the stadium, where the horizontal `2wall` at `y=1450*16` samples the
 water texture — giving a live reflective ripple plane. The 128×128 ripple
 field sim runs continuously and feeds `drawWater`'s 2×2 upscale into the same
-texture. So P5 composes: **static world ring + animated torus + evolving
+texture. So torus ustep village (P5) composes: **static world ring + animated torus + evolving
 render-to-texture water plane + sprite overlay**, all in the one VR pipeline.
 
 ### 10.3 VIRTUAL — the dev harness (not in the demo)
@@ -513,22 +514,22 @@ render-to-texture water plane + sprite overlay**, all in the one VR pipeline.
 the archive (`[count][count×u32 offsets][blobs]`, produced by
 `VIRTUAL/OBJECTS/WORLD.PAS`) and only computes each object's file pointer —
 the saved source has no actual `Load_Object` body (the loop is a no-op) — so
-VIRTUAL is a skeleton superseded by P2/P5. The archive holds two torus V3Ds
+VIRTUAL is a skeleton superseded by swiatynia city/torus ustep village (P2/P5). The archive holds two torus V3Ds
 (offsets 12 and 5680). The port's `VIRTUAL.exe` + `world_pack` reproduce the
 archive and load/decode both objects (`--check`), which is the faithful
 "world_reader" of this side project.
 
 ### 10.4 Non-world parts
 
-P1 (logo/text + dissolve), P3 (tunnel), P6 (bump), P7 (water) have no 3D
-worlds. P4 and P8 are **object-only** 3D: a single hero mesh (+ morph targets
+oko + szklo (P1) (logo/text + dissolve), tunel + wygibasy (P3) (tunnel), gratki (P6) (bump), gratki + woda (P7) (water) have no 3D
+worlds. processorek Nevosolek (P4) and nad czerwonym lampa (P8) are **object-only** 3D: a single hero mesh (+ morph targets
 from `CODE/DATAS`) driven along a camera path (`trasa.dat`/`tr2.dat`,
 ping-pong) and rendered by the *other* renderer (`ENGINE.ASM` rotate/sort +
 `face()`/`show` with per-face texture + shade `add al,cl`). They reuse
 `MROTATE`/`PERSP`/`BITSORT`/`NORMALS.PM` but have no `World` table, no
 `textury` per-instance texturing, no `CalculateVisiblating`. They are
 documented in `ASSET_FORMATS.md` §4.5/§4.6 and `PORTING_NOTES.md`; this doc
-covers the VR *world* engine (P2/P5/VIRTUAL).
+covers the VR *world* engine (swiatynia city/torus ustep village (P2/P5)/VIRTUAL).
 
 ---
 
@@ -557,36 +558,36 @@ indirection.
 | Concept | Original (file) | Port | Parity |
 |---|---|---|---|
 | Object load | `OBJECTS.PM Load_Object` | `core/engine/loader.asm vk_load_object` | field-exact (v3d.crosscheck) |
-| World table P2 (212 rec) | `CODE/INC/WORLD` | `core/data/p2world.inc` | **byte-identical** (0/212 diffs, verified) |
-| World table P5 (45 rec) | `CODE/P5/WORLD` | `core/parts/p5_world.inc` | byte-identical |
-| Camera path P2 | `P2/TRASA.!` (2964) | `core/data/p2trasa.inc` | byte-identical |
-| Camera path P5 | `P5/TRASA.!` (3876) | `core/parts/p5_trasa.inc` | byte-identical |
-| Still cams P2 | `P2/WIDOKI` (64) | `core/data/p2widoki.inc` | byte-identical |
+| World table swiatynia city (P2) (212 rec) | `CODE/INC/WORLD` | `core/data/p2world.inc` | **byte-identical** (0/212 diffs, verified) |
+| World table torus ustep village (P5) (45 rec) | `CODE/P5/WORLD` | `core/parts/p5_world.inc` | byte-identical |
+| Camera path swiatynia city (P2) | `P2/TRASA.!` (2964) | `core/data/p2trasa.inc` | byte-identical |
+| Camera path torus ustep village (P5) | `P5/TRASA.!` (3876) | `core/parts/p5_trasa.inc` | byte-identical |
+| Still cams swiatynia city (P2) | `P2/WIDOKI` (64) | `core/data/p2widoki.inc` | byte-identical |
 | Obj prepare | `VIRTUAL.INC PrepareObjectVirtual` | `core/engine/vprep.asm` | fidelity port |
 | Obj rotate/transform | `MROTATE.PM` + `PLE2` | `core/engine/vrot.asm` | fidelity port |
 | Camera matrix | `VIRTUAL.INC MakeCameraMatrix` (SMC) | `core/engine/cammat.asm` (bss vars) | arithmetic-identical |
 | Visibility | `VIRTUAL.INC CalculateVisiblating` | `core/engine/vvis.asm vk_calc_visibility` | identical (shrd-15) |
-| World sort | `VIRSORT.PM VirSort` (P2 shift 0 / P5 shift 4) | `core/engine/vvis.asm vk_virsort` | same key/handing, stable-desc low16 |
+| World sort | `VIRSORT.PM VirSort` (swiatynia city (P2) shift 0 / torus ustep village (P5) shift 4) | `core/engine/vvis.asm vk_virsort` | same key/handing, stable-desc low16 |
 | Projection | `PERSP.PM` | `core/engine/persp.asm` | identical |
 | Draw dispatch | `OBJECTS.PM DrawZielonyLudek` | `core/engine/p2draw.asm` | fidelity port (+trace mode) |
 | Texture mapper | `TXTR.ASM tm_face` | `core/engine/txtr.asm` | instruction-identical |
-| World render loop | `P2.AS^`/`P5.AS^` inline | `core/engine/p2loop.asm vk_p2_render_frame` | fidelity port |
-| P2 water stage | `P2/WATER/WATER.PM` | `core/parts/water.p2.inc` | faithful (2026-08-05 rewrite) |
-| P5 water RTT + mirror | `P5/WATER.PM` + `P5.AS^` rysujCiulusa/mirror | `core/parts/p5.asm` + `water.p5.inc` | faithful (mirror + drawWater + tex0 polygon) |
-| P5 morph | `P5.AS^ MakeMorphTable` | `core/parts/p5.asm` | faithful (incl. CalcRest delta rewind, KNOWN_DIFFERENCES) |
+| World render loop | `P2.AS^`/`P5.AS^` inline | `core/engine/p2loop.asm vk_vr_world_render_frame` | fidelity port |
+| swiatynia city (P2) water stage | `P2/WATER/WATER.PM` | `core/parts/water.p2.inc` | faithful (2026-08-05 rewrite) |
+| torus ustep village (P5) water RTT + mirror | `P5/WATER.PM` + `P5.AS^` rysujCiulusa/mirror | `core/parts/p5.asm` + `water.p5.inc` | faithful (mirror + drawWater + tex0 polygon) |
+| torus ustep village (P5) morph | `P5.AS^ MakeMorphTable` | `core/parts/p5.asm` | faithful (incl. CalcRest delta rewind, KNOWN_DIFFERENCES) |
 | Selector indirection | `textury[]` + EOS selectors | `bridge.cpp sel_base_table` + `fs_sel` | semantic equivalent |
 | VIRTUAL archive | `WORLD.PAS` → `objects/world` | `tools/world_pack` golden | byte-identical archive |
 
-Verified this audit: P2 world 212/212 records equal; P5 world 45/45 equal;
+Verified this audit: swiatynia city (P2) world 212/212 records equal; torus ustep village (P5) world 45/45 equal;
 VIRTUAL archive offsets (12, 5680) match; wall UV windows and torus
 v/f counts match the documented format.
 
 ### 12.1 Misunderstood/under-documented concepts now written up
 
-- **P5's water is a render-to-texture world polygon** (`+44=0` →
+- **torus ustep village (P5)'s water is a render-to-texture world polygon** (`+44=0` →
   `textury[0]` waterWorld), fed by the per-frame torus→screen→mirror→OR bake
   and the 128×128 ripple sim — the "water" in the *ring* is not a screen
-  overlay (P2's is); it is 3D geometry texturing a live render target. The
+  overlay (swiatynia city (P2)'s is); it is 3D geometry texturing a live render target. The
   port does reproduce it; this is the first doc that ties record
   `"tu bedzie woda"` to `textury[0]`.
 - The **`+44` world field** is a *texture-slot index*; its source comment
@@ -599,15 +600,15 @@ v/f counts match the documented format.
   is exactly the port's `p2draw.asm` guard against overriding `fs_sel`.
 - **VirSort's index-high-bits packing** is vestigial: the 4-nibble radix
   touches only the low 16 bits, so the sort is purely by `low16(zet)`
-  descending; the port reproduces that key (and P5's `sar bx,4`).
+  descending; the port reproduces that key (and torus ustep village (P5)'s `sar bx,4`).
 - **`WORLD.V3D`** (`CODE/WORLD/WORLD.V3D`, 2,164 B = 4 + 45×48) is a *dev
-  snapshot* of the P5 world whose only difference from the shipped
+  snapshot* of the torus ustep village (P5) world whose only difference from the shipped
   `P5/WORLD` is record 0 (torus **adders (8,5,0)** vs (0,0,0)) — the shipped
   part dropped the built-in torus spin in favor of flight-scene morphing.
   (Earlier ASSETS.md wording "matches P5/WORLD record 0 byte-for-byte" is
   too strong: 44/45 records match; record 0 differs.)
 - **VIRTUAL viewer** is a no-op skeleton in the shipped source; its real
-  world logic lives in P2/P5. The port keeps only a decode/check tool.
+  world logic lives in swiatynia city/torus ustep village (P2/P5). The port keeps only a decode/check tool.
 
 ---
 
@@ -623,21 +624,21 @@ v/f counts match the documented format.
 - **Visibility gate**: `vk_calc_visibility` returns a `visOut` that the loop
   copies back into `world+0`; a visible record draws even if every face
   culls — keep the per-row gate (`cmp d[world],0; je skip`).
-- **P5's texture-0 polygon** needs `_waterWorld` and `_bufor1/2` allocated +
+- **torus ustep village (P5)'s texture-0 polygon** needs `_waterWorld` and `_bufor1/2` allocated +
   the `textury[0]` selector before the world loop; the mirror bake and
   `drawWater` must run in the same frame ordering (torus-vs-water order
   matters for the OR).
-- **SortShift**: `virsort_shift` is 0 (P2) / 4 (P5); never "optimize" the
+- **SortShift**: `virsort_shift` is 0 (swiatynia city (P2)) / 4 (torus ustep village (P5)); never "optimize" the
   sort into a key the original didn't use — the radix must stay far→near on
   the low 16 bits.
 - **ABI**: every NASM→C++ call in this layer needs `RSP%16==0`
   (prologue push-count → `sub rsp,0x28` etc., see PORTING_NOTES.md); the
-  `vk_p2_render_frame` MS-ABI stack args were once shifted +8 (KNOWN_DIFFERENCES #4).
+  `vk_vr_world_render_frame` MS-ABI stack args were once shifted +8 (KNOWN_DIFFERENCES #4).
 - **No z-buffer is a feature**: overlaps resolve by draw order. Adding a
   depth buffer or changing the sort direction changes the look vs the
   original captures.
 - Angle/coordinate conventions: 1/1024 turn, `&0x3ff` at use; ×16 unit
   space; positions authored `val*16`. Preserve these in any new content.
 - Dev fingerprint of a correct VR frame: record order in `worldkol` is
-  descending `low16(zet)`, `world+0` flips 0/1 with depth, and the P5 water
+  descending `low16(zet)`, `world+0` flips 0/1 with depth, and the torus ustep village (P5) water
   plane samples `_waterWorld` (cols 32..287 of the backbuffer baked in).

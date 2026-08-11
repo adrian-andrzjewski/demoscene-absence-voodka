@@ -50,8 +50,8 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   (0x20000, presented). See `port/platform/platform_abi.h`.
   **There is NO module `.data`/`.bss` "capacity" limit** (combined module data
   is only ~40 KB; rip-relative `[rel X]` reaches any image offset). An early
-  P4 "arena migration" was done under the belief the module data was full —
-  a misdiagnosis; the real P4 bugs were ported-register collisions, and P4
+  processorek Nevosolek (P4) "arena migration" was done under the belief the module data was full —
+  a misdiagnosis; the real processorek Nevosolek (P4) bugs were ported-register collisions, and processorek Nevosolek (P4)
   was removed from the port entirely on 2026-08-06 (see Status). The generic
   lesson stands: use a spare register (e.g. `r8`) for scratch so `ecx` stays
   a loop counter, and never load a memory variable whose helper macro
@@ -68,70 +68,70 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   service ids defined in `eos.inc` (original `EOS.INC` is not in the repo, so
   the port defines its own ids). `wait_vbl` = QPC-paced ~70Hz retrace emulation
   (`timer.cpp`); `GetModPos` = libxmp pattern position as **(order<<8)|row**
-  (proven from DEMO.AS^'s `mov al,bl` merge + P1's `0ff00h` order mask;
+  (proven from DEMO.AS^'s `mov al,bl` merge + oko + szklo (P1)'s `0ff00h` order mask;
   validated against DOSBox scene timing).
 - **Selectors:** user-mode x64 forbids arbitrary fs/gs bases. `sel_base_table`
   in `bridge.cpp` maps alloc_selector handles -> base pointers; texture mappers
   read the base up front instead of `fs:[...]`.
 - **Self-modifying code:** the original patches instruction immediates
-  (P6 `BUMPXXX`/`BUMPYYY`, water `WaterX/Y`/`innerWater`, `DESTINY`) — it's
+  (gratki (P6) `BUMPXXX`/`BUMPYYY`, water `WaterX/Y`/`innerWater`, `DESTINY`) — it's
   read-only under DEP. These are ported as explicit memory state with identical
   arithmetic (see `p6.asm`, `water.inc`).
-- **Status:** platform layer, EOS-replacement ABI, and parts P6 (2D bump map)
-  and P7 (7-phase water, 160x100->320x200 upscale) run end-to-end at
-  69.9 fps with audio and per-frame recording. **P4 is ported and wired
+- **Status:** platform layer, EOS-replacement ABI, and parts gratki (P6) (2D bump map)
+  and gratki + woda (P7) (7-phase water, 160x100->320x200 upscale) run end-to-end at
+  69.9 fps with audio and per-frame recording. **processorek Nevosolek (P4) is ported and wired
   (2026-08-06)**: `port/core/parts/p4.asm` (multi-object 3D viewer with its
   own `face` rasterizer, ob/ca Euler matrices, 2951-key camera path from
   vodka 74, logo overlay, tull picture outro) runs `--part 4` (seek 0x0D40)
-  and the full sequence P1-P8 end to end, exit 0, frame-recorded. The
+  and the full sequence all eight scenes end to end, exit 0, frame-recorded. The
   missing `v_txr1.pal`/`proc.pal` were recovered byte-identical from
   `P4.OBJ` (16 grays + 6 black; 33 warm colors - verified against the
-  textures' pixel ranges). P1-P3 are
-  ported and wired; part P5 (`--part 5`, the
+textures' pixel ranges). oko + szklo and tunel + wygibasy are
+ported and wired; the torus ustep village scene (P5) (`--part 5`, the
   morphing-torus-over-water VR scene) is now ported and wired into boot.asm
-  (+ core CMake) and runs crash-free: it reuses the P2 VR layer
-  (vk_p2_render_frame / vk_load_object / vk_prepare+VKdraw / textury) plus a
-  P5-specific 128x128->256x256 water engine (`parts/water.p5.inc`), with its
+  (+ core CMake) and runs crash-free: it reuses the swiatynia city (P2) VR layer
+  (vk_vr_world_render_frame / vk_load_object / vk_prepare+VKdraw / textury) plus a
+  torus ustep village (P5)-specific 128x128->256x256 water engine (`parts/water.p5.inc`), with its
   own World + TRASA camera data (`parts/p5_world.inc`, `parts/p5_trasa.inc`).
-  P8 is now wired and runs crash-free (~70 fps with live animation): the
-  frame-1 sort crash was P8's `prepare`/`co_prepare` doubling con vertex indices
+  nad czerwonym lampa (P8) is now wired and runs crash-free (~70 fps with live animation): the
+  frame-1 sort crash was nad czerwonym lampa (P8)'s `prepare`/`co_prepare` doubling con vertex indices
   into byte-space, so `rotate`'s rcalc/check writes (reference `rcalc[idx*2]`)
   overran module .bss into the engine's `addr_tab` - fixed by moving rcalc/check
   to the arena and using the reference's byte*2 rcalc stride (the port had *4)
   plus reading show()'s face vertex index from con (not rcalc).
 - **Asset-format audit (2026-08-05)** reverse-engineered every runtime format
-  (docs/ASSET_FORMATS.md) and fixed another 10 port bugs: P3 `make_pal` 8-bit
-  clamp semantics, P2 water rewritten faithful to `P2/WATER/WATER.PM` (was a
-  P7-engine reuse: wrong picture, no absence.pal, white screen) as
-  `parts/water.p2.inc` + `p2_watertab.asm`, P5 `vodka 72` sun load, P5 RIP
-  drop injection (`p5_tablica3.asm`, duplicate-+256 bug preserved), P8
+  (docs/ASSET_FORMATS.md) and fixed another 10 port bugs: tunel + wygibasy (P3) `make_pal` 8-bit
+  clamp semantics, swiatynia city (P2) water rewritten faithful to `P2/WATER/WATER.PM` (was a
+  gratki + woda engine reuse: wrong picture, no absence.pal, white screen) as
+  `parts/water.p2.inc` + `p2_watertab.asm`, torus ustep village (P5) `vodka 72` sun load, torus ustep village (P5) RIP
+  drop injection (`p5_tablica3.asm`, duplicate-+256 bug preserved), nad czerwonym lampa (P8)
   outros now actually presented (DAC/VGA writes need explicit
   `vk_present_frame`), water.inc 99-row loop (was 100 = 2-byte OOB write),
-  palette 6->8-bit rounding, `--part 5` boundary 0x1200->0x1400, P6 word-cmp.
-  Full playthrough exit 0; P3 ramp/P2 water palette/P8 outros
+  palette 6->8-bit rounding, `--part 5` boundary 0x1200->0x1400, gratki (P6) word-cmp.
+  Full playthrough exit 0; tunel + wygibasy (P3) ramp/P2 water palette/P8 outros
   frame-record-verified.
 - **Full-pipeline audit (2026-08-05, second pass)** compared every stage
-  (decode/palette/present) against the DOSBox captures: fixed P2's world
-  palette (was P5's 2WORLD.PAL, now the original inline `jjdj` from
+  (decode/palette/present) against the DOSBox captures: fixed swiatynia city (P2)'s world
+  palette (was torus ustep village (P5)'s 2WORLD.PAL, now the original inline `jjdj` from
   `CODE/P2/WORLD.P!` -> `parts/jjdj.pal`; stadium renders red/maroon like
-  the original, env torus dark blue not gold), P3's face rasterizer sampled
+  the original, env torus dark blue not gold), tunel + wygibasy (P3)'s face rasterizer sampled
   map/lgmap swapped (`lgmap[edx]+map[ecx]`) and its `licznik` scroll offset
-  used `mov` instead of `add`, and P1 applied its ModPos>=0x300 white wash
+  used `mov` instead of `add`, and oko + szklo (P1) applied its ModPos>=0x300 white wash
   BEFORE presenting (the original's fade is a post-present sub-frame
   transient, so the red/blue edges + logos were never meant to show
-  brightened). Verified the P8 last.dat fullscreen is already
+  brightened). Verified the nad czerwonym lampa (P8) last.dat fullscreen is already
   byte-exact (the checked-in `port_outro.png` capture predates the present
-  fixes). New `jjdj.repro` CTest guards the P2 palette provenance.
+  fixes). New `jjdj.repro` CTest guards the swiatynia city (P2) palette provenance.
 - **Full playthrough runs clean end-to-end (exit 0, ~66-70 fps)** after the
-  2026-08-04 validation pass fixed: P2 `_file_addr` qword load (64-bit read
-  of a dword var scooped P1's `len`=81), P5 mirror/water 32-bit-vs-16-bit
+  2026-08-04 validation pass fixed: swiatynia city (P2) `_file_addr` qword load (64-bit read
+  of a dword var scooped oko + szklo (P1)'s `len`=81), torus ustep village (P5) mirror/water 32-bit-vs-16-bit
   index truncation (the original water samples with a 16-bit wrap - mask
-  `& 0xffff`), P5 `vk_p2_render_frame` stack-arg shift (+8) and `vodkasel`
+  `& 0xffff`), torus ustep village (P5) `vk_vr_world_render_frame` stack-arg shift (+8) and `vodkasel`
   truncated selector base, `_scrSel` init (boot allocates it like DEMO.AS^),
   the VR face painter-sort (BITSORT Sort was never ported - now `pz_sort` in
-  p2draw.asm + `prep_sort` in P2/P5 init), EOS `wait_vbl` now returns the EOS
-  tick DELTA not the absolute counter (P2's local workaround macro reverted;
-  P8's sun_step clamp wraps robustly), P2 texture slots t[1]=t001 t[2..4]=t002
+p2draw.asm + `prep_sort` in the swiatynia city / torus ustep village (P2/P5) init), EOS `wait_vbl` now returns the EOS
+  tick DELTA not the absolute counter (swiatynia city (P2)'s local workaround macro reverted;
+  nad czerwonym lampa (P8)'s sun_step clamp wraps robustly), swiatynia city (P2) texture slots t[1]=t001 t[2..4]=t002
   (was shifted), and Present(0) instead of vsync (two clocks had summed to
   ~31 fps). ModPos scene table validated vs DOSBox (<=1.7 s over 4 min;
   original plays ~5% slower - DIAMOND/SB16 rate, documented). See
@@ -169,7 +169,7 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   .V3D/.V3M decode via the ported loader) + `tablica3.crosscheck` (generated
   NASM tables vs original TASM text, all five water/drop tables) +
   `pal.integrity` + `pal.repro`
-  (OBJ-extraction reproducibility) + `jjdj.repro` (P2 world-palette
+  (OBJ-extraction reproducibility) + `jjdj.repro` (swiatynia city (P2) world-palette
   provenance vs `CODE/P2/WORLD.P!`) + `build.addr32` (COFF reloc hygiene) +
   `v3d.viewer_parse` (the asset_viewer's own parse selftest: every V3D/V3M
   header/count/index/spin verified); the Python ones are skipped if no
@@ -182,7 +182,7 @@ in this repo**. Source includes absolute machine paths like
 `D:\TASM\EOS\EOS.INC`, `c:\TASM\EOS\EOS.INC`, `\TASM\EOS\EOS.INC`
 (inconsistent across files) — you must have EOS.INC reachable at each path.
 Flow:
-1. Assemble each part `P1..P8` to `.OBJ` (e.g. `CODE/P2/P2.BAT` runs
+1. Assemble each part `P1..nad czerwonym lampa (P8)` to `.OBJ` (e.g. `CODE/P2/P2.BAT` runs
    `tasmx /kh32768 p2.as^`; `P5/M.BAT`, `P6/M.BAT`, `COMS/M.BAT` exist; others
    assemble with plain `tasmx part.as(^)`).
 2. Link everything from `CODE/`:

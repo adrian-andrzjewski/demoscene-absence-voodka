@@ -1,11 +1,11 @@
-// p2loop_selftest.cpp - CTest for the P2 per-frame render loop (p2loop.asm
-// vk_p2_render_frame = CalculateVisiblating -> VirSort -> WorldKol walk ->
+// p2loop_selftest.cpp - CTest for the swiatynia city (P2) per-frame render loop (p2loop.asm
+// vk_vr_world_render_frame = CalculateVisiblating -> VirSort -> WorldKol walk ->
 // prepare/draw dispatch).
 //
 // Builds a synthetic World record table (48B records: +0 visible, +4 X, +8 Y,
 // +12 Z, +16 obj#, +44 type), an object-offset table, a type->texture
 // selector table, sets the camera (vk_make_camera_matrix + cam_cameraX/Y/Z),
-// then runs vk_p2_render_frame in TRACE mode and compares the emitted
+// then runs vk_vr_world_render_frame in TRACE mode and compares the emitted
 // { drawn, recordIndex, objNumber } stream against a C++ reference that
 // re-derives the same visibility gate and painter order.
 //
@@ -24,7 +24,7 @@
 extern "C" void vk_make_camera_matrix(int ax,int ay,int az);
 extern "C" int32_t cam_matrix[16];
 extern "C" int32_t cam_cameraX, cam_cameraY, cam_cameraZ;
-extern "C" void vk_p2_render_frame(uint8_t* base, const int32_t* world, int count,
+extern "C" void vk_vr_world_render_frame(uint8_t* base, const int32_t* world, int count,
                                    int32_t* worldZet, int32_t* worldKol,
                                    const uint32_t* objects, const uint16_t* textury,
                                    int32_t* trace);
@@ -112,7 +112,7 @@ static void run_case(){
 
         // ---- run port ----
         std::vector<int32_t> got(n*3);
-        vk_p2_render_frame(base, world, n, worldZet, worldKol, objects, textury, got.data());
+        vk_vr_world_render_frame(base, world, n, worldZet, worldKol, objects, textury, got.data());
 
         for (int i=0;i<n*3;i++) ck("loop", got[i], eref[i]);
         free(base);
@@ -120,7 +120,7 @@ static void run_case(){
 }
 
 int main(){
-    virsort_shift = 0;   // P2 mode (P5 would be 4)
+    virsort_shift = 0;   // swiatynia city (P2) mode (torus ustep village (P5) would be 4)
     // also exercise the zero-count / all-invisible edge: n=1 behind camera
     {
         srand(7);
@@ -133,14 +133,14 @@ int main(){
         uint16_t textury[4]={1,2,3,4};
         int32_t got[3]={-1,-1,-1};
         world[0]=0; world[1]=0;world[2]=0;world[3]=-100;world[4]=1; world[11]=3;
-        vk_p2_render_frame(base, world, 1, zet, kol, objects, textury, got);
+        vk_vr_world_render_frame(base, world, 1, zet, kol, objects, textury, got);
         ck("edge.drawn", got[0], 0);
         ck("edge.idx", got[1], 0);
         ck("edge.obj", got[2], 0);
         free(base);
     }
     run_case();
-    if (failures==0){ std::printf("p2loop.crosscheck: OK\n"); return 0; }
-    std::printf("p2loop.crosscheck: %d failure(s)\n", failures);
+    if (failures==0){ std::printf("vr_world_loop.crosscheck: OK\n"); return 0; }
+    std::printf("vr_world_loop.crosscheck: %d failure(s)\n", failures);
     return 1;
 }

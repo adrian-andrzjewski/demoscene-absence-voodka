@@ -47,7 +47,7 @@ int main() {
             if (vis[i] != v) { std::printf("FAIL vis t=%d flag[%d]: nasm=%d ref=%d\n",t,i,vis[i],v); if(++failures>=20)break; }
         }
 
-        // virsort on a shuffled zet array, in both key-shift modes (P2=0, P5=4)
+        // virsort on a shuffled zet array, in both key-shift modes (swiatynia city (P2)=0, torus ustep village (P5)=4)
         int32_t keys[N]; for (int i=0;i<N;i++) keys[i]=(int32_t)((rand()%70000)-1000);
         for (int shift = 0; shift <= 4 && failures < 20; shift += 4) {
             virsort_shift = shift;

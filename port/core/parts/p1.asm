@@ -1,6 +1,6 @@
 ; p1.asm - NASM x64 port of CODE/P1/P1.ASM  (part 1: textured 3D head).
 ;
-; Faithful port of P1: a 3D "head" (602 verts / 1156 faces, shape3/constr3),
+; Faithful port of oko + szklo (P1): a 3D "head" (602 verts / 1156 faces, shape3/constr3),
 ; texture-mapped with _rm.inc (map) via tm_face, framed by two 2D cut polygons
 ; (cut_tab1 built from p_tab/p_tab2), with text logos overlaid, and a three
 ; step pixel fade (znika1/2/3) driven by the _wlk1..3 mask frames.
@@ -77,7 +77,7 @@ zoom    EQU 400
 
 ; --------------------------------------------------------------------- .bss
 section .bss align=16
-global part1
+global scene_oko_szklo
 
 scr_sel:    resw 1
 map_sel:    resw 1
@@ -138,8 +138,8 @@ con:
 section .text
 
 ; ------------------------------------------------------------------- part1
-global part1
-part1:
+global scene_oko_szklo
+scene_oko_szklo:
         push    rbp
         mov     rbp, rsp
         push    rbx

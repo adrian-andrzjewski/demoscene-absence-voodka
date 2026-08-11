@@ -1,4 +1,5 @@
-; p4.asm - NASM x64 port of CODE/P4/P4.ASM  (part 4: multi-object 3D viewer).
+; p4.asm - NASM x64 port of CODE/P4/P4.ASM  (processorek Nevosolek:
+; multi-object 3D viewer).
 ;
 ; Scene: 4 sub-objects (222+81+8+256 verts, 440+158+12+384 faces) in one
 ; 567-vertex model space. Per-face texture mapping over 4 textures (sw.inc,
@@ -12,14 +13,15 @@
 ; The raw 567-vertex source block (shape[222] + src1[81] + src2[8] +
 ; src3[256], src1..3 PREPARED in place) lives in the arena as shape_a8 for
 ; n_calc and make_chip. The renderer's logical shape+s1+s2+s3 view is rebuilt
-; in p4_render_shape after make_chip, matching the original contiguous data
+; in processorek_nevosolek_render_shape after make_chip, matching the original contiguous data
 ; layout. The con1..c3 face tables (994x6, modified by prepare/co_prepare)
 ; live in one arena block (con_a8) - n_calc's con_addr and show()/rotate()
 ; both index it. n_vert_src/n_add/n_vert/n_rot are engine working arrays
 ; (arena). draw_tab (sort_addr) is arena. rcalc/check live in module .bss
 ; (small, only this part touches them).
 ;
-; selectors: map1_sel..map4_sel = textures (fs), scr_sel = screen (es). con3
+; selectors: map1_sel..processorek_nevosolek_map4_sel = textures (fs),
+; scr_sel = screen (es). con3
 ; stores the texture MAP INDEX (0..3) instead of a runtime selector handle;
 ; show() resolves mapN_sel -> sel_base_table and keeps the texture base in fsq
 ; (per face) and the screen base in esq (once) - mirrors txtr.asm / p8.
@@ -61,7 +63,7 @@ extern n_calc
 extern rotate_normals
 extern prep_sort
 extern sort
-extern vk_p4_draw_triangle
+extern vk_processorek_nevosolek_draw_triangle
 
 p_len   EQU 222+81+8+256
 f_len   EQU 440+158+12+384
@@ -83,14 +85,14 @@ ruchow  EQU 2951
 
 ; --------------------------------------------------------------------- .bss
 section .bss align=16
-global part4
+global scene_processorek_nevosolek
 
 scr_addr:    resd 1
 scr_sel:     resw 1
 map1_sel:    resw 1
 map2_sel:    resw 1
 map3_sel:    resw 1
-map4_sel:    resw 1
+processorek_nevosolek_map4_sel:    resw 1
 
 _m1off: resd 1
 _m2off: resd 1
@@ -207,12 +209,12 @@ stary:     resw 1
 ; make_chip scratch targets. The original's shape pointer is followed by the
 ; rotated s1/s2/s3 working vertices; sync_render_shape rebuilds that logical
 ; contiguous view after every make_chip call.
-p4_s1: resw 81*3
-p4_s2: resw (8+256)*3
-p4_render_shape: resw p_len*3
+processorek_nevosolek_s1: resw 81*3
+processorek_nevosolek_s2: resw (8+256)*3
+processorek_nevosolek_render_shape: resw p_len*3
 align 8
-global p4_draw_args
-p4_draw_args:
+global processorek_nevosolek_draw_args
+processorek_nevosolek_draw_args:
         resd 6
         resd 3
         resd 1
@@ -240,20 +242,20 @@ map_sel_tab: times 4 dw 0
 
 ; raw vertex block (source of the arena copy)
 sw_shape:
-        %include "p4_vws_1.inc"   ; 222
-        %include "p4_vws_2.inc"   ; 81
-        %include "p4_vws_3.inc"   ; 8
-        %include "p4_vws_4.inc"   ; 256
+%include "p4_vws_1.inc"   ; 222
+%include "p4_vws_2.inc"   ; 81
+%include "p4_vws_3.inc"   ; 8
+%include "p4_vws_4.inc"   ; 256
 
 ; raw face tables (copied to the arena; prepare/co_prepare modify the copies)
 con1:
-        %include "p4_vwc_1.inc"   ; 440
+%include "p4_vwc_1.inc"   ; 440
 c1:
-        %include "p4_vwc_2.inc"   ; 158
+%include "p4_vwc_2.inc"   ; 158
 c2:
-        %include "p4_vwc_3.inc"   ; 12
+%include "p4_vwc_3.inc"   ; 12
 c3:
-        %include "p4_vwc_4.inc"   ; 384
+%include "p4_vwc_4.inc"   ; 384
 
 ; con2 - per-face UV connectivity (pos pair index * 2), 440+158+14 faces x 3
 con2:
@@ -349,9 +351,9 @@ tablica:
 ; --------------------------------------------------------------------- .text
 section .text
 
-; ------------------------------------------------------------------- part4 --
-global part4
-part4:
+; ------------------------------------------------------------------- scene_processorek_nevosolek --
+global scene_processorek_nevosolek
+scene_processorek_nevosolek:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -436,7 +438,7 @@ part4:
         mov     edi, 320*160
         mov     eax, EOS_ALLOCATE_SELECTOR
         call    eos_dispatch
-        mov     [rel map4_sel], ax
+mov     [rel processorek_nevosolek_map4_sel], ax
         movzx   edx, ax
         mov     [rel map_sel_tab+6], dx
 
@@ -585,7 +587,7 @@ part4:
 
         v_sync
         set_pal pal, 0, 256
-        ; P4's sw texture reserves texel 0 for the black clear/unused value.
+        ; processorek Nevosolek (P4)'s sw texture reserves texel 0 for the black clear/unused value.
         ; Keep palette entry 0 black, place the meaningful warm ramp at 1..63,
         ; and leave entry 64 as the generated shaded sw ramp used by the
         ; plane faces (con3 color offset 64).
@@ -761,7 +763,7 @@ part4:
         movzx   ebx, word [rel map3_sel]
         call    eos_dispatch
         mov     eax, EOS_DEALLOCATE_SELECTOR
-        movzx   ebx, word [rel map4_sel]
+movzx   ebx, word [rel processorek_nevosolek_map4_sel]
         call    eos_dispatch
 
         add     rsp, 0x28
@@ -1084,7 +1086,7 @@ make_pts:
 ;            idiv by bx(=3), write x,y,z words. rsi = face table (arena),
 ;            rdi = pts out, ecx = faces.
 calc_pts:
-        lea     r14, [rel p4_render_shape]
+        lea     r14, [rel processorek_nevosolek_render_shape]
 .cp:
         movzx   ebp, word [rsi]
         lea     r12d, [ebp*2+ebp]
@@ -1172,17 +1174,17 @@ sync_render_shape:
         mov     eax, [rel shape_a8]
         add     rax, qword [rel Code32_addr]
         mov     rsi, rax
-        lea     rdi, [rel p4_render_shape]
+        lea     rdi, [rel processorek_nevosolek_render_shape]
         mov     ecx, 222*6
         rep movsb
 
-        lea     rsi, [rel p4_s1]
-        lea     rdi, [rel p4_render_shape+222*6]
+        lea     rsi, [rel processorek_nevosolek_s1]
+        lea     rdi, [rel processorek_nevosolek_render_shape+222*6]
         mov     ecx, 81*6
         rep movsb
 
-        lea     rsi, [rel p4_s2]
-        lea     rdi, [rel p4_render_shape+(222+81)*6]
+        lea     rsi, [rel processorek_nevosolek_s2]
+        lea     rdi, [rel processorek_nevosolek_render_shape+(222+81)*6]
         mov     ecx, (8+256)*6
         rep movsb
 
@@ -1216,7 +1218,7 @@ make_chip:
         add     eax, 222*6
         add     rax, qword [rel Code32_addr]
         mov     rsi, rax
-        lea     rdi, [rel p4_s1]
+        lea     rdi, [rel processorek_nevosolek_s1]
         mov     ecx, 81
         call    ro_chip
 
@@ -1252,7 +1254,7 @@ make_chip:
         add     eax, (222+81)*6
         add     rax, qword [rel Code32_addr]
         mov     rsi, rax
-        lea     rdi, [rel p4_s2]
+        lea     rdi, [rel processorek_nevosolek_s2]
         mov     ecx, 8+256
         call    ro_chip
 
@@ -1498,7 +1500,7 @@ rotate:
         mov     eax, [rel con_a8]
         add     rax, qword [rel Code32_addr]
         mov     r13, rax
-        lea     r14, [rel p4_render_shape]
+        lea     r14, [rel processorek_nevosolek_render_shape]
         lea     r8, [rel check]
         lea     r9, [rel rcalc]
         lea     rsi, [rel pts_tab]
@@ -1951,7 +1953,7 @@ show:
         sub     bx, cx
         js      .hide
 .draw:
-        lea     rax, [rel p4_draw_args]
+        lea     rax, [rel processorek_nevosolek_draw_args]
         mov     edx, [rel x_1]
         mov     [rax], edx
         mov     edx, [rel y_1]
@@ -1980,7 +1982,7 @@ show:
         ; show() has one per-face push active here; it already restores the
         ; entry alignment, so reserve the normal 32-byte shadow space.
         sub     rsp, 0x20
-        call    vk_p4_draw_triangle
+        call    vk_processorek_nevosolek_draw_triangle
         add     rsp, 0x20
 .hide:
         pop     rsi
@@ -1991,10 +1993,10 @@ show:
         ret
 
 ; ===================================================================== face
-; Textured-triangle rasterizer (P4's own, identical shape to txtr.asm's
+; Textured-triangle rasterizer (processorek Nevosolek (P4)'s own, identical shape to txtr.asm's
 ; tm_face). x_1..3/y_1..3 + p_1..3 from show; low byte of `col` offset added
 ; to every texel; texture base in fsq, screen base in esq. The production
-; show path uses vk_p4_draw_triangle for bounded edge coverage; this original
+; show path uses vk_processorek_nevosolek_draw_triangle for bounded edge coverage; this original
 ; fixed-point routine remains below as a source reference.
 face:
         push    rbp

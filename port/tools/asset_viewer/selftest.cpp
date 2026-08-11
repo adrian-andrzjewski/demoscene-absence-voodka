@@ -148,13 +148,13 @@ int main() {
             int nov, nof;
         };
         const DatasExpected kDatas[] = {
-            {"shape3+constr3", 602, 1156},   // P1
-            {"log_s+log_c",     341,  646},   // P3
-            {"vws_1+vwc_1",     222,  440},   // P4
+            {"shape3+constr3", 602, 1156},   // oko + szklo (P1)
+            {"log_s+log_c",     341,  646},   // tunel + wygibasy (P3)
+            {"vws_1+vwc_1",     222,  440},   // processorek Nevosolek (P4)
             {"vws_2+vwc_2",      81,  158},
             {"vws_3+vwc_3",       8,   12},
             {"vws_4+vwc_4",     256,  384},
-            {"sw_s_1+sw_c_1",    40,   40},   // P8
+            {"sw_s_1+sw_c_1",    40,   40},   // nad czerwonym lampa (P8)
             {"sw_s_2+sw_c_2",    33,   48},
             {"ob_s_1+ob_c_1",   114,  224},
             {"ob_s_2+ob_c_2",   128,  256},

@@ -1,6 +1,6 @@
-; p4_raster.asm - native x64 replacement for the production P4 bridge.
+; p4_raster.asm - native x64 replacement for the production processorek Nevosolek (P4) bridge.
 ;
-; The P4 core passes a pointer to the fixed-layout P4DrawArgs record.  This
+; The processorek Nevosolek (P4) core passes a pointer to the fixed-layout ProcessorekNevosolekDrawArgs record.  This
 ; scan converter intentionally follows bridge.cpp's C++ oracle: sort by Y,
 ; interpolate the long and short edges in double precision, clamp the
 ; covered rectangle, and use the original 8-bit wrapped texture address.
@@ -8,7 +8,7 @@
 BITS 64
 DEFAULT REL
 
-; P4DrawArgs
+; ProcessorekNevosolekDrawArgs
 %define ARG_XY       0
 %define ARG_UV       24
 %define ARG_TEXTURE  40
@@ -27,13 +27,13 @@ DEFAULT REL
 %define SCREEN       -0xf8
 %define COLOR        -0xfc
 
-global vk_p4_draw_triangle
-global vk_p4_draw_triangle_asm
+global vk_processorek_nevosolek_draw_triangle
+global vk_processorek_nevosolek_draw_triangle_asm
 
 section .text
 
-vk_p4_draw_triangle:
-vk_p4_draw_triangle_asm:
+vk_processorek_nevosolek_draw_triangle:
+vk_processorek_nevosolek_draw_triangle_asm:
         push    rbp
         mov     rbp, rsp
         push    rbx

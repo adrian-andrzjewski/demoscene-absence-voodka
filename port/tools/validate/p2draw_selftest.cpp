@@ -1,4 +1,4 @@
-// p2draw_selftest.cpp - CTest for the P2 object rasterizer (p2draw.asm
+// p2draw_selftest.cpp - CTest for the swiatynia city (P2) object rasterizer (p2draw.asm
 // DrawObject / DrawZielonyLudek).
 //
 // Constructs synthetic objects (type 1 TEXTURE and type 2 PHONG) with known
@@ -22,7 +22,7 @@
 #include <algorithm>
 
 extern "C" void vk_draw_object_trace(uint8_t* base, uint32_t objOff, int32_t* rec);
-extern "C" void ts_p2draw_set_base(uint8_t* base, void* rec);
+extern "C" void ts_vr_object_draw_set_base(uint8_t* base, void* rec);
 
 static int failures = 0;
 static void ck2(int idx, int32_t got, int32_t want){
@@ -156,7 +156,7 @@ static void run_case(bool phong, int NV, int NOF){
 
     // run trace
     std::vector<int32_t> got(NOF*10);
-    ts_p2draw_set_base(base, got.data());
+    ts_vr_object_draw_set_base(base, got.data());
     vk_draw_object_trace(base, OBJ, got.data());
 
     int nrec = NOF*10;
@@ -169,7 +169,7 @@ int main(){
     for (int t=0;t<400 && failures<20;t++){
         run_case(t&1, 8+(rand()%20), 6+(rand()%16));
     }
-    if (failures==0){ std::printf("p2draw.crosscheck: OK\n"); return 0; }
-    std::printf("p2draw.crosscheck: %d failure(s)\n", failures);
+    if (failures==0){ std::printf("vr_object_draw.crosscheck: OK\n"); return 0; }
+    std::printf("vr_object_draw.crosscheck: %d failure(s)\n", failures);
     return 1;
 }

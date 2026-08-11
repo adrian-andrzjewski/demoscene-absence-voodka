@@ -1,4 +1,4 @@
-; p1_data.inc - static data for the P1 port (mirrors P1.ASM's data section).
+; p1_data.inc - static data for the oko + szklo (P1) port (mirrors P1.ASM's data section).
 
 ; per-frame screen-shift table (33 entries; indexed by ModPos & 31)
 section .data

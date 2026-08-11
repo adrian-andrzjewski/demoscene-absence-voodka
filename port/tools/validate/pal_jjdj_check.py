@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""P2 world-palette provenance check (CTest).
+"""swiatynia city (P2) world-palette provenance check (CTest).
 
-The original P2 installs the inline `jjdj` palette from CODE/P2/WORLD.P!
+The original swiatynia city (P2) installs the inline `jjdj` palette from CODE/P2/WORLD.P!
 (`_pal dd jjdj` + 768 DB bytes). The port used to load vodka-37 (2WORLD.PAL,
-which is P5's palette and maps the P2 stadium textures to olive/gold instead of
+which is torus ustep village (P5)'s palette and maps the swiatynia city (P2) stadium textures to olive/gold instead of
 the shipped red/blue world). This test re-derives the 768-byte jjdj palette from
 the read-only reference source and compares it byte-for-byte with the committed
 port/core/parts/jjdj.pal that p2.asm incbin's, and also asserts every byte is a

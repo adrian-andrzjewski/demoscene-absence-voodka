@@ -33,7 +33,7 @@ global _file_addr
 _file_addr: resd 1
 
 ; normal-scale constant used by the engine's n_calc normalize step
-; (DEMO.AS^: `public len; len dd 0`; P1 sets it to 81)
+; (DEMO.AS^: `public len; len dd 0`; oko + szklo (P1) sets it to 81)
 global len
 len: resd 1
 

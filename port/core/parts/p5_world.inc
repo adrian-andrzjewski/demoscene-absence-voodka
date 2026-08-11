@@ -1,8 +1,8 @@
-; p5_world.inc - P5 world records (12 dd = 48B each), converted from WORLD
-global p5_world
-global p5_worldsobjects
-p5_worldsobjects: dd 45
-p5_world:
+; torus_ustep_village_world.inc - torus ustep village (P5) world records (12 dd = 48B each), converted from WORLD
+global torus_ustep_village_world
+global torus_ustep_village_worldsobjects
+torus_ustep_village_worldsobjects: dd 45
+torus_ustep_village_world:
         dd 0,    0,-400*16,0,   3,   256,0,0,   0,0,0, 3 ;do_punktu
         dd 0,  -600*16,0, 2172*16,   1,   0,0,0,   0,0,0, 1 ;do_punktu
         dd 0,     0,0, 2172*16,   2,   0,0,0,   0,0,0, 1 ;do_punktu

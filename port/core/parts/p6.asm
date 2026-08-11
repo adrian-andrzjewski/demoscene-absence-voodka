@@ -27,7 +27,7 @@ extern white
 
 section .bss
 ; per-frame scratch
-global part6
+global scene_gratki
 
 section .data
 ramki:       dd 0
@@ -49,8 +49,8 @@ bump_y_base: dd 0
 section .text
 
 ; ---------------------------------------------------------------- part6 ----
-global part6
-part6:
+global scene_gratki
+scene_gratki:
         push    rbp
         mov     rbp, rsp
         push    rbx

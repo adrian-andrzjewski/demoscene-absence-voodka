@@ -1,6 +1,6 @@
 ; p3.asm - NASM x64 port of CODE/P3/P3.ASM  (part 3: twisted landscape + tunnel).
 ;
-; Faithful port. P3 is a P1-style ENGINE part: same engine.asm reuse (shape/
+; Faithful port. tunel + wygibasy (P3) uses the oko + szklo (P1)-style ENGINE part: same engine.asm reuse (shape/
 ; con/n_calc/rotate_shape/rotate_normals/bit_sort/sort + a textured-triangle
 ; show/face).  Two extras:
 ;   - tooneling : the background tunnel, sampling the shared _tableToonel u/v
@@ -29,7 +29,7 @@
 ; routine adds Code32_addr before dereferencing.  shape/con statics are copied
 ; into the arena by p3_engine_set.
 ;
-; Timeline (ModPos): P3 spans 0x0B40..0x0D3E (tunnel flashes near the end).
+; Timeline (ModPos): tunel + wygibasy (P3) spans 0x0B40..0x0D3E (tunnel flashes near the end).
 ;
 ; ABI: 8-push prologue + sub 0x28 -> RSP%16==0 at call sites.
 
@@ -51,7 +51,7 @@ extern white
 extern sel_base_table
 extern len
 
-; engine surfaces (engine.asm) - same globals P1/P2 use
+; engine surfaces (engine.asm) - same globals used by oko + szklo/swiatynia city (P1/P2)
 extern shape_addr
 extern srot_addr
 extern n_addr
@@ -109,7 +109,7 @@ y2_max   EQU 200
 %endmacro
 
 section .data align=16
-global part3
+global scene_tunel_wygibasy
 
 map_sel:   dw 0
 lgmap_sel: dw 0
@@ -240,8 +240,8 @@ section .bss align=16
 section .text
 
 ; ================================================================== PART3 ===
-global part3
-part3:
+global scene_tunel_wygibasy
+scene_tunel_wygibasy:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -338,7 +338,7 @@ part3:
         ; rate (~35 fps instead of the original's ~70 fps). Since wait_vbl at
         ; the top of this loop already lands on the frame boundary, v_sync is
         ; dropped here so the object's per-frame rotation stays in sync with
-        ; the original (the whole P3 object phase cycle, including the solid
+        ; the original (the whole tunel + wygibasy (P3) object phase cycle, including the solid
         ; cog pose, is then reached).
         ; skrin -> framebuffer
         mov     esi, [rel skrin]
@@ -1089,7 +1089,7 @@ section .data
 section .text
 
 ; ---------------------------------------------------------------- face ------
-; Dual-texture rasterizer. Port of P3's face with self-modifying steps ->
+; Dual-texture rasterizer. Port of tunel + wygibasy (P3)'s face with self-modifying steps ->
 ; explicit f_pstep/f_estep and resolved register bases.
 face:
         push    rbp

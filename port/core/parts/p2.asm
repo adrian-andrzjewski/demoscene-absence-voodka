@@ -1,13 +1,14 @@
 ; p2.asm - NASM x64 port of CODE/P2/P2.AS^  (part 2: the 3D stadium fly-through
 ; + the reflective water floor).
 ;
-; Faithful port. The per-frame world render is delegated to vk_p2_render_frame
+; Faithful port. The per-frame VR-world render is delegated to
+; vk_vr_world_render_frame
 ; (p2loop.asm) which already composes MakeCameraMatrix-input visibility +
 ; VirSort + the WorldKol walk + prepareObjectVirtual + drawObject, so this file
-; only sequences the P2 stage: camera path selection, world angle adders, the
+; only sequences the swiatynia city (P2) stage: camera path selection, world angle adders, the
 ; two frame loops (Main world / Main2 water), the sun sprite, and the drops.
 ;
-; Timeline (ModPos): P2 spans 0x0400..0x0B40 (per app.cpp kPartStartModPos).
+; Timeline (ModPos): swiatynia city (P2) spans 0x0400..0x0B40 (per app.cpp kPartStartModPos).
 ;   Main  : world fly-through (camera from trasa/widoki), exits at >0x730.
 ;   wodda : fade + pikus water picture; Main2 loops camera+world until 0xB3F.
 ;
@@ -53,19 +54,19 @@ extern fs_sel
 extern gs_sel
 
 ; p2 render loop + camera path
-extern vk_p2_render_frame
-extern vk_p2_camera
-extern vk_p2_camera_flash_flag
+extern vk_vr_world_render_frame
+extern vk_swiatynia_city_camera
+extern vk_swiatynia_city_camera_flash_flag
 extern vk_make_camera_matrix
 extern vk_load_object
 
 ; world table (p2world.asm) + object struct offsets (loader.asm)
-extern vk_p2_world
-extern vk_p2_worldsobjects
+extern vk_swiatynia_city_world
+extern vk_swiatynia_city_worldsobjects
 extern lo_objects
 
 section .data align=16
-global part2
+global scene_swiatynia_city
 
 ramki:      dd 0
 last_vbl:   dd 0
@@ -77,8 +78,8 @@ znacznik:   dd 0
 lampa:      db 0
 ; world palette (jjdj, the original P2/world.p! inline palette) - the init
 ; copies jjdj into the arena and stores the arena offset here (port convention:
-; add Code32_addr to use). NOT vodka 37: 2WORLD.PAL is P5's palette and maps the
-; P2 textures to olive/gold instead of the shipped red/blue world.
+; add Code32_addr to use). NOT vodka 37: 2WORLD.PAL is torus ustep village (P5)'s palette and maps the
+; swiatynia city (P2) textures to olive/gold instead of the shipped red/blue world.
 _pal:       dd 0
 jjdj:
         incbin "jjdj.pal"
@@ -127,9 +128,9 @@ worldkol:   resd 256
 
 section .text
 
-; ------------------------------------------------------------------ part2 ---
-global part2
-part2:
+; ------------------------------------------------------------------ scene_swiatynia_city ---
+global scene_swiatynia_city
+scene_swiatynia_city:
         push    rbp
         mov     rbp, rsp
         push    rbx
@@ -165,7 +166,7 @@ part2:
         extern prep_sort
         call    prep_sort
 
-        ; VirSort key shift: P2's INC/VIRSORT.PM uses low16(zet) unshifted
+        ; VirSort key shift: swiatynia city (P2)'s INC/VIRSORT.PM uses low16(zet) unshifted
         extern virsort_shift
         mov     dword [rel virsort_shift], 0
 
@@ -185,8 +186,8 @@ part2:
         ;      floor then showed the gold obrazek noise instead of t001)
         %macro texsel_from_vodka 2       ; %1=vka idx, %2=textury word slot
         ; NOTE: _file_addr is a DWORD (globals.asm resd). A 64-bit load also
-        ; scoops the following dword (`len`, which P1 sets to 81), so after
-        ; P1 runs rsi becomes garbage (0x51_00040000) and the table deref
+        ; scoops the following dword (`len`, which oko + szklo (P1) sets to 81), so after
+        ; oko + szklo (P1) runs rsi becomes garbage (0x51_00040000) and the table deref
         ; crashes. Keep this a 32-bit load (zero-extends cleanly).
         mov     esi, [rel _file_addr]
         add     rsi, qword [rel Code32_addr]
@@ -241,8 +242,8 @@ part2:
         AllocateMemory 64000, stary
 
         ; ---- initial camera from first_ruch (= trasa[0] xyz angles) ----
-        extern vk_p2_trasa
-        lea     rsi, [rel vk_p2_trasa]
+        extern vk_swiatynia_city_trasa
+        lea     rsi, [rel vk_swiatynia_city_trasa]
         mov     eax, [rsi + 0]
         mov     [rel cam_cameraX], eax
         mov     eax, [rsi + 4]
@@ -264,10 +265,10 @@ part2:
         ; original EOS; no last_vbl priming needed here anymore)
 
         ; ---- world palette (jjdj = the original P2/world.p! inline palette)
-        ; for the stadium; P1 hands off with a full-white palette (p1.asm
-        ; .virtual), so P2 fades into _pal below. The original P2.AS^ defines
-        ; `_pal dd jjdj`; 2WORLD.PAL (vodka 37) is P5's palette and would map
-        ; the P2 textures to olive/gold instead of the shipped red/blue world.
+        ; for the stadium; oko + szklo (P1) hands off with a full-white palette (p1.asm
+        ; .virtual), so swiatynia city (P2) fades into _pal below. The original P2.AS^ defines
+        ; `_pal dd jjdj`; 2WORLD.PAL (vodka 37) is torus ustep village (P5)'s palette and would map
+        ; the swiatynia city (P2) textures to olive/gold instead of the shipped red/blue world.
         AllocateMemory 768, _pal
         lea     rsi, [rel jjdj]                  ; source (module .data)
         mov     rdi, [rel _pal]
@@ -277,7 +278,7 @@ part2:
 
 ; ------------------------------------------------------------------- Main ---
 .main_loop:
-        ; ---- palette fade-in from P1's white end-state toward _pal (world).
+        ; ---- palette fade-in from oko + szklo (P1)'s white end-state toward _pal (world).
         ; Faithful port of P2.AS^ Main 130-143: a per-frame ileFadow ramp that
         ; steps pal_fadein10 by (ileFadow>>1) toward _pal, dissolving white.
         mov     eax, [rel ileFadow]
@@ -303,26 +304,26 @@ part2:
         ; ---- camera: trasa path or scripted widoki ----
         movzx   ecx, ax
         mov     edx, [rel trasa_ruch]
-        lea     r8, [rel p2_cam_out]
-        call    vk_p2_camera
+        lea     r8, [rel swiatynia_city_cam_out]
+        call    vk_swiatynia_city_camera
         ; apply camera result to globals
-        mov     eax, [rel p2_cam_out+0]
+        mov     eax, [rel swiatynia_city_cam_out+0]
         mov     [rel cam_cameraX], eax
-        mov     eax, [rel p2_cam_out+4]
+        mov     eax, [rel swiatynia_city_cam_out+4]
         mov     [rel cam_cameraY], eax
-        mov     eax, [rel p2_cam_out+8]
+        mov     eax, [rel swiatynia_city_cam_out+8]
         mov     [rel cam_cameraZ], eax
-        mov     eax, [rel p2_cam_out+12]
+        mov     eax, [rel swiatynia_city_cam_out+12]
         mov     [rel cam_eyeAX], eax
-        mov     eax, [rel p2_cam_out+16]
+        mov     eax, [rel swiatynia_city_cam_out+16]
         mov     [rel cam_eyeAY], eax
-        mov     eax, [rel p2_cam_out+20]
+        mov     eax, [rel swiatynia_city_cam_out+20]
         mov     [rel cam_eyeAZ], eax
 
         ; WIDOKI's seventh dword marks the still-camera cuts that flash the
         ; current world palette to pure white.  `plum` is the previous ModPos
         ; guard from P2.AS^, so a held audio position cannot retrigger it.
-        cmp     dword [rel vk_p2_camera_flash_flag], 0
+        cmp     dword [rel vk_swiatynia_city_camera_flash_flag], 0
         je      .no_widoki_flash
         movzx   eax, word [rel ModPos]
         cmp     dword [rel plum], eax
@@ -336,7 +337,7 @@ part2:
         ; ---- trasa-path camera advance + world rotation (P2.AS^ ruchamy) ----
         ; Only the trasa path (ModPos <= 0x63F) advances trasa_ruch / rotates the
         ; world; the scripted widoki phase does neither.
-        lea     r12, [rel vk_p2_world]      ; world base (register-indirect avoids
+        lea     r12, [rel vk_swiatynia_city_world]      ; world base (register-indirect avoids
                                             ; ADDR32 reloc to the external .data)
         cmp     word [rel ModPos], 0x63f
         jg      .no_ruch
@@ -402,7 +403,7 @@ part2:
 
 .do_katys:
         ; ---- world angle adders: world[i].angle += world[i].adder ----
-        mov     r13d, [rel vk_p2_worldsobjects]   ; value
+        mov     r13d, [rel vk_swiatynia_city_worldsobjects]   ; value
         xor     ecx, ecx
 .katys:
         cmp     ecx, r13d
@@ -431,26 +432,26 @@ part2:
 
         ; ---- render the world (visibility+sort+walk: prepare+draw) ----
         mov     rcx, [rel Code32_addr]          ; base
-        lea     rdx, [rel vk_p2_world]      ; direct data label address
-        mov     r8d, [rel vk_p2_worldsobjects]
+        lea     rdx, [rel vk_swiatynia_city_world]      ; direct data label address
+        mov     r8d, [rel vk_swiatynia_city_worldsobjects]
         lea     r9, [rel worldzet]
         lea     rax, [rel worldkol]
-        mov     [rel p2_kol_tmp], rax
+        mov     [rel swiatynia_city_kol_tmp], rax
         lea     rax, [rel lo_objects]
-        mov     [rel p2_obj_tmp], rax
+        mov     [rel swiatynia_city_obj_tmp], rax
         lea     rax, [rel textury]
-        mov     [rel p2_tex_tmp], rax
-        ; vk_p2_render_frame(base, world, count, zet, kol, objects, textury, trace=0)
+        mov     [rel swiatynia_city_tex_tmp], rax
+        ; vk_vr_world_render_frame(base, world, count, zet, kol, objects, textury, trace=0)
         ; 5th..8th args at [rsp+0x20..0x38] (callee reads they at +0x20/+0x28/+0x30/+0x38).
         sub     rsp, 0x20
-        mov     rax, [rel p2_kol_tmp]
+        mov     rax, [rel swiatynia_city_kol_tmp]
         mov     [rsp+0x20], rax
-        mov     rax, [rel p2_obj_tmp]
+        mov     rax, [rel swiatynia_city_obj_tmp]
         mov     [rsp+0x28], rax
-        mov     rax, [rel p2_tex_tmp]
+        mov     rax, [rel swiatynia_city_tex_tmp]
         mov     [rsp+0x30], rax
         mov     qword [rsp+0x38], 0
-        call    vk_p2_render_frame
+        call    vk_vr_world_render_frame
         add     rsp, 0x20
 
         ; ---- sun sprite ----
@@ -481,7 +482,7 @@ part2:
         call    pikus
 
         ; restore stary (the pre-water screen) into the presented framebuffer
-        ; before the final P2 water-transition flash, matching the original's
+        ; before the final swiatynia city (P2) water-transition flash, matching the original's
         ; copy to VGA memory while its DAC is still white.
         mov     esi, [rel stary]
         add     rsi, qword [rel Code32_addr]
@@ -499,7 +500,7 @@ part2:
         call    pal_flash
 
         ; world[0] angle adders for Main2 water wobble
-        lea     r12, [rel vk_p2_world]
+        lea     r12, [rel vk_swiatynia_city_world]
         mov     dword [r12+32], 16
         mov     dword [r12+36], 6
         mov     dword [r12+40], 2
@@ -525,27 +526,27 @@ part2:
         movzx   ecx, word [rel ModPos]
         and     ecx, 0x63f                  ; force trasa branch
         mov     edx, [rel trasa_ruch]
-        lea     r8, [rel p2_cam_out]
-        call    vk_p2_camera
-        mov     eax, [rel p2_cam_out+0]
+        lea     r8, [rel swiatynia_city_cam_out]
+        call    vk_swiatynia_city_camera
+        mov     eax, [rel swiatynia_city_cam_out+0]
         mov     [rel cam_cameraX], eax
-        mov     eax, [rel p2_cam_out+4]
+        mov     eax, [rel swiatynia_city_cam_out+4]
         mov     [rel cam_cameraY], eax
-        mov     eax, [rel p2_cam_out+8]
+        mov     eax, [rel swiatynia_city_cam_out+8]
         mov     [rel cam_cameraZ], eax
-        mov     eax, [rel p2_cam_out+12]
+        mov     eax, [rel swiatynia_city_cam_out+12]
         mov     [rel cam_eyeAX], eax
-        mov     eax, [rel p2_cam_out+16]
+        mov     eax, [rel swiatynia_city_cam_out+16]
         mov     [rel cam_eyeAY], eax
-        mov     eax, [rel p2_cam_out+20]
+        mov     eax, [rel swiatynia_city_cam_out+20]
         mov     [rel cam_eyeAZ], eax
 
         mov     eax, [rel ramki]
         add     [rel trasa_ruch], eax
 
         ; ---- world angle adders for all records ----
-        lea     r12, [rel vk_p2_world]
-        mov     r13d, [rel vk_p2_worldsobjects]
+        lea     r12, [rel vk_swiatynia_city_world]
+        mov     r13d, [rel vk_swiatynia_city_worldsobjects]
         xor     ecx, ecx
 .katyz:
         cmp     ecx, r13d
@@ -569,18 +570,18 @@ part2:
 
         ; ---- render ----
         sub     rsp, 0x20
-        mov     rax, [rel p2_kol_tmp]
+        mov     rax, [rel swiatynia_city_kol_tmp]
         mov     [rsp+0x20], rax
-        mov     rax, [rel p2_obj_tmp]
+        mov     rax, [rel swiatynia_city_obj_tmp]
         mov     [rsp+0x28], rax
-        mov     rax, [rel p2_tex_tmp]
+        mov     rax, [rel swiatynia_city_tex_tmp]
         mov     [rsp+0x30], rax
         mov     qword [rsp+0x38], 0
         mov     rcx, [rel Code32_addr]
-        lea     rdx, [rel vk_p2_world]
-        mov     r8d, [rel vk_p2_worldsobjects]
+        lea     rdx, [rel vk_swiatynia_city_world]
+        mov     r8d, [rel vk_swiatynia_city_worldsobjects]
         lea     r9, [rel worldzet]
-        call    vk_p2_render_frame
+        call    vk_vr_world_render_frame
         add     rsp, 0x20
 
         ; ---- bolek toggle (sun sweep direction) ----
@@ -773,8 +774,8 @@ pikus:
         mov     ecx, 16000
         rep movsd
 
-        call    drawWaterP2
-        call    calculateWaterP2
+        call    drawWaterSwiatyniaCity
+        call    calculateWaterSwiatyniaCity
         inc     dword [rel nPage]
 
         WaitVblDelta
@@ -799,10 +800,10 @@ pikus:
 ; ------------------------------------------------------------ data/section ---
 ; camera selection scratch + render-frame arg temps
 section .data align=16
-p2_cam_out: times 8 dd 0
-p2_kol_tmp: dq 0
-p2_obj_tmp: dq 0
-p2_tex_tmp: dq 0
+swiatynia_city_cam_out: times 8 dd 0
+swiatynia_city_kol_tmp: dq 0
+swiatynia_city_obj_tmp: dq 0
+swiatynia_city_tex_tmp: dq 0
 _obidx:   dd 0
 ; pikus (water stage) asset offsets - arena offsets, add Code32_addr to use
 _obrazek2: dd 0                     ; vodka 17 = absence.dat (refraction pic)

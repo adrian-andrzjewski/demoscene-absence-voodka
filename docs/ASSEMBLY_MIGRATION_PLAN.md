@@ -118,7 +118,7 @@ Record the current behavior before changing the production target:
 - Current libxmp PCM output.
 - Audio self-check results.
 - Pause/resume behavior.
-- `--part`, `--modpos`, `--ms`, and `--order` behavior.
+- canonical `--scene` plus historical `--part`, `--modpos`, `--ms`, and `--order` behavior.
 - Window-close behavior in every part.
 - Headless/no-audio behavior.
 - Release executable size and link map.
@@ -235,7 +235,7 @@ and Release calls belong to NASM.
    presenter and compare GPU readback against expected RGBA pixels.
 2. Compare indexed framebuffer, palette, and GPU diagnostic captures against
    the C++ reference byte-for-byte.
-3. Run the first four diagnostic frames from P1, P2, P4, P7, and P8 through
+3. Run the first four diagnostic frames from oko + szklo (P1), swiatynia city (P2), processorek Nevosolek (P4), gratki + woda (P7), and nad czerwonym lampa (P8) through
    both presenter implementations.
 4. Confirm exact 4x nearest-neighbour scaling and row-pitch handling.
 5. Exercise repeated initialization, partial-failure cleanup, and shutdown
@@ -256,8 +256,8 @@ No-go if D3D11 cannot be made reliable with explicit assembly COM calls. Do not
 spend time converting input, logging, or allocators before this gate passes.
 
 Current result (2026-08-09): **GO**. The standalone and integrated assembly
-presenter gates passed, including byte-identical P1/P2/P4/P7/P8 captures and a
-17,611-frame full P1-P8 run. Phase 1C has since moved the C++ presenter into
+presenter gates passed, including byte-identical oko + szklo/swiatynia city/processorek Nevosolek/gratki + woda/nad czerwonym lampa captures and a
+17,611-frame full eight-scene run. Phase 1C has since moved the C++ presenter into
 the non-shipped `VOODKA_REFERENCE.exe` oracle; the shipped `VOODKA.exe` now
 uses the NASM presenter by default and retains only a C++ recording/diagnostic
 dispatch around it.
@@ -612,7 +612,7 @@ Implement:
 - Entry-part selection.
 - Key-map copy.
 - Logging bridge.
-- P4 triangle rasterizer.
+- processorek Nevosolek (P4) triangle rasterizer.
 
 ### Assembly interfaces
 
@@ -639,12 +639,12 @@ vk_audio_seek_ms
 vk_audio_seek_order
 vk_key_map_copy
 vk_log_printf
-vk_p4_draw_triangle
+vk_processorek_nevosolek_draw_triangle
 ```
 
-### P4 rasterizer
+### processorek Nevosolek (P4) rasterizer
 
-Port the current `vk_p4_draw_triangle` independently and compare it against
+Port the current `vk_processorek_nevosolek_draw_triangle` independently and compare it against
 the C++ implementation using randomized triangles, edge cases, UV wrapping,
 clipping, and degenerate geometry.
 
@@ -663,7 +663,7 @@ Go only if:
 
 - Every NASM-core call resolves to assembly or an approved external Windows import.
 - EOS service behavior remains unchanged.
-- P4 output matches the C++ reference.
+- processorek Nevosolek (P4) output matches the C++ reference.
 - Existing NASM-vs-C++ bridge tests pass.
 - The complete demo runs using the assembly bridge.
 
@@ -855,7 +855,7 @@ seeks, pauses, and shuts down without any C or C++ implementation object.
 - Phase-aligned framebuffer comparison.
 - Palette byte comparison.
 - GPU readback comparison.
-- P4 rasterizer randomized comparison.
+- processorek Nevosolek (P4) rasterizer randomized comparison.
 - ModPos trace comparison.
 - Full PCM comparison where possible.
 - Perceptual and spectral audio comparison where exact PCM differs.
@@ -971,7 +971,7 @@ production soundtrack-path resolver into NASM, removes the production host's
 dead command-line getter/storage path, and passes a stable assembly path
 pointer directly into the dedicated audio initializer. Its focused path/arena
 gates and complete 61-test suite pass. Phase 3B.6.7B.2 now moves the
-production seek precedence, part-start table, self-test loop, audio-check
+production seek precedence, scene-start table, self-test loop, audio-check
 dispatch, crash-filter handoff, and DemoStart32 result branch into NASM. Its
 mode probe and complete 62-test suite pass. Phase 3B.6.7B.3 now moves the
 production subsystem initialization order, quit checkpoints, service argument
@@ -988,7 +988,7 @@ symbols, owns the logger/timeline forwarding and formatting boundary, and
 retains only the narrow `vk_log_printf` bridge for remaining C++ services.
 The ABI probe and complete 65-test suite pass; the reference target retains
 the C++ implementations as the behavioral oracle. Phase 3B.6.7B.6 now moves
-the production P4 textured-triangle bridge from `bridge.cpp` into a standalone
+the production processorek Nevosolek (P4) textured-triangle bridge from `bridge.cpp` into a standalone
 NASM SSE2/double-precision scan converter. Its complete-frame raster probe and
 the complete 66-test suite pass; the reference target retains the C++
 rasterizer as the oracle.

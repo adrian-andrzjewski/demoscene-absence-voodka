@@ -6,7 +6,7 @@
 // UV block (nov*2 dd = nov*8 bytes; drawn via [uv + vidx*8], OBJECTS.PM:189-194;
 // hex-proven by WALL.V3D: 140 = 36 + 4*12 + 2*12 + 4*8). The block is present
 // in PHONG files too (filled with exporter leftovers) but only read for TEX.
-// .V3M is the same blob minus the 36-byte header (P5 morph target).
+// .V3M is the same blob minus the 36-byte header (torus ustep village (P5) morph target).
 //
 // Checks: header sanity + minimum size, then the ASM load: struct fields,
 // data offsets, and the in-place x16 vertex scale.
@@ -105,7 +105,7 @@ int main() {
                            "2wall.v3d", "2wall2.v3d", "2wall3.v3d", "2torus.v3d" };
     for (const char* n : v3ds) check_v3d(dane.c_str(), n);
 
-    // .V3M = same blob minus the 36-byte header (P5 morph target): identical
+    // .V3M = same blob minus the 36-byte header (torus ustep village (P5) morph target): identical
     // face/tail structure, DIFFERENT vertex positions (128 verts x 12 bytes).
     std::vector<uint8_t> v3d = readFile(dane + "\\2torus.v3d");
     std::vector<uint8_t> v3m = readFile(dane + "\\2torus.v3m");

@@ -1,4 +1,4 @@
-# P4 and P8 scene reconstruction
+# processorek Nevosolek (P4) and nad czerwonym lampa (P8) scene reconstruction
 
 This document is the source-level reconstruction of the two standalone 3D
 parts in VOODKA. It is intentionally more specific than the general
@@ -10,7 +10,7 @@ are regenerated.
 
 ## 1. What these scenes are
 
-P4 and P8 are not entries in the P2/P5 World table. They do not instantiate
+processorek Nevosolek (P4) and nad czerwonym lampa (P8) are not entries in the swiatynia city/torus ustep village (P2/P5) World table. They do not instantiate
 objects from WORLD records, and their camera files are not the 48-byte World
 camera format. Each part is a self-contained assembly program that combines:
 
@@ -23,7 +23,7 @@ camera format. Each part is a self-contained assembly program that combines:
    indexed triangle rasterization.
 
 The scene is therefore defined by the part source plus its DATAS includes.
-There is no single P4 or P8 “world asset” that can be loaded independently.
+There is no single processorek Nevosolek (P4) or nad czerwonym lampa (P8) “world asset” that can be loaded independently.
 The archive textures are raw indexed pixels; the DATAS files are raw
 16-bit geometry; the source assembly is what assigns geometry to textures,
 palette offsets, animation buffers, and camera placement.
@@ -44,22 +44,22 @@ reconstruction documentation. The relevant entries are:
 
 | Index | Asset | Size and interpretation | Scene |
 |---:|---|---|---|
-| 24 | sw.inc | 44,032 bytes, 256x172 indexed texture | P4, P8 |
-| 25 | v_txr1.inc | 51,200 bytes, 256x200 indexed texture | P4 |
-| 26 | proc.inc | 51,200 bytes, 256x200 indexed texture | P4 |
-| 27 | metal.inc | 51,200 bytes, 256x200 indexed texture | P4, P8 |
-| 28 | logo_a.dat | 48,000 bytes, 15 frames of 64x50 | P4 |
-| 29 | tull.inc | 64,000 bytes, 320x200 image | P4 |
-| 30 | tull.pal | 768-byte 6-bit VGA palette | P4 |
-| 70 | last.pal | 768-byte 6-bit VGA palette | P8 |
-| 71 | last.dat | 63,680 bytes, 320x199 image | P8 |
-| 73 | log.inc | 77,824 bytes, 19 frames of 64x64 | P8 |
-| 74 | trasa.dat | 106,704 bytes, 2,964 camera nodes | P4 |
-| 75 | tr2.dat | 90,288 bytes, 2,508 camera nodes | P8 |
+| 24 | sw.inc | 44,032 bytes, 256x172 indexed texture | processorek Nevosolek (P4), nad czerwonym lampa (P8) |
+| 25 | v_txr1.inc | 51,200 bytes, 256x200 indexed texture | processorek Nevosolek (P4) |
+| 26 | proc.inc | 51,200 bytes, 256x200 indexed texture | processorek Nevosolek (P4) |
+| 27 | metal.inc | 51,200 bytes, 256x200 indexed texture | processorek Nevosolek (P4), nad czerwonym lampa (P8) |
+| 28 | logo_a.dat | 48,000 bytes, 15 frames of 64x50 | processorek Nevosolek (P4) |
+| 29 | tull.inc | 64,000 bytes, 320x200 image | processorek Nevosolek (P4) |
+| 30 | tull.pal | 768-byte 6-bit VGA palette | processorek Nevosolek (P4) |
+| 70 | last.pal | 768-byte 6-bit VGA palette | nad czerwonym lampa (P8) |
+| 71 | last.dat | 63,680 bytes, 320x199 image | nad czerwonym lampa (P8) |
+| 73 | log.inc | 77,824 bytes, 19 frames of 64x64 | nad czerwonym lampa (P8) |
+| 74 | trasa.dat | 106,704 bytes, 2,964 camera nodes | processorek Nevosolek (P4) |
+| 75 | tr2.dat | 90,288 bytes, 2,508 camera nodes | nad czerwonym lampa (P8) |
 
-Texture bytes are palette indices, not RGB values. P4 and P8 use the same
-sw.inc pixels but do not use the same embedded sw palette arrangement. P4
-includes sw.pal as the 64-colour P4 material source; P8 includes a full base
+Texture bytes are palette indices, not RGB values. processorek Nevosolek (P4) and nad czerwonym lampa (P8) use the same
+sw.inc pixels but do not use the same embedded sw palette arrangement. processorek Nevosolek (P4)
+includes sw.pal as the 64-colour processorek Nevosolek (P4) material source; nad czerwonym lampa (P8) includes a full base
 palette in the recovered object. The port names the recovered versions
 port/core/parts/sw.pal and port/core/parts/p8_sw.pal to prevent accidental
 substitution. metal.pal is the same 64-colour chrome ramp in both parts.
@@ -137,11 +137,11 @@ vertices, using check to avoid projecting the same vertex repeatedly.
 
 The projection is integer division, not floating point. The standard centre
 is (160,100), and zoom is 160. The exact denominators and y signs differ
-between P4 and P8 and are documented below. The resulting coordinates are
+between processorek Nevosolek (P4) and nad czerwonym lampa (P8) and are documented below. The resulting coordinates are
 signed screen-space values; face clips them during scan conversion.
 
 bit_sort calls the generic radix/painter sorter in ENGINE. Neither scene has
-per-pixel depth. The P4 show loop walks its sorted table backwards; P8 walks
+per-pixel depth. The processorek Nevosolek (P4) show loop walks its sorted table backwards; nad czerwonym lampa (P8) walks
 forwards. This traversal is part of the original implementation and must be
 kept with the sorter’s key ordering to reproduce overlap.
 
@@ -149,15 +149,15 @@ face sorts the three vertices by y, computes 16.16 edge slopes, computes
 16-bit UV slopes, clips the vertical span to rows 0..199, and fills one
 scanline at a time. Horizontal middle-edge handling is selected by pom.
 The source rasterizer writes directly to the indexed framebuffer and is
-opaque. The port retains the same projected/cull/sort decisions; its P4
+opaque. The port retains the same projected/cull/sort decisions; its processorek Nevosolek (P4)
 bounded C++ triangle helper is a compatibility implementation of the
 assembly scan conversion, not a new material model.
 
-## 3. P4: tunnel, plate, CPU detail, and chrome object
+## 3. processorek Nevosolek (P4): tunnel, plate, CPU detail, and chrome object
 
 ### 3.1 Composition and geometry inventory
 
-P4 declares p_len = 567 vertices and f_len = 994 faces in
+processorek Nevosolek (P4) declares p_len = 567 vertices and f_len = 994 faces in
 CODE/P4/P4.ASM near the file header. The concatenated geometry is:
 
 | Segment | Vertices/faces | Source include | Runtime role | Material |
@@ -173,7 +173,7 @@ The other three source tables are copied/rotated into s1, s2, and s3 before
 each frame. The final scene is one concatenated face list, not four
 independently submitted models.
 
-P4's visible result is the textured concentric environment surrounding a
+processorek Nevosolek (P4)'s visible result is the textured concentric environment surrounding a
 central plate/hero composition, with the small proc-marked component and
 chrome/phong geometry appearing according to the camera path. The source
 does not contain a scene graph or named object transforms; those relationships
@@ -181,7 +181,7 @@ are encoded by the concatenation offsets and con3 ranges.
 
 ### 3.2 Assembly-time layout and connectivity
 
-P4 lays out the source data in this order:
+processorek Nevosolek (P4) lays out the source data in this order:
 
 ~~~text
 src1 = VWS_2 (81 vertices)
@@ -205,7 +205,7 @@ addresses shape, while later groups address s1, s2, and s3. co_prepare then
 adds the combined base/source offset to the c3 normal connectivity used by
 n_calc.
 
-This is an important distinction from an ordinary morph target: P4 does not
+This is an important distinction from an ordinary morph target: processorek Nevosolek (P4) does not
 interpolate VWS_1 into VWS_2/3/4. It keeps VWS_1 as the fixed environment and
 replaces the source-object buffers with a per-frame z-axis rotation and bob.
 The “morph” terminology in inventory tools describes the shared combined
@@ -252,15 +252,15 @@ set_pal spal3, 144,  33
 set_pal spal4, 192,  64
 ~~~
 
-Thus the final P4 palette is a deliberately overlaid table. The generated
+Thus the final processorek Nevosolek (P4) palette is a deliberately overlaid table. The generated
 sw ramp occupies 64..127, the generated v_txr1 ramp starts at 128, proc
 colours overwrite the 144..176 region, and metal occupies 192..255. The
 texture index is first fetched and only then offset by con3 colour. A palette
 file copied into the wrong slot can therefore make an otherwise correctly
 decoded texture look like a different material.
 
-The original P4 source calls set_pal with spal1 at entry 0. The modern port
-uses the recovered P4 object/capture placement for the black/unused sw entry
+The original processorek Nevosolek (P4) source calls set_pal with spal1 at entry 0. The modern port
+uses the recovered processorek Nevosolek (P4) object/capture placement for the black/unused sw entry
 and the warm sw range, because the checked-in historical include and the
 linked/recovered object do not expose that placement equally clearly. This
 is a port compatibility detail; the source call sequence remains the
@@ -286,7 +286,7 @@ performed by face.
 
 ### 3.5 Camera path and frame timing
 
-P4 loads archive entry 74, whose source is CODE/P4/TRASA.DAT. Each record is
+processorek Nevosolek (P4) loads archive entry 74, whose source is CODE/P4/TRASA.DAT. Each record is
 nine little-endian dwords, 36 bytes:
 
 ~~~text
@@ -318,7 +318,7 @@ the separate ro_z animation below rotates the auxiliary geometry.
 
 ### 3.6 Per-frame geometry animation
 
-make_chip is the P4-specific object animation. ro_z starts at zero, is masked
+make_chip is the processorek Nevosolek (P4)-specific object animation. ro_z starts at zero, is masked
 to 10 bits, and is advanced by frames*2 after the frame is drawn. It rotates
 src1 into s1 and src2 followed by src3 into the contiguous s2/s3 buffers.
 The effective x/y operation is:
@@ -351,7 +351,7 @@ face. The first 440 centres belong to the stationary base; the remaining
 centres are rotated by make_chip. This centre data drives both depth keys and
 the early bounds test.
 
-### 3.7 P4 transform, projection, culling, and materials
+### 3.7 processorek Nevosolek (P4) transform, projection, culling, and materials
 
 For each face, rotate applies:
 
@@ -369,7 +369,7 @@ The face is kept only if its centre is inside:
 -6600 <= p_z <= 4000
 ~~~
 
-The sort key is p_z+12000. For each unique vertex the P4 projection is:
+The sort key is p_z+12000. For each unique vertex the processorek Nevosolek (P4) projection is:
 
 ~~~text
 denom = p_z + 7600
@@ -384,7 +384,7 @@ screen-space culling expression for visible faces is:
 (x1-x2)*(y3-y2) - (x2-x3)*(y2-y1)
 ~~~
 
-P4 hides a face when this result is negative. Faces with con3 visibility
+processorek Nevosolek (P4) hides a face when this result is negative. Faces with con3 visibility
 zero bypass this test; the 440 sw environment faces are intentionally drawn
 without this cull. The 158 auxiliary faces, 12 proc faces, and 384 chrome
 faces have visibility set.
@@ -415,7 +415,7 @@ surface while leaving the rest of the scene correct.
 
 ### 3.8 Draw order, compositing, and logo
 
-The main P4 loop is:
+The main processorek Nevosolek (P4) loop is:
 
 1. wait_vbl and GetModPos;
 2. install the working palette when ModPos changes;
@@ -434,9 +434,9 @@ the source changes direction through ciota and advances by an integer
 frames/2 amount. Because it is written after show, it has no depth relation
 to the mesh and can cover any rendered face.
 
-### 3.9 P4 outro
+### 3.9 processorek Nevosolek (P4) outro
 
-At ModPos >= 1200h, P4 leaves the 3D loop. spadaj installs white, copies
+At ModPos >= 1200h, processorek Nevosolek (P4) leaves the 3D loop. spadaj installs white, copies
 tull.inc directly to the VGA framebuffer, and fades the 768-byte white
 palette toward tull.pal one DAC component at a time for 64 iterations.
 After the fade it holds until ModPos 1338h. The brum loop uses tablica indexed
@@ -447,11 +447,11 @@ The original performs these picture and DAC writes directly. The modern port
 must explicitly present after them, otherwise the correct memory contents
 are never visible in a D3D window.
 
-## 4. P8: sw shell, animated metal objects, sun, and final picture
+## 4. nad czerwonym lampa (P8): sw shell, animated metal objects, sun, and final picture
 
 ### 4.1 Composition and geometry inventory
 
-P8 declares p_len = 483 vertices and f_len = 864 faces. Its source layout is:
+nad czerwonym lampa (P8) declares p_len = 483 vertices and f_len = 864 faces. Its source layout is:
 
 | Segment | Vertices/faces | Source include | Runtime role | Material |
 |---|---:|---|---|---|
@@ -473,9 +473,9 @@ The final c6/s6 group is not a new external asset. It is a second assembly of
 SW_S_1/SW_C_1, and prepare changes its copied y coordinates by -1620. This
 deliberately supplies a lower/rear closure for the painter sequence.
 
-### 4.2 P8 assembly-time layout
+### 4.2 nad czerwonym lampa (P8) assembly-time layout
 
-P8 lays out its vertex buffers as:
+nad czerwonym lampa (P8) lays out its vertex buffers as:
 
 ~~~text
 src3 = OB_S_1 (114 vertices)
@@ -520,7 +520,7 @@ historical quirk: preserve co_prepare, make_pts, and make_phong ordering
 instead of treating the co_prepare shift as dead or applying it twice to the
 working mesh.
 
-### 4.3 Startup and P8 palette
+### 4.3 Startup and nad czerwonym lampa (P8) palette
 
 PART8 begins at P8.ASM:300:
 
@@ -537,7 +537,7 @@ PART8 begins at P8.ASM:300:
 7. co_prepare and make_pts initialize face centres and copy the hero centres
    into pts_src.
 
-The P8 palette is assembled as:
+The nad czerwonym lampa (P8) palette is assembled as:
 
 ~~~text
 pal[0..63]    = recovered full sw base palette
@@ -547,8 +547,8 @@ pal[192..255] = metal.pal
 ~~~
 
 The original source calls the full base include sw.pal, while the recovered
-P8 object shows the base as a 256-entry palette with a black entry at index
-0. The port's p8_sw.pal preserves that recovered layout. P8 material offsets
+nad czerwonym lampa (P8) object shows the base as a 256-entry palette with a black entry at index
+0. The port's p8_sw.pal preserves that recovered layout. nad czerwonym lampa (P8) material offsets
 therefore mean:
 
 - 0: base sw surface;
@@ -564,7 +564,7 @@ and decrements ile_fade by frames until zero.
 
 make_pos temporarily sets r_x=256, builds the object matrix, then resets r_x
 to zero. It transforms the 33 SW_S_2 vertices into pkt, subtracts 8000 from
-z, and computes the same projected coordinates as P4:
+z, and computes the same projected coordinates as processorek Nevosolek (P4):
 
 ~~~text
 U = ((226+16) * p_x) / p_z + 96
@@ -576,12 +576,12 @@ The 16 con3 plane faces use the SW_C_2 vertex indices minus the 40-vertex
 shape offset to select pkt entries. Their material is sw with colour offset
 128 and plane_flag set. The remaining 32 cap/transition faces use sw with
 offset 64 and ordinary con2 UVs. This is the reason the lower cap is not
-decoded by treating every P8 face as a metal/phong face.
+decoded by treating every nad czerwonym lampa (P8) face as a metal/phong face.
 
 ### 4.5 Camera path and timeline
 
-P8 loads entry 75, sourced from CODE/COMS/TRASA.DAT and packed as tr2.dat.
-It has 2,508 nodes of the same nine-dword, 36-byte format used by P4:
+nad czerwonym lampa (P8) loads entry 75, sourced from CODE/COMS/TRASA.DAT and packed as tr2.dat.
+It has 2,508 nodes of the same nine-dword, 36-byte format used by processorek Nevosolek (P4):
 
 ~~~text
 o_x,o_y,o_z,r_x,r_y,r_z,cm_x,cm_y,cm_z
@@ -593,7 +593,7 @@ interpolation is performed. The translation fields are dwords and the
 rotation/camera fields use the low signed words. The active 3D loop ends at
 ModPos 2700h, after which the separate last.dat sequence begins.
 
-The path supplies o_x/o_y/o_z and r_x/r_y/r_z/cm_x/cm_y/cm_z. P8’s three
+The path supplies o_x/o_y/o_z and r_x/r_y/r_z/cm_x/cm_y/cm_z. nad czerwonym lampa (P8)’s three
 hero rotations are not in the path: ro_1 starts at 0, ro_2 at 160, and ro_3
 at -70, and they are advanced independently after every rendered frame.
 
@@ -632,9 +632,9 @@ Angles are masked to 10 bits when sampled, so they wrap naturally. These
 rotations are the visible independent animation of the three metal hero
 meshes; the sw shell and cap remain static in object space.
 
-### 4.7 P8 transform, projection, culling, and materials
+### 4.7 nad czerwonym lampa (P8) transform, projection, culling, and materials
 
-P8 uses the same Q15 object/camera matrix construction as P4. Its centre
+nad czerwonym lampa (P8) uses the same Q15 object/camera matrix construction as P4. Its centre
 reject bounds are:
 
 ~~~text
@@ -651,11 +651,11 @@ screen_x = ((160+32) * p_x) / denom + 160
 screen_y = (-160       * p_y) / denom + 100
 ~~~
 
-The negative y factor is part of the original P8 orientation. Reusing P4’s
+The negative y factor is part of the original nad czerwonym lampa (P8) orientation. Reusing processorek Nevosolek (P4)’s
 positive-y projection mirrors the scene vertically and changes winding.
 
-P8 show uses the same cross-product expression as P4 but hides when the
-result is less than or equal to zero. This differs from P4’s strictly
+nad czerwonym lampa (P8) show uses the same cross-product expression as processorek Nevosolek (P4) but hides when the
+result is less than or equal to zero. This differs from processorek Nevosolek (P4)’s strictly
 negative rejection. The first 40 upper-ring faces and final 40 closure faces
 have visibility zero and are always drawn. The 48 cap faces and all 736 hero
 faces have visibility enabled.
@@ -680,14 +680,14 @@ U = (normal_x + 128) << 8
 V = (normal_y + 108) << 8
 ~~~
 
-As in P4, “phong” means environment/normal mapping into an indexed metal
+As in processorek Nevosolek (P4), “phong” means environment/normal mapping into an indexed metal
 texture. It is not per-pixel Phong illumination. The visible blue/silver
 shading comes from metal.inc and metal.pal, while the object orientation
 changes the normal-derived lookup.
 
 ### 4.8 Main loop and opening fade
 
-The P8 3D loop is:
+The nad czerwonym lampa (P8) 3D loop is:
 
 1. wait_vbl and GetModPos;
 2. after ModPos 2630h, call brum for music-synchronised flashes;
@@ -705,7 +705,7 @@ The P8 3D loop is:
 fade starts with ile_fade=64. For every one of the 768 palette bytes it
 computes clamp(pal[i]+ile_fade,0,63), installs white, and subtracts frames.
 The framebuffer is already being drawn with the final material indices; only
-the DAC values change. This explains why P8 can appear as a white wash while
+the DAC values change. This explains why nad czerwonym lampa (P8) can appear as a white wash while
 the indexed scene is already fully assembled.
 
 brum begins at ModPos 2630h. It uses tablica[(ModPos & 63)*4] and a second
@@ -723,7 +723,7 @@ the right of the 320x200 screen. Texel zero is transparent, all other bytes
 are copied as indexed pixels.
 
 sun_step ping-pongs between 1 and 18 and advances by frames/4, with a
-minimum step of one for small frame deltas. It uses the working P8 palette,
+minimum step of one for small frame deltas. It uses the working nad czerwonym lampa (P8) palette,
 not a separate sun palette. Since it is drawn after the sorted 3D faces, it
 always composites on top.
 
@@ -748,7 +748,7 @@ This is a diagnostic/manual camera and matrix override, not part of the
 recorded autonomous animation. The port maps these controls through its
 Key_Map bridge.
 
-### 4.11 P8 final picture and fade
+### 4.11 nad czerwonym lampa (P8) final picture and fade
 
 When ModPos reaches 2700h, the 3D loop stops:
 
@@ -773,7 +773,7 @@ changes the final fade/picture boundary.
 
 ## 5. Reconstructing each scene from scratch
 
-### 5.1 P4 recipe
+### 5.1 processorek Nevosolek (P4) recipe
 
 1. Assemble VWS_1..4 and VWC_1..4 into the exact source/buffer order shown
    above; preserve signed 16-bit coordinates.
@@ -791,7 +791,7 @@ changes the final fade/picture boundary.
 8. Draw logo_a.dat after the mesh.
 9. At 1200h switch to tull.inc and execute the palette fade/flash outro.
 
-### 5.2 P8 recipe
+### 5.2 nad czerwonym lampa (P8) recipe
 
 1. Assemble SW_S_1/SW_C_1, SW_S_2/SW_C_2, OB_S_1..3 and OB_C_1..3 into
    shape/s2/s3/s4/s5/s6 and con1/c2/c3/c4/c5/c6.
@@ -800,7 +800,7 @@ changes the final fade/picture boundary.
 4. Run make_pos for s2, prepare the three normal groups with n_calc, and
    make_pts. Do not treat the redundant co_prepare s3 shift as an additional
    transform.
-5. Build the four P8 palette regions and maintain bialy separately.
+5. Build the four nad czerwonym lampa (P8) palette regions and maintain bialy separately.
 6. For each frame, load/ping-pong a tr2 node, make_phong all three hero
    objects, rotate/project/cull/sort the 864-face list, and draw material
    groups according to con3.
@@ -818,23 +818,23 @@ implementation differences are:
 - The 32-bit DOS arena and selectors are represented by a 64 MB arena plus
   32-bit arena offsets. C++ receives resolved pointers through bridge.cpp.
   Arbitrary x64 FS/GS selector bases are not used.
-- The original P4/P8 face routine writes VGA memory. The port writes an
+- The original processorek Nevosolek/nad czerwonym lampa (P4/P8) face routine writes VGA memory. The port writes an
   indexed backbuffer and explicitly presents it through D3D11. Direct VGA
   picture/palette sequences therefore contain explicit present calls in the
   port.
-- P4’s broad-span x64 translation had a coverage defect that could leave
+- processorek Nevosolek (P4)’s broad-span x64 translation had a coverage defect that could leave
   disconnected triangles. Projection, culling, sorting, UV packing, and
-  palette offsets remain in the NASM core, while vk_p4_draw_triangle in
+  palette offsets remain in the NASM core, while vk_processorek_nevosolek_draw_triangle in
   bridge.cpp provides a bounded 320x200 scan conversion helper.
-- P8’s original rcalc/check indexing was byte-stride sensitive. The port
+- nad czerwonym lampa (P8)’s original rcalc/check indexing was byte-stride sensitive. The port
   moved these high-volume scratch arrays to the arena and preserved the
   reference byte*2 index convention. The earlier *4 port stride caused the
   first-frame sort/scene corruption.
 - The port has an explicit bialy buffer for P8. This prevents the initial
   pure-white state and flash path from accidentally reusing the mutable
   fade buffer.
-- The port recovered missing P4 v_txr1.pal and proc.pal data from P4.OBJ and
-  keeps the P4/P8 sw palettes distinct. The P4 proc palette needed a final
+- The port recovered missing processorek Nevosolek (P4) v_txr1.pal and proc.pal data from P4.OBJ and
+  keeps the processorek Nevosolek/nad czerwonym lampa (P4/P8) sw palettes distinct. The processorek Nevosolek (P4) proc palette needed a final
   one-triplet correction; this is the vws3/vwc3 surface issue recorded in
   KNOWN_DIFFERENCES.md.
 - The original sinus table and the generated port table differ by a small
@@ -847,7 +847,7 @@ implementation differences are:
   in wall-clock time. Scene boundaries and frame-delta animation are
   ModPos/tick aligned, but absolute pacing and audio pitch are not bit-identical.
 - Current validation covers crash-free full playthroughs, archive/palette
-  provenance, mesh parsing, frame recording, and the P4/P8 palette fixes.
+  provenance, mesh parsing, frame recording, and the processorek Nevosolek/nad czerwonym lampa (P4/P8) palette fixes.
   It does not prove pixel equality for every phase of every moving camera
   frame; phase-aligned original-vs-port captures remain the correct test for
   final visual fidelity.
@@ -861,18 +861,18 @@ docs/WORLD_ARCHITECTURE.md.
 
 | Concern | Original source | Modern counterpart |
 |---|---|---|
-| P4 startup/loop/outro | CODE/P4/P4.ASM:286-540 | port/core/parts/p4.asm |
-| P4 UVs/palette/setup | CODE/P4/P4.ASM:551-750 | port/core/parts/p4.asm |
-| P4 animation | CODE/P4/P4.ASM:792-1045 | port/core/parts/p4.asm |
-| P4 projection/show | CODE/P4/P4.ASM:1046-1812 | port/core/parts/p4.asm, bridge.cpp |
-| P4 logo | CODE/P4/P4.ASM:1814-end | port/core/parts/p4.asm |
-| P8 startup/loop/outro | CODE/P8/P8.ASM:300-600 | port/core/parts/p8.asm |
-| P8 setup/palette/UVs | CODE/P8/P8.ASM:613-860 | port/core/parts/p8.asm |
-| P8 hero rotation | CODE/P8/P8.ASM:861-1132 | port/core/parts/p8_rot.asm |
-| P8 projection/show | CODE/P8/P8.ASM:1133-1900 | port/core/parts/p8.asm, p8_more.asm |
-| P8 input/fade/flash/sun | CODE/P8/P8.ASM:1903-end | port/core/parts/p8_more.asm |
-| P4 geometry | CODE/DATAS/VWS_1..4.INC and VWC_1..4.INC | port/core/parts/p4_*.inc |
-| P8 geometry | CODE/DATAS/SW_* and OB_*.INC | port/core/parts/p8_*.inc |
-| P4 camera | CODE/P4/TRASA.DAT, archive 74 | data/vodka.dat |
-| P8 camera | CODE/COMS/TRASA.DAT, archive 75 | data/vodka.dat |
+| processorek Nevosolek (P4) startup/loop/outro | CODE/P4/P4.ASM:286-540 | port/core/parts/p4.asm |
+| processorek Nevosolek (P4) UVs/palette/setup | CODE/P4/P4.ASM:551-750 | port/core/parts/p4.asm |
+| processorek Nevosolek (P4) animation | CODE/P4/P4.ASM:792-1045 | port/core/parts/p4.asm |
+| processorek Nevosolek (P4) projection/show | CODE/P4/P4.ASM:1046-1812 | port/core/parts/p4.asm, bridge.cpp |
+| processorek Nevosolek (P4) logo | CODE/P4/P4.ASM:1814-end | port/core/parts/p4.asm |
+| nad czerwonym lampa (P8) startup/loop/outro | CODE/P8/P8.ASM:300-600 | port/core/parts/p8.asm |
+| nad czerwonym lampa (P8) setup/palette/UVs | CODE/P8/P8.ASM:613-860 | port/core/parts/p8.asm |
+| nad czerwonym lampa (P8) hero rotation | CODE/P8/P8.ASM:861-1132 | port/core/parts/p8_rot.asm |
+| nad czerwonym lampa (P8) projection/show | CODE/P8/P8.ASM:1133-1900 | port/core/parts/p8.asm, p8_more.asm |
+| nad czerwonym lampa (P8) input/fade/flash/sun | CODE/P8/P8.ASM:1903-end | port/core/parts/p8_more.asm |
+| processorek Nevosolek (P4) geometry | CODE/DATAS/VWS_1..4.INC and VWC_1..4.INC | port/core/parts/p4_*.inc |
+| nad czerwonym lampa (P8) geometry | CODE/DATAS/SW_* and OB_*.INC | port/core/parts/p8_*.inc |
+| processorek Nevosolek (P4) camera | CODE/P4/TRASA.DAT, archive 74 | data/vodka.dat |
+| nad czerwonym lampa (P8) camera | CODE/COMS/TRASA.DAT, archive 75 | data/vodka.dat |
 | Shared raster/normal/sort primitives | CODE/INC/ENGINE.INC and linked engine objects | port/core/engine |

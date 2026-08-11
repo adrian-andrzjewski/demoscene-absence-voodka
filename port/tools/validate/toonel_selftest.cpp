@@ -1,7 +1,7 @@
 // toonel_selftest.cpp - CTest for vk_make_toonel (shared tunnel table).
 //
 // vk_make_toonel fills a 128000-byte buffer with the tunnel u/v table that
-// boot's Start32 builds once and the tunnel parts (P3 tooneling) read. This
+// boot's Start32 builds once and the tunnel parts (tunel + wygibasy (P3) tooneling) read. This
 // test validates the REAL NASM routine:
 //   - determinism: two fills hash identically;
 //   - non-triviality: the buffer is not zero/uniform;
