@@ -222,7 +222,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_log_format_probe` | Phase 3B.6.4-5 byte-level MSVC-oracle comparison for NASM integer/string/pointer/fixed-float formatting (CTest `win32.log_format`) |
 | `win32_log_api_probe` | Phase 3B.6.4 real production `vk::logPrint` va_list/formatter/sink integration witness (CTest `win32.log_api`) |
 | `win32_timeline_probe` | Phase 3B.6.6 byte-level production NASM timeline formatter/file-sink witness (CTest `win32.timeline_sink`) |
-| `win32_arena_probe` | Phase 3B.6.7A production NASM arena/archive discovery, copy, alignment, and teardown witness (CTest `win32.arena_service`) |
+| `win32_arena_probe` | Phase 3B.6.7A/C.6.1 production NASM arena/archive discovery, decorated `vk::` namespace ABI, copy, alignment, and teardown witness (CTest `win32.arena_service`) |
 | `win32_music_path_probe` | Phase 3B.6.7B.1 production NASM soundtrack-path override, executable-directory, and fallback witness (CTest `win32.music_path`) |
 | `win32_app_modes_probe` | Phase 3B.6.7B.2 production NASM seek precedence, part-start, self-test, audio-check, and result ABI witness (CTest `win32.app_modes`) |
 | `win32_app_startup_probe` | Phase 3B.6.7B.3 production NASM subsystem order, Win64 POD arguments, quit checkpoints, and rollback witness (CTest `win32.app_startup`) |

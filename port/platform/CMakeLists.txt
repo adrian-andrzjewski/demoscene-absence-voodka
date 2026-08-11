@@ -1,7 +1,6 @@
 # platform/CMakeLists.txt - the C++ Windows integration layer.
 
 set(VOODKA_PLATFORM_COMMON_SOURCES
-    arena.cpp
     input.cpp
     audio_controller.asm
     audio_lifecycle.asm
@@ -19,6 +18,7 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 set(VOODKA_PLATFORM_SOURCES
     production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
+    bridge_arena.asm
     timer.asm
     audio_dispatch.asm
     win32_platform_abi.asm
@@ -36,6 +36,7 @@ set(VOODKA_REFERENCE_SOURCES
     log.cpp
     timeline.cpp
     timer.cpp
+    arena.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_present.cpp
     audio.cpp
@@ -46,6 +47,7 @@ add_executable(VOODKA WIN32 ${VOODKA_PLATFORM_SOURCES})
 function(configure_voodka_platform_target target)
 target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")
 target_include_directories(${target} PRIVATE "${CMAKE_SOURCE_DIR}/tools/validate")
+target_include_directories(${target} PRIVATE "${CMAKE_BINARY_DIR}/generated")
 target_link_libraries(${target} PRIVATE voodka_core)
 
 if(MSVC)

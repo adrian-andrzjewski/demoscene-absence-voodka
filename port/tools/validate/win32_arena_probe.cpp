@@ -5,11 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace vk {
-
-void logPrint(const char*, ...) {}
-
-}  // namespace vk
+extern "C" void vk_log_printf(const char*, ...) {}
 
 int main() {
     if (!vk::platformInit()) return 1;

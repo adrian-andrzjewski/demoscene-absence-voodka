@@ -595,7 +595,10 @@ reference target and host tools remain C++ where they provide the differential
 oracle. The current bridge gate is 82/82 Release tests green, including live
 WASAPI, P1 playback, pause, close, file/input forwarding, and the new
 shutdown/logging bridge probes. The P4 rasterizer is already assembly-owned
-and remains covered by its framebuffer-equivalence probe.
+and remains covered by its framebuffer-equivalence probe. The shipped arena
+namespace veneer has also been removed; `bridge_arena.asm` now exposes the
+decorated `vk::` ABI over the native archive service while reference/tools keep
+the C++ oracle.
 
 The next gate is the remaining application/startup namespace surface. This
 keeps the executable buildable after each slice and postpones removal of the

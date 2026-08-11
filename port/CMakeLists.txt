@@ -67,6 +67,9 @@ file(MAKE_DIRECTORY "${VOODKA_GENERATED_DIR}")
 configure_file(
     "${CMAKE_SOURCE_DIR}/core/eos_replace/d3d11_shader_paths.inc.in"
     "${VOODKA_GENERATED_DIR}/d3d11_shader_paths.inc" @ONLY)
+configure_file(
+    "${CMAKE_SOURCE_DIR}/core/eos_replace/voodka_repo_root.inc.in"
+    "${VOODKA_GENERATED_DIR}/voodka_repo_root.inc" @ONLY)
 add_custom_command(
     OUTPUT "${VOODKA_D3D11_VS_CSO}" "${VOODKA_D3D11_PS_CSO}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${VOODKA_GENERATED_DIR}"
@@ -618,10 +621,13 @@ set_tests_properties(win32.timeline_sink PROPERTIES TIMEOUT 10)
 # archive discovery/loading, zeroed bump allocation, and teardown boundary.
 add_executable(win32_arena_probe
     tools/validate/win32_arena_probe.cpp
-    platform/arena.cpp)
+    platform/bridge_arena.asm)
 target_compile_definitions(win32_arena_probe PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN VOODKA_ASSEMBLY_PLATFORM=1)
 target_include_directories(win32_arena_probe PRIVATE platform)
+target_include_directories(win32_arena_probe PRIVATE
+    "${CMAKE_BINARY_DIR}/generated"
+    "${CMAKE_SOURCE_DIR}/core/eos_replace")
 target_link_libraries(win32_arena_probe PRIVATE voodka_core kernel32 user32)
 add_test(NAME win32.arena_service COMMAND win32_arena_probe)
 set_tests_properties(win32.arena_service PROPERTIES TIMEOUT 10)

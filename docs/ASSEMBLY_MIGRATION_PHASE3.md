@@ -1375,10 +1375,52 @@ processorek Nevosolek (P4) framebuffer equivalence           passed
 
 This is a **GO**. Shutdown and logging forwarding are now native x64 assembly,
 and the P4 render boundary is already independently equivalent. The shipping
-target still has C++ application/startup namespace wrappers and the CRT entry
-boundary; those are the next risk-controlled cleanup gates. No custom `/ENTRY`
-or C++ removal is justified until those remaining imports and lifecycle
-contracts are audited together.
+target still has C++ input, pause/progress, and application namespace wrappers
+plus the CRT entry boundary; those are the next risk-controlled cleanup gates.
+No custom `/ENTRY` or C++ removal is justified until those remaining imports
+and lifecycle contracts are audited together.
+
+## Phase 3B.6.7C.6.1 arena namespace boundary
+
+The shipped target no longer compiles `arena.cpp`. `bridge_arena.asm` now
+exports the exact decorated MSVC `vk::` arena namespace ABI and forwards the
+arena/archive operations to the already native `win32_arena.asm` service. It
+also preserves the production diagnostics for archive discovery, missing
+archives, and unknown/null internal-file names, and exports the fixed overlay
+constants consumed by the remaining bridge code. The C++ implementation stays
+in the reference and VIRTUAL targets.
+
+### Assembly interfaces and dependencies
+
+```text
+vk::arena / vk::platformInit / vk::platformShutdown
+vk::arenaAlloc / vk::arenaFree / vk::loadInternalFile
+vk::archiveBytes / vk::archiveSize
+vk::kFramebufferOffset / vk::kBackbufferOffset
+```
+
+The wrapper depends on `win32_arena.asm`, the assembly logging bridge, and a
+CMake-generated repository-root include used only for the development-tree
+archive fallback. The existing `win32_arena_probe` now links the decorated
+NASM wrapper directly and verifies zeroed aligned allocation, archive loading
+and copying, case-insensitive filename behavior, cached loads, fixed offsets,
+and complete teardown.
+
+### Phase 3B.6.7C.6.1 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM arena namespace/archive probe                           1/1 passed
+focused runtime + arena + P1/pause/close gates               5/5 passed; 56.50 s
+full regression suite                                      82/82 passed; 105.45 s
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. The shipped arena namespace implementation is now native x64
+assembly without changing archive bytes, allocation offsets, overlay layout,
+asset loading, rendering, audio, timing, or teardown. The next boundary is the
+remaining input, pause/progress, and application bridge namespace surface.
 
 ## Phase 3B.6.7C production platform audit
 
@@ -1388,7 +1430,7 @@ remaining boundary:
 | Component | Shipped role | Current dependency/risk | Conversion order |
 |---|---|---|---|
 | `production_entry.cpp` | CRT `WinMain` transfer to `asm_voodka_winmain` | Small code footprint, but it retains CRT initialization and the last CRT imports | Final host gate after C++ global/runtime dependencies are gone |
-| `arena.cpp` | Namespace-vk wrappers over `win32_arena.asm` | Low behavior risk; only logging and fixed ABI forwarding remain | Later cleanup slice |
+| `arena.cpp` | Reference/VIRTUAL namespace implementation | Shipped target now uses `bridge_arena.asm`; C++ remains only as the behavioral/tool oracle | Reference/tool targets only |
 | `input.cpp` | Namespace-vk wrappers, quit flag, reference-only C++ watcher branch | Production state/worker already lives in `win32_input.asm`; bool and byte-map ABI must remain exact | Medium, after bridge consumers are mapped |
 | `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
 | `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
@@ -1403,11 +1445,11 @@ remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
 objects and must be removed or deliberately retained before a custom `/ENTRY`
 claim.
 
-## Next gate: Phase 3B.6.7C.6 remaining application and startup adapters
+## Next gate: Phase 3B.6.7C.6.2 remaining application and startup adapters
 
 The next risk-first slice must map and migrate the remaining production
 application/startup namespace wrappers in `bridge.cpp`, `progress.cpp`,
-`pause.cpp`, `input.cpp`, and `arena.cpp`. It must preserve command-line modes,
+`pause.cpp`, and `input.cpp`. It must preserve command-line modes,
 window title/progress output, pause/audio pumping, input state, archive
 ownership, and failure rollback while keeping the reference target unchanged.
 The C++ bridge must not be deleted and custom `/ENTRY` must not be attempted
