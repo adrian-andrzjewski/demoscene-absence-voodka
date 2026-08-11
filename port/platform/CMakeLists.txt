@@ -64,6 +64,7 @@ add_custom_command(TARGET ${target} POST_BUILD
 endfunction()
 
 configure_voodka_platform_target(VOODKA)
+target_compile_definitions(VOODKA PRIVATE VOODKA_ASSEMBLY_PLATFORM=1)
 
 # Non-shipped behavioral oracle. This target is intentionally separate from
 # VOODKA so libxmp cannot enter the production dependency graph.

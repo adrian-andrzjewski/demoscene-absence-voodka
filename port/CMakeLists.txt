@@ -571,6 +571,14 @@ target_link_libraries(win32_crash_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.crash_report COMMAND win32_crash_probe)
 set_tests_properties(win32.crash_report PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.3 feasibility witness: exercise the production NASM file sink,
+# critical section, flush, close, and on-disk marker through the real path.
+add_executable(win32_log_probe tools/validate/win32_log_probe.cpp)
+target_compile_definitions(win32_log_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(win32_log_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.log_sink COMMAND win32_log_probe)
+set_tests_properties(win32.log_sink PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

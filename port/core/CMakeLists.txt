@@ -22,6 +22,7 @@ set(VOODKA_CORE_ASM
     eos_replace/win32_args.asm
     eos_replace/win32_lifecycle.asm
     eos_replace/win32_shutdown.asm
+    eos_replace/win32_log.asm
     eos_replace/boot.asm
     eos_replace/toonel.asm
     inc/globals.asm

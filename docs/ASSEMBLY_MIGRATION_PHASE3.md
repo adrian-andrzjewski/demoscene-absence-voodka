@@ -358,8 +358,43 @@ contains the C++ logging sink, path resolution, and startup orchestration, but
 the exception registration, formatter, flush handoff, and shutdown path are
 now assembly-owned.
 
-## Next gate: Phase 3B.6.3
+## Phase 3B.6.3 low-level logging sink
 
-Phase 3B.6.3 should migrate the production logging sink or an isolated startup
-service. It must preserve diagnostic output, file lifecycle, failure-path
-behavior, and the same normal/ESC/close teardown witnesses.
+The production low-level file sink is now native x64 assembly in
+`win32_log.asm`.
+
+- `asm_log_init` constructs the module-directory `voodka.log` path, initializes
+  the x64 `CRITICAL_SECTION`, and opens the file with the existing
+  `CREATE_ALWAYS`/read-sharing behavior.
+- `asm_log_write` serializes bytes with the assembly-owned critical section and
+  calls `WriteFile`; `asm_log_flush` and `asm_log_shutdown` own flush, close,
+  and critical-section deletion.
+- `log.cpp` still performs `va_list`/`vsnprintf` formatting and forwards the
+  resulting bytes through the fixed assembly ABI. This preserves every current
+  format string while removing production file-I/O ownership from C++.
+- `VOODKA_REFERENCE.exe` and `VIRTUAL.exe` retain their C++ logger paths. The
+  test-only `win32_log_probe` verifies an assembly-written marker on disk.
+
+### Phase 3B.6.3 validation
+
+```text
+Release production/reference/tools build               passed
+Win32 runtime/crash/log probes                         3/3 passed; 0.17 s
+full regression suite                                  56/56 passed; 104.45 s
+production low-level logging sink                     NASM x64
+production message formatting                         C++ CRT oracle
+reference/VIRTUAL logging paths                        C++ differential paths
+```
+
+The full suite retains all rendering, audio, timing, asset, Win32, D3D11, and
+dedicated-player coverage. This is a **GO** for the next host boundary. The
+remaining production logging dependency is the C++ formatting stage and its
+CRT/STL startup context; path resolution and broader startup orchestration are
+also still C++.
+
+## Next gate: Phase 3B.6.4
+
+Phase 3B.6.4 should inventory and migrate the production format subset or an
+isolated startup service. Any formatter replacement must preserve all existing
+diagnostic bytes, numeric formatting, concurrent writes, and crash-path output
+before the C++ formatting stage can be removed.
