@@ -131,7 +131,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-87 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+88 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original

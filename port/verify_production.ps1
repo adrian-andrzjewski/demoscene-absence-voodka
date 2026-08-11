@@ -106,6 +106,16 @@ if ($projectText -match '<ClCompile\s+Include=' -or
 $nasmEntries = ([regex]::Matches($projectText, '<NASM\s')).Count
 if ($nasmEntries -eq 0) { Fail "generated VOODKA project contains no NASM entries" }
 Write-Host "Source graph: $nasmEntries NASM entries, 0 C/C++ compile entries"
+if ($projectText -notmatch '<EntryPointSymbol>asm_voodka_process_entry</EntryPointSymbol>') {
+    Fail "generated VOODKA project does not use the native NASM process entry"
+}
+if ($projectText -notmatch '<IgnoreAllDefaultLibraries>true</IgnoreAllDefaultLibraries>') {
+    Fail "generated VOODKA project does not disable default CRT libraries"
+}
+if ($projectText -notmatch '<SubSystem>Windows</SubSystem>') {
+    Fail "generated VOODKA project is not configured as a Windows GUI image"
+}
+Write-Host "Link contract: native NASM entry, /NODEFAULTLIB, Windows subsystem"
 
 # The reference/tool graph may contain libxmp; the shipped PE must not import
 # it or any CRT/C++ runtime.
