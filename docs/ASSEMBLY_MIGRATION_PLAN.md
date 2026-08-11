@@ -592,7 +592,7 @@ services, the 70 Hz QPC timer, and the bridge ABI groups (selectors,
 palette, presentation, fixed overlay pointers, arena forwarders, wait-vbl,
 ModPos, dedicated-audio forwarding, archive loading, and key-map copying). The
 reference target and host tools remain C++ where they provide the differential
-oracle. The current bridge gate is 84/84 Release tests green, including live
+oracle. The current bridge gate is 85/85 Release tests green, including live
 WASAPI, P1 playback, pause, close, file/input forwarding, and the direct
 decorated input ABI probe, as well as the new
 shutdown/logging bridge probes. The P4 rasterizer is already assembly-owned
@@ -603,8 +603,9 @@ the C++ oracle. The shipped pause namespace veneer has now also been removed;
 `bridge_pause.asm` owns the synchronized state transition and audio-pump
 handoff.
 
-The shipped input and pause namespace veneers have now been removed; the next
-gate is progress and the remaining application/startup namespace surface. This
+The shipped input, pause, and progress namespace veneers have now been
+removed; the next gate is the remaining application/startup bridge surface.
+This
 keeps the executable buildable after each slice and postpones removal of the
 C++ bridge, CRT startup, and remaining CRT imports until the high-risk platform
 behavior and lifecycle contracts are proven equivalent.

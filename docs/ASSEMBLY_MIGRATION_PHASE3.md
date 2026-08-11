@@ -1506,6 +1506,46 @@ native x64 assembly without visual, soundtrack, timing, or lifecycle drift.
 The remaining shipped C++ platform logic is concentrated in progress reporting
 and the application bridge wrappers.
 
+## Phase 3B.6.7C.6.4 progress namespace boundary
+
+The shipped target no longer compiles `progress.cpp`. `bridge_progress.asm`
+now owns the scene-boundary table, transition state, per-frame timeline call,
+elapsed-time conversion, title formatting, `SetWindowTextA` update, and
+transition-only structured log. It uses the existing assembly formatter and
+variadic logging bridge, preserving the Win64 integer/string stack layout for
+the final scene log. The reference target retains the C++ progress
+implementation as its oracle.
+
+### Assembly interfaces and dependencies
+
+```text
+vk::progressInit / vk::progressUpdate
+```
+
+The assembly table preserves all eleven existing ModPos thresholds, canonical
+scene names, and effect labels. `audioElapsedSec` is converted with the same
+truncate-and-modulo rules as the C++ implementation; timeline emission remains
+per frame even when no scene transition occurs. `win32_progress_abi_probe`
+stubs the audio/timer/timeline services and checks first-transition output,
+repeat-frame suppression, threshold crossing, elapsed formatting, and timeline
+arguments.
+
+### Phase 3B.6.7C.6.4 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM decorated progress ABI probe                            1/1 passed
+focused progress/timer + P1/pause/close gates                6/6 passed; 56.37 s
+full regression suite                                      85/85 passed; 109.74 s
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. Progress reporting is now native x64 assembly without
+changing scene boundaries, title text, timeline cadence, soundtrack
+synchronization, or full-demo playback. The remaining shipped C++ platform
+logic is concentrated in `bridge.cpp` and the CRT-owned entry shim.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1517,25 +1557,24 @@ remaining boundary:
 | `arena.cpp` | Reference/VIRTUAL namespace implementation | Shipped target now uses `bridge_arena.asm`; C++ remains only as the behavioral/tool oracle | Reference/tool targets only |
 | `input.cpp` | Reference-only namespace implementation | Shipped target now uses decorated ABI exports from `win32_input.asm`; reference retains C++ watcher/state oracle | Reference target only |
 | `pause.cpp` | Reference-only pause namespace implementation | Shipped target now uses `bridge_pause.asm`; reference retains C++ state/logging oracle | Reference target only |
-| `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
-| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, and logging services are now in assembly; remaining application/startup adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
+| `progress.cpp` | Reference-only progress implementation | Shipped target now uses `bridge_progress.asm`; reference retains C++ scene/title/timeline oracle | Reference target only |
+| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, logging, arena, input, pause, and progress services are now in assembly; remaining application adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
 
 `dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
 `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
 and the API-set CRT runtime/math/stdio/locale/heap DLLs. The production image
 has no libxmp dependency. The CRT imports are therefore not evidence that the
 demo core or audio player still uses C++; they are attributable to the
-remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
-objects and must be removed or deliberately retained before a custom `/ENTRY`
-claim.
+remaining `production_entry.cpp` and `bridge.cpp` objects and must be removed
+or deliberately retained before a custom `/ENTRY` claim.
 
-## Next gate: Phase 3B.6.7C.6.4 progress and application adapters
+## Next gate: Phase 3B.6.7C.6.5 remaining application bridge adapters
 
 The next risk-first slice must map and migrate the remaining production
-progress and application/startup namespace wrappers in `progress.cpp` and
-`bridge.cpp`. It must preserve command-line modes,
-window title/progress output, pause/audio pumping, input state, archive
-ownership, and failure rollback while keeping the reference target unchanged.
+application/startup namespace and WndProc adapters in `bridge.cpp`. It must
+preserve command-line modes, scene selection, self-test/audio-check behavior,
+window message routing, failure rollback, and the existing startup/shutdown
+contracts while keeping the reference target unchanged.
 The C++ bridge must not be deleted and custom `/ENTRY` must not be attempted
 until these symbols have assembly implementations, the PE import set is
 re-attributed, and full playback plus close/failure paths remain equivalent.

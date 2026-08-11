@@ -656,6 +656,20 @@ target_link_libraries(win32_pause_abi_probe PRIVATE kernel32)
 add_test(NAME win32.pause_abi COMMAND win32_pause_abi_probe)
 set_tests_properties(win32.pause_abi PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.6.4 progress namespace gate: validate scene boundaries,
+# per-frame timeline calls, elapsed formatting, and transition-only logging.
+add_executable(win32_progress_abi_probe
+    tools/validate/win32_progress_abi_probe.cpp
+    platform/bridge_progress.asm
+    core/eos_replace/win32_log_format.asm)
+target_compile_definitions(win32_progress_abi_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_progress_abi_probe PRIVATE
+    platform core/inc core/eos_replace)
+target_link_libraries(win32_progress_abi_probe PRIVATE kernel32 user32)
+add_test(NAME win32.progress_abi COMMAND win32_progress_abi_probe)
+set_tests_properties(win32.progress_abi PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B witness: exercise the production NASM soundtrack-path
 # resolver, including override identity and staged executable-directory data.
 add_executable(win32_music_path_probe tools/validate/win32_music_path_probe.cpp)
