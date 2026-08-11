@@ -886,12 +886,40 @@ This is a **GO** for the next audio-orchestration gate. The remaining high-risk
 boundary is the C++ runtime state machine: Win32 worker handles, atomic control
 records, pause/seek acknowledgements, and deterministic teardown.
 
-## Next gate: Phase 3B.6.7B.9.2
+## Phase 3B.6.7B.9.2 assembly-owned audio runtime storage
 
-Phase 3B.6.7B.9.2 should migrate the audio runtime state and synchronization
-ownership in measured stages: first the POD runtime record and scalar state,
-then Win32 worker creation and acknowledgement loops, and finally the C++
-storage/path helpers. Import attribution, PCM/perceptual audio comparison,
-full-demo playback, A/V synchronization, and failure/lifecycle probes remain
-mandatory; custom `/ENTRY` is still deferred until no production C++ object
-requires CRT initialization.
+The dedicated player `Runtime` POD layout remains visible to the transitional
+C++ orchestration, but its backing storage is now `asm_audio_runtime_state` in
+`audio_runtime_state.asm`: a 64-byte-aligned, loader-zeroed 0x2000-byte block
+shared by the shipped and reference targets. A compile-time size assertion
+guards the C++ view against overrunning that fixed assembly allocation. No
+field offsets, handles, atomics, ring pointers, seek bases, or teardown order
+were changed.
+
+This deliberately separates state ownership from behavior. The Release build
+and complete 69/69 suite pass, including live WASAPI control/seek/stress,
+device-failure cleanup, and P1/pause/close playback. The C++ state machine is
+still retained as the oracle for the next synchronization migration.
+
+### Phase 3B.6.7B.9.2 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+full regression suite                                      69/69 passed; 104.63 s
+audio Runtime storage                                      NASM x64 fixed BSS block
+Runtime layout guard                                       C++ static_assert passed
+worker/control behavior                                    unchanged and fully green
+```
+
+This is a **GO** for synchronization ownership. The next slice must move the
+Win32 worker handles and acknowledgement loops while preserving PCM output,
+pause/seek semantics, failure injection, and deterministic join/teardown.
+
+## Next gate: Phase 3B.6.7B.9.3
+
+Phase 3B.6.7B.9.3 should migrate the audio worker creation, control-state
+acknowledgement, seek quiescence, and deterministic join/teardown in assembly.
+Import attribution, PCM/perceptual audio comparison, full-demo playback, A/V
+synchronization, and failure/lifecycle probes remain mandatory; custom
+`/ENTRY` is still deferred until no production C++ object requires CRT
+initialization.

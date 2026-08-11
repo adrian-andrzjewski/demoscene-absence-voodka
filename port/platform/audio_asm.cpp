@@ -21,6 +21,7 @@
 extern "C" uint32_t asm_audio_lower_bound_u32(const uint32_t* values,
                                                 uint32_t count,
                                                 uint32_t key);
+extern "C" unsigned char asm_audio_runtime_state[0x2000];
 
 namespace vk {
 
@@ -58,7 +59,14 @@ struct Runtime {
     double seekTimeBase = 0.0;
 };
 
-Runtime g_runtime;
+static_assert(sizeof(Runtime) <= 0x2000,
+              "assembly-owned audio runtime block is too small");
+
+// The state layout remains described by this POD for now, but its storage is
+// no longer a C++ global object.  The shipped and reference targets both use
+// the same loader-zeroed NASM block, which removes one C++ data owner without
+// changing any field offsets or orchestration behavior.
+#define g_runtime (*reinterpret_cast<Runtime*>(asm_audio_runtime_state))
 
 bool issueState(Runtime* runtime, uint32_t state, uint32_t* sequenceOut) {
     InterlockedExchange(
