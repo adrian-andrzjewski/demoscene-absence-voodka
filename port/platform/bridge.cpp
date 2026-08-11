@@ -285,6 +285,7 @@ int vk_platform_quit_requested() {
     return vk::quitRequested() ? 1 : 0;
 }
 
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 // Production shutdown coordinator ABI. The order is owned by
 // win32_shutdown.asm; these wrappers keep each existing subsystem teardown
 // implementation unchanged and independently testable.
@@ -298,8 +299,10 @@ void vk_shutdown_selectors()   { vk::resetSelectors(); }
 void vk_shutdown_platform()    { vk::platformShutdown(); }
 void vk_shutdown_log_flush()   { vk::logFlush(); }
 void vk_shutdown_log_shutdown() { vk::logShutdown(); }
+#endif
 
 // trace hook from NASM (simple %s/%x/%d formatting via platform logger)
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 void vk_log_printf(const char* fmt, ...) {
 #if defined(VOODKA_ASSEMBLY_PLATFORM)
     char buf[512];
@@ -315,6 +318,7 @@ void vk_log_printf(const char* fmt, ...) {
     vk::logPrint("%s", buf);
 #endif
 }
+#endif
 
 #if !defined(VOODKA_ASSEMBLY_PLATFORM)
 struct ProcessorekNevosolekDrawArgs {

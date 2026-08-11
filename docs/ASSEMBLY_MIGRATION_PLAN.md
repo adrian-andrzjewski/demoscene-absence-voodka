@@ -592,13 +592,15 @@ services, the 70 Hz QPC timer, and the bridge ABI groups (selectors,
 palette, presentation, fixed overlay pointers, arena forwarders, wait-vbl,
 ModPos, dedicated-audio forwarding, archive loading, and key-map copying). The
 reference target and host tools remain C++ where they provide the differential
-oracle. The current bridge gate is 80/80 Release tests green, including live
-WASAPI, P1 playback, pause, close, and the file/input bridge probes.
+oracle. The current bridge gate is 82/82 Release tests green, including live
+WASAPI, P1 playback, pause, close, file/input forwarding, and the new
+shutdown/logging bridge probes. The P4 rasterizer is already assembly-owned
+and remains covered by its framebuffer-equivalence probe.
 
-The next gate is the remaining bridge service surface: shutdown/logging and
-the P4 rasterizer boundary. This keeps the executable buildable after each
-slice and postpones removal of the C++ bridge, CRT startup, and remaining CRT
-imports until the high-risk platform behavior is proven equivalent.
+The next gate is the remaining application/startup namespace surface. This
+keeps the executable buildable after each slice and postpones removal of the
+C++ bridge, CRT startup, and remaining CRT imports until the high-risk platform
+behavior and lifecycle contracts are proven equivalent.
 
 ---
 

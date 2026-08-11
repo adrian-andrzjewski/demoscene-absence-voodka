@@ -118,7 +118,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-80 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+82 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -168,7 +168,10 @@ forwarding, and fixed framebuffer overlay pointers.
 ordering, elapsed-audio conversion, playback controls, and seek forwarding.
 `bridge.file` validates NASM archive-name/offset forwarding and preserves
 unknown/null-file diagnostic logging. `bridge.input` validates the bounded
-128-entry normalized key-map copy.
+128-entry normalized key-map copy. `bridge.shutdown` validates the ten native
+assembly teardown forwarders and their exact coordinator order. `bridge.log`
+validates the native variadic bridge with register and stack-passed arguments
+through the production formatter and sink.
 `audio.wasapi_asm_probe` performs the complete 44.1 kHz stereo PCM WASAPI
 activation, event, buffer, stop/reset, and COM teardown sequence in NASM; the
 C++ executable only validates its fixed-width report.
@@ -237,6 +240,8 @@ Python-based tests skip cleanly if no interpreter is found.
 | `bridge_timing_audio_probe` | Phase 3B.6.7C.3 NASM wait-vbl delta, ModPos, elapsed-audio, playback, and seek ABI gate (CTest `bridge.timing_audio`) |
 | `bridge_file_probe` | Phase 3B.6.7C.4 NASM archive/file forwarding and unknown/null diagnostic gate (CTest `bridge.file`) |
 | `bridge_input_probe` | Phase 3B.6.7C.4 NASM 128-byte normalized key-map copy and bounds gate (CTest `bridge.input`) |
+| `bridge_shutdown_probe` | Phase 3B.6.7C.5 NASM shutdown-forwarding and teardown-order gate (CTest `bridge.shutdown`) |
+| `bridge_log_probe` | Phase 3B.6.7C.5 Win64 register/stack-varargs logging bridge gate (CTest `bridge.log`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3-4 production NASM module/command-line/DPI handoff and complete host coordination; only the minimal CRT `WinMain` shim remains, reference retains the C++ host |

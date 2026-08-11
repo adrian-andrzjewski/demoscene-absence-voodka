@@ -1321,8 +1321,64 @@ visual/audio/A-V/reference differential gates                passed
 This is a **GO**. The shipped archive/file and key-map C ABI services are now
 native x64 assembly without changing asset resolution, loading, key-state
 normalization, rendering, soundtrack, synchronization, or lifecycle behavior.
-The remaining bridge work is shutdown/logging forwarding and the P4 rasterizer
-adapter.
+The remaining bridge work is shutdown/logging forwarding; the P4 rasterizer
+adapter is already assembly-owned and remains covered by its existing output
+gate.
+
+## Phase 3B.6.7C.5 shutdown, logging, and P4 boundary closure
+
+This slice removes the production C++ shutdown and variadic logging bridge
+bodies. `bridge_shutdown.asm` now forwards each teardown service directly to
+the already native subsystem owner, while `bridge_log.asm` captures the MSVC
+x64 register and stack varargs into the contiguous cursor expected by the
+proven NASM formatter and sink. The idempotent teardown coordinator itself was
+already native in `win32_shutdown.asm`; this change removes its remaining C++
+adapter layer without changing the established order.
+
+The P4 processorek Nevosolek rasterizer is not reimplemented in this slice: it
+was migrated in Phase 3B.6.7B.6 and is already in the shipped NASM source list.
+Its complete-framebuffer `processorek_nevosolek.raster` probe remains the
+pixel-equivalence gate. The reference executable continues to retain the C++
+shutdown/logging/P4 paths as differential oracles.
+
+### Assembly interfaces and dependencies
+
+```text
+vk_shutdown_input / vk_shutdown_audio / vk_shutdown_recording
+vk_shutdown_diagnostics / vk_shutdown_timeline / vk_shutdown_present
+vk_shutdown_selectors / vk_shutdown_platform / vk_shutdown_log_flush
+vk_shutdown_log_shutdown
+vk_log_printf
+```
+
+The shutdown adapters depend only on the existing assembly-owned input,
+dedicated-audio, recording, diagnostics, timeline, presenter, selector, arena,
+and logging services. The logging adapter must preserve the Win64 varargs
+contract, including the first three register slots and later stack slots, then
+delegate byte formatting and file output to `asm_log_vformat` and
+`asm_log_write`. The dedicated bridge probes use decorated C++ stubs to verify
+forwarding and teardown order, and a sixth-argument varargs case to exercise
+the stack portion of the ABI.
+
+### Phase 3B.6.7C.5 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM shutdown bridge probe                                  1/1 passed
+NASM variadic logging bridge probe                          1/1 passed
+full regression suite                                      82/82 passed; 106.16 s
+full assembly P1/pause/close playback                       passed
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+processorek Nevosolek (P4) framebuffer equivalence           passed
+```
+
+This is a **GO**. Shutdown and logging forwarding are now native x64 assembly,
+and the P4 render boundary is already independently equivalent. The shipping
+target still has C++ application/startup namespace wrappers and the CRT entry
+boundary; those are the next risk-controlled cleanup gates. No custom `/ENTRY`
+or C++ removal is justified until those remaining imports and lifecycle
+contracts are audited together.
 
 ## Phase 3B.6.7C production platform audit
 
@@ -1336,7 +1392,7 @@ remaining boundary:
 | `input.cpp` | Namespace-vk wrappers, quit flag, reference-only C++ watcher branch | Production state/worker already lives in `win32_input.asm`; bool and byte-map ABI must remain exact | Medium, after bridge consumers are mapped |
 | `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
 | `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
-| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, and key-map services are now in assembly; shutdown/logging and P4 adapter paths still retain C++ calls, variadic forwarding, `/GS`, and CRT helpers | Next highest-risk platform gate |
+| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, and logging services are now in assembly; remaining application/startup namespace adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
 
 `dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
 `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
@@ -1347,14 +1403,13 @@ remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
 objects and must be removed or deliberately retained before a custom `/ENTRY`
 claim.
 
-## Next gate: Phase 3B.6.7C.5 shutdown, logging, and P4 bridge services
+## Next gate: Phase 3B.6.7C.6 remaining application and startup adapters
 
-The next risk-first slice must migrate the shutdown/logging forwarding surface
-and the P4 processorek adapter. Shutdown must preserve idempotent ordering,
-worker joins, COM/D3D release, selector reset, window destruction, and log
-flush/close. Logging must preserve the variadic ABI and byte-level formatting;
-the rasterizer must remain pixel-equivalent against the C++ oracle. Each group
-needs a dedicated ABI/output probe and the full playback/close/failure suite.
-Do not remove the C++ bridge or attempt custom `/ENTRY` until every production
-bridge symbol has an assembly implementation, the PE import set is understood,
-and full playback plus close/failure paths remain equivalent.
+The next risk-first slice must map and migrate the remaining production
+application/startup namespace wrappers in `bridge.cpp`, `progress.cpp`,
+`pause.cpp`, `input.cpp`, and `arena.cpp`. It must preserve command-line modes,
+window title/progress output, pause/audio pumping, input state, archive
+ownership, and failure rollback while keeping the reference target unchanged.
+The C++ bridge must not be deleted and custom `/ENTRY` must not be attempted
+until these symbols have assembly implementations, the PE import set is
+re-attributed, and full playback plus close/failure paths remain equivalent.

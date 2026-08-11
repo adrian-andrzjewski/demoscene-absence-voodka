@@ -839,6 +839,28 @@ target_link_libraries(bridge_input_probe PRIVATE kernel32)
 add_test(NAME bridge.input COMMAND bridge_input_probe)
 set_tests_properties(bridge.input PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.5 shutdown/logging bridge gates: exercise direct teardown
+# service dispatch and the production variadic formatter/sink boundary.
+add_executable(bridge_shutdown_probe
+    tools/validate/bridge_shutdown_probe.cpp
+    platform/bridge_shutdown.asm)
+target_compile_definitions(bridge_shutdown_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(bridge_shutdown_probe PRIVATE kernel32)
+add_test(NAME bridge.shutdown COMMAND bridge_shutdown_probe)
+set_tests_properties(bridge.shutdown PROPERTIES TIMEOUT 10)
+
+add_executable(bridge_log_probe
+    tools/validate/bridge_log_probe.cpp
+    platform/bridge_log.asm
+    core/eos_replace/win32_log_format.asm)
+target_compile_definitions(bridge_log_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(bridge_log_probe PRIVATE
+    "${CMAKE_SOURCE_DIR}/core/inc"
+    "${CMAKE_SOURCE_DIR}/core/eos_replace")
+target_link_libraries(bridge_log_probe PRIVATE kernel32)
+add_test(NAME bridge.log COMMAND bridge_log_probe)
+set_tests_properties(bridge.log PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe
