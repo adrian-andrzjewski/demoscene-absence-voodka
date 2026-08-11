@@ -1,6 +1,6 @@
 # Phase 3 progress: pure Win32/thread runtime and callback integration
 
-Status: **Phase 3A and Phase 3B.1-3B.6.7B.1 passed; remaining host migration is in progress.**
+Status: **Phase 3A and Phase 3B.1-3B.6.7B.2 passed; remaining host migration is in progress.**
 
 Snapshot date: **2026-08-11**
 
@@ -542,7 +542,7 @@ owners:
 
 | Component | Current production ownership | Migration risk |
 |---|---|---|
-| `app.cpp` | Host orchestration, subsystem ordering, seek/self-test dispatch, CRT `WinMain` handoff target; production music-path resolution is now an assembly ABI | Very high: subsystem ordering, CRT exception/startup state, and many failure paths remain coupled here; reference-only STL code remains the oracle |
+| `app.cpp` | Host orchestration, subsystem ordering, CRT `WinMain` handoff target; production path and mode dispatch are now assembly ABIs | Very high: subsystem ordering, CRT exception/startup state, and many failure paths remain coupled here; reference-only STL code remains the oracle |
 | `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
 | `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
 | `d3d11_dispatch.cpp` | Production presenter adapter, palette state, frame recording and GPU/source diagnostics | Medium-high: normal COM calls are assembly, but optional capture uses `std::string`, `std::vector`, `fopen_s`, `fwrite`, and `fflush` |
@@ -592,10 +592,43 @@ soundtrack, scene timing, or reference behavior. The process still cannot use
 custom `/ENTRY`: remaining production C++ host, diagnostic, timing, bridge,
 and audio-orchestration objects still contribute CRT/STL imports.
 
-## Next gate: Phase 3B.6.7B.2
+## Phase 3B.6.7B.2 production mode and entry-seek dispatcher
 
-Phase 3B.6.7B.2 should continue the remaining host orchestration in risk order,
-starting with the production seek/self-test/result ABI around `app.cpp`, while
-measuring the CRT import set after every slice. The reference target must remain
-buildable and behaviorally comparable; no custom `/ENTRY` attempt is justified
-until the host no longer constructs C++ runtime objects during startup.
+The production host's mode-control branch is now native x64 assembly in
+`win32_app_modes.asm`.
+
+- `asm_voodka_apply_entry_seek` preserves selector precedence exactly as
+  `--modpos`, `--ms`, `--order`, then `--part`, including the valid `1..8`
+  part range and the calibrated part-start ModPos table.
+- `asm_voodka_run_mode` preserves self-test priority, the 60-frame diagnostic
+  loop, the default 20-second audio-check duration, crash-filter installation,
+  `DemoStart32` arguments, and result-code propagation.
+- The remaining namespace-vk calls use explicit `vk_app_*` C ABI adapters in
+  `bridge.cpp`; the reference executable retains its original C++ branch.
+- `win32_app_modes_probe` stubs those service adapters and validates every
+  selector/mode branch without requiring a window, GPU, or audio device.
+
+### Phase 3B.6.7B.2 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM mode/seek dispatcher probe                            1/1 passed; 0.20 s
+full regression suite                                      62/62 passed; 106.54 s
+production seek/mode/result branch                         NASM x64
+reference seek/mode/result branch                          C++ differential path
+```
+
+This is a **GO** for the next host slice. Production `app.cpp` no longer owns
+the seek table, selector precedence, self-test loop, audio-check dispatch, or
+demo result branch. The remaining high-risk C++ owners are subsystem ordering,
+audio worker orchestration, D3D11 diagnostics/capture, timing, and input/state
+adapters. The CRT/STL import audit still blocks custom `/ENTRY` startup.
+
+## Next gate: Phase 3B.6.7B.3
+
+Phase 3B.6.7B.3 should reduce the remaining production `app.cpp` subsystem
+ordering and failure-path ownership, beginning with a POD startup/result
+contract around initialization and teardown while preserving the reference
+oracle. Import measurements and full-demo playback remain mandatory after each
+slice; no custom `/ENTRY` attempt is justified until the host no longer
+constructs C++ runtime objects during startup.

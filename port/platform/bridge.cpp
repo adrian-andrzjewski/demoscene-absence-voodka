@@ -113,6 +113,58 @@ uint32_t vk_audio_seek_rows(uint32_t rows) { return vk::audioSeekRows(rows); }
 uint32_t vk_audio_seek_ms(int ms)           { return vk::audioSeekMs(ms); }
 uint32_t vk_audio_seek_order(int order)     { return vk::audioSeekOrder(order); }
 
+// Production app-mode adapters. The NASM dispatcher owns selector precedence,
+// part-start data, self-test looping, and result propagation; these functions
+// keep the remaining namespace-vk service calls behind explicit C symbols.
+void vk_set_entry_part(int part);
+void vk_app_seek_modpos(uint32_t requested) {
+    const uint32_t reached = vk::audioSeekRows(requested);
+    vk::logPrint("[app] seek --modpos %ld -> reached ModPos %u\n",
+                 static_cast<long>(requested), reached);
+}
+void vk_app_seek_ms(int ms) {
+    const uint32_t reached = vk::audioSeekMs(ms);
+    vk::logPrint("[app] seek --ms %ld -> reached ModPos %u\n",
+                 static_cast<long>(ms), reached);
+}
+void vk_app_seek_order(int order) {
+    const uint32_t reached = vk::audioSeekOrder(order);
+    vk::logPrint("[app] seek --order %ld -> reached ModPos %u\n",
+                 static_cast<long>(order), reached);
+}
+void vk_app_seek_part(uint32_t part, uint32_t modpos) {
+    const uint32_t reached = vk::audioSeekRows(modpos);
+    vk::logPrint("[app] seek --part %ld -> ModPos 0x%x reached %u\n",
+                 static_cast<long>(part), modpos, reached);
+    vk_set_entry_part(static_cast<int>(part));
+}
+void vk_app_no_entry_seek() {
+    vk::logPrint("[app] no entry seek (module starts at beginning)\n");
+}
+
+void vk_app_log_selftest() {
+    vk::logPrint("[app] SELF-TEST: rendering known pattern\n");
+}
+void vk_app_selftest_pattern() {
+    vk::selfTestPattern();
+}
+int vk_app_diag_readback_enabled() {
+    return vk::diagReadbackEnabled() ? 1 : 0;
+}
+void vk_app_present_frame() {
+    vk::presentFrame();
+}
+void vk_app_log_audio_check(int seconds) {
+    vk::logPrint("[app] AUDIO CHECK: running %d s\n", seconds);
+}
+int vk_app_audio_self_check(int seconds) {
+    return vk::audioSelfCheck(seconds);
+}
+void vk_app_log_demo_start(uint64_t arenaBase) {
+    vk::logPrint("[app] arena=%p starting demo core\n",
+                 reinterpret_cast<void*>(arenaBase));
+}
+
 // entry-part selector: 0 = run the full part1..part8 sequence (default),
 // 1..8 = run only that part. Set by app.cpp before DemoStart32.
 static int g_entry_part = 0;

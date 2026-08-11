@@ -632,6 +632,17 @@ target_link_libraries(win32_music_path_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.music_path COMMAND win32_music_path_probe)
 set_tests_properties(win32.music_path PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.2 witness: exercise NASM seek precedence, part-start table,
+# self-test loop, audio-check default, and demo result propagation with C ABI
+# service stubs; no window, GPU, or audio device is required.
+add_executable(win32_app_modes_probe
+    tools/validate/win32_app_modes_probe.cpp)
+target_compile_definitions(win32_app_modes_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(win32_app_modes_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.app_modes COMMAND win32_app_modes_probe)
+set_tests_properties(win32.app_modes PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.
