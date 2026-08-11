@@ -13,10 +13,11 @@
 #include <cstring>
 #include <cstdlib>
 
+#if defined(VOODKA_REFERENCE_BUILD)
 // Very small crash logger: print exception address + register state then let
 // the OS terminate. Gives the exact faulting RIP without a debugger attached.
-// The production filter entry is NASM; this C ABI body remains the logger
-// oracle until the logging subsystem is migrated.
+// The shipped target uses the equivalent formatter in win32_crash.asm; this
+// C++ body remains the differential oracle.
 extern "C" LONG WINAPI vk_crash_report(EXCEPTION_POINTERS* ep) {
     EXCEPTION_RECORD* er = ep->ExceptionRecord;
     CONTEXT* cx = ep->ContextRecord;
@@ -28,6 +29,7 @@ extern "C" LONG WINAPI vk_crash_report(EXCEPTION_POINTERS* ep) {
     vk::logFlush();
     return EXCEPTION_CONTINUE_SEARCH;
 }
+#endif
 #include <string>
 #include <vector>
 

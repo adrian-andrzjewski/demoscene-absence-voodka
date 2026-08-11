@@ -326,12 +326,40 @@ cleanup, production close-triggered process exit, reference close, and the
 removed production libxmp rejection path. The full suite retains all existing
 rendering, audio, timing, asset, Win32, D3D11, and dedicated-player coverage.
 This is a **GO** for the next host boundary, but the production executable
-still contains C++ subsystem implementations, formatted logging, crash
-formatting, path resolution, and startup orchestration.
+still contains C++ subsystem implementations, the formatted logging sink, path
+resolution, and startup orchestration.
 
-## Next gate: Phase 3B.6.2
+## Phase 3B.6.2 crash-report formatter
 
-Phase 3B.6.2 should migrate the production logging/crash-reporting boundary or
-the remaining startup orchestration, whichever can be isolated with a stable
-C ABI and differential evidence. It must preserve diagnostics, failure-path
+The production exception filter now formats its diagnostics in
+`win32_crash.asm`. It reads the Win64 `EXCEPTION_POINTERS`/AMD64 `CONTEXT`
+layout directly, emits the same three `[CRASH]` lines through `vk_log_printf`,
+flushes through the shutdown logging ABI, and returns
+`EXCEPTION_CONTINUE_SEARCH`. The C++ logger remains the sink and the reference
+target retains `vk_crash_report` as the differential oracle.
+
+The test-only `win32_crash_probe` constructs synthetic exception/context
+records and verifies the complete formatted output, including the fifth and
+sixth values passed in Win64 stack slots. The production symbol scan confirms
+that `VOODKA.exe` no longer references `vk_crash_report`.
+
+### Phase 3B.6.2 validation
+
+```text
+Release production/reference build                     passed
+crash/runtime probes                                   2/2 passed; 0.11 s
+full regression suite                                  55/55 passed; 104.48 s
+production crash filter/formatter                     NASM x64
+reference crash formatter                              C++ differential oracle
+```
+
+This is a **GO** for the next host boundary. The production executable still
+contains the C++ logging sink, path resolution, and startup orchestration, but
+the exception registration, formatter, flush handoff, and shutdown path are
+now assembly-owned.
+
+## Next gate: Phase 3B.6.3
+
+Phase 3B.6.3 should migrate the production logging sink or an isolated startup
+service. It must preserve diagnostic output, file lifecycle, failure-path
 behavior, and the same normal/ESC/close teardown witnesses.

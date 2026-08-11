@@ -562,6 +562,15 @@ target_link_libraries(win32_runtime_probe PRIVATE kernel32 user32)
 add_test(NAME win32.runtime_probe COMMAND win32_runtime_probe)
 set_tests_properties(win32.runtime_probe PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.2 feasibility witness: invoke the production NASM exception
+# filter with synthetic EXCEPTION_POINTERS and verify all varargs register
+# values, including the fifth/sixth Win64 stack arguments.
+add_executable(win32_crash_probe tools/validate/win32_crash_probe.cpp)
+target_compile_definitions(win32_crash_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(win32_crash_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.crash_report COMMAND win32_crash_probe)
+set_tests_properties(win32.crash_report PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

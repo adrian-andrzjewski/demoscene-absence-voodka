@@ -81,7 +81,8 @@ setup are implemented in `core/eos_replace/win32_app_entry.asm`; true custom
 initialization. Production raw command-line storage, exception-filter entry,
 and the global Escape watcher lifecycle are also implemented in
 `core/eos_replace/win32_crash.asm` and `core/eos_replace/win32_input.asm`;
-formatted logging and message-pump state remain in C++ for the current gate.
+crash formatting, the key map, and the message pump are now assembly-owned;
+the formatted logging sink remains in C++ for the current gate.
 
 ## Running
 
@@ -189,6 +190,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_live_wasapi_probe --longrun` | Phase 2Q sustained 15-second assembly producer/ring/WASAPI transfer and teardown gate (CTest `audio.live_wasapi_longrun`) |
 | `d3d11_asm_present_probe` | Phase 1B standalone NASM D3D11/COM presenter, GPU readback, Present, and Release gate (CTest `d3d11.asm_present_probe`) |
 | `win32_runtime_probe` | Phase 3A no-CRT NASM process, HWND/WndProc, message pump, worker/event, exception-filter registration, and teardown gate (CTest `win32.runtime_probe`) |
+| `win32_crash_probe` | Phase 3B.6.2 synthetic `EXCEPTION_POINTERS`/Win64 varargs witness for the production NASM crash formatter (CTest `win32.crash_report`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3 production NASM module/command-line/DPI handoff into the C++ host; reference remains direct C++ |
@@ -196,6 +198,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` command-line/input bridge | Phase 3B.5 production NASM flag/value parsing, selector storage, 128-byte key map, and main-thread message pump; reference retains C++ behavior |
 | `VOODKA` lifecycle automation | Phase 3B.6 production NASM pause/close automation worker, event/thread state, message injection, join, and handle cleanup; reference retains C++ behavior |
 | `VOODKA` shutdown coordinator | Phase 3B.6.1 production NASM atomic shutdown claim, teardown ordering, window destruction, log close, and quit-to-ExitProcess handoff; reference retains C++ behavior |
+| `VOODKA` crash formatter | Phase 3B.6.2 production NASM exception-record/context formatting and log-flush handoff; reference retains the C++ formatter |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |
