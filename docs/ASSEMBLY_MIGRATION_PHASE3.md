@@ -545,20 +545,22 @@ owners:
 | `app.cpp` / `production_entry.cpp` | `app.cpp` is now reference-only; production retains only the minimal CRT `WinMain` shim, while `win32_app_host.asm` owns host configuration, logging, window failure, startup, seek, run, and final return | Medium-high: the remaining shim still requires CRT entry initialization; C++ platform services and the bridge remain live owners |
 | `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
 | `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
-| `d3d11_dispatch.cpp` | Production presenter adapter, palette state, frame recording and GPU/source diagnostics | Medium-high: normal COM calls are assembly, but optional capture uses `std::string`, `std::vector`, `fopen_s`, `fwrite`, and `fflush` |
+| `d3d11_dispatch.cpp` | Reference-only historical presenter adapter; production recording/readback service is now `win32_d3d_dispatch.asm` | Closed for production; the C++ implementation remains an oracle |
 | `timer.cpp` | QPC calibration, 70 Hz wait, pause/quit choke point | Medium-high: timing changes can alter every scene and A/V boundary |
 | `input.cpp` / `pause.cpp` | Main-thread message pump, key-state bridge, atomics, pause state | Medium: the assembly WndProc/watcher already exist, but queue semantics and global cancellation remain live C++ behavior |
 | `progress.cpp` | Scene table, title updates, transition bookkeeping | Low-medium: bounded state and Win32 `SetWindowTextA`, but title/log timing is observable |
-| `audio_dispatch.cpp` | Thin C++ dispatch into the dedicated player | Low: mostly ABI forwarding; safe after the audio orchestration contract is frozen |
+| `audio_dispatch.cpp` | Reference-only historical production dispatch; `audio_dispatch.asm` now owns the shipped namespace ABI | Closed for production; forwarding behavior is covered by `audio_dispatch_probe` |
 | `timeline.cpp` / `log.cpp` | Public C++ adapters over assembly formatter/sinks | Low: no production formatted CRT path remains, but adapters still contribute C++ objects until final removal |
 
-The shipped import audit still reports `MSVCP140`, `VCRUNTIME140`, UCRT
-runtime/string/math/stdio/heap/locale imports, plus `ceil`, `floor`,
-`fopen_s`, `fwrite`, `fflush`, `malloc`, and `free`. D3D11/COM and Win32
-imports are expected platform dependencies; the CRT/STL imports are the
-remaining all-assembly blocker. `audio.cpp`, `d3d11_present.cpp`, asset viewer,
-VIRTUAL, and packaging/validation tools remain intentionally outside the
-shipped production dependency boundary.
+The current Release import audit for `VOODKA.exe` reports `VCRUNTIME140.dll`,
+the API-set UCRT runtime/math/stdio/locale/heap imports, `d3d11.dll`,
+`ole32.dll`, `KERNEL32.dll`, `USER32.dll`, and `GDI32.dll`; it reports no
+`libxmp`, `MSVCP140`, or standalone `xmp` dependency. The remaining CRT/UCRT
+imports come from the still-live C++ audio orchestration and platform bridge,
+not from the removed production D3D11/audio dispatch shims. D3D11/COM and
+Win32 imports are expected platform dependencies. `audio.cpp`,
+`d3d11_present.cpp`, asset viewer, VIRTUAL, and packaging/validation tools
+remain intentionally outside the shipped production dependency boundary.
 
 ## Phase 3B.6.7B.1 production soundtrack path ABI
 
@@ -818,10 +820,48 @@ diagnostic output. Remaining production C++ is concentrated in the bridge's
 service wrappers, timing/input/pause/progress, audio dispatch, and the minimal
 CRT entry boundary.
 
-## Next gate: Phase 3B.6.7B.8
+## Phase 3B.6.7B.8 audio dispatch ABI
 
-Phase 3B.6.7B.8 should inventory and reduce the remaining production bridge,
-audio-dispatch, timing, input/pause, progress, and resource wrappers. Import
-attribution, full-demo playback, A/V synchronization, and failure/lifecycle
-probes remain mandatory; custom `/ENTRY` is still deferred until no production
-C++ object requires CRT initialization.
+The shipped target no longer compiles `audio_dispatch.cpp`. The new
+`audio_dispatch.asm` exports the exact decorated `vk::` audio ABI and forwards
+to the already-tested dedicated-player orchestration in `audio_asm.cpp`:
+
+- enabled-mode initialization, play/stop, pump, position/length, elapsed-time,
+  seek, and self-check calls preserve the existing argument and return-value
+  contracts;
+- disabled mode retains the former production rejection behavior, including
+  the exact log message and zero/one default results; and
+- shutdown remains unconditional, matching the old C++ dispatch behavior.
+
+`audio_dispatch_probe` supplies deterministic player stubs and checks every
+forward, disabled-mode branch, double return, variadic log call, and shutdown
+path. The complete Release suite passes 68/68, including the real dedicated
+audio/WASAPI tests and P1/pause/close demo playback. `audio_asm.cpp` remains
+the next audio migration boundary because it still owns Win32 thread handles,
+waits, state transitions, seek calibration, and C++ container algorithms.
+
+### Phase 3B.6.7B.8 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM audio-dispatch probe                                  1/1 passed; 0.04 s
+full regression suite                                      68/68 passed; 104.91 s
+production audio_dispatch.cpp                              not compiled
+production namespace-vk audio ABI                          NASM x64
+dedicated player orchestration                              C++ transitional owner
+reference/libxmp path                                       retained outside VOODKA.exe
+```
+
+This is a **GO** for the next audio/runtime boundary. The dispatch shim is no
+longer a blocker; the next risk is moving the C++ audio orchestration without
+altering PCM output, WASAPI lifecycle, seek behavior, or A/V synchronization.
+
+## Next gate: Phase 3B.6.7B.9
+
+Phase 3B.6.7B.9 should migrate the C++ audio orchestration boundary in measured
+stages: first the seek/timeline lookup and scalar state, then Win32 worker
+creation and synchronization ownership, and finally the C++ storage/path
+helpers. Import attribution, PCM/perceptual audio comparison, full-demo
+playback, A/V synchronization, and failure/lifecycle probes remain mandatory;
+custom `/ENTRY` is still deferred until no production C++ object requires CRT
+initialization.

@@ -957,8 +957,9 @@ PCM/timeline parity audit is complete.
 Phase 2X makes the production/reference split structural rather than merely
 command-line selectable:
 
-- `VOODKA.exe` compiles `audio_dispatch.cpp`, which exposes the existing
-  application audio ABI and forwards it to the dedicated assembly service;
+- At the Phase 2X boundary, `VOODKA.exe` compiled `audio_dispatch.cpp`, which
+  exposed the application audio ABI and forwarded it to the dedicated assembly
+  service; Phase 3B.6.7B.8 later replaces that shim with `audio_dispatch.asm`;
 - `VOODKA.exe` does not compile `audio.cpp` and does not link `xmp_static`;
 - `VOODKA_REFERENCE.exe` uses the same platform/runtime sources but adds
   `audio.cpp` and `xmp_static` as the non-shipped C++/libxmp behavioral oracle;

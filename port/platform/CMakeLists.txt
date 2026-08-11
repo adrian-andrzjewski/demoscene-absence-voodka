@@ -13,7 +13,7 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 set(VOODKA_PLATFORM_SOURCES
     production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
-    audio_dispatch.cpp
+    audio_dispatch.asm
     win32_platform_abi.asm
     p4_raster.asm
     win32_d3d_dispatch.asm

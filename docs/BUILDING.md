@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (67 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (68 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -116,7 +116,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-67 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+68 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -206,6 +206,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_platform_abi_probe` | Phase 3B.6.7B.5 exact MSVC-decorated `vk::log*`/`vk::timeline*` assembly ABI, variadic logger forwarding, timeline formatting, audio-clock sampling, flush, and close witness (CTest `win32.platform_abi`) |
 | `p4_raster_probe` | Phase 3B.6.7B.6 deterministic NASM-vs-C++ P4 textured-triangle scan-conversion comparison across sorting, clipping, degenerate, horizontal, and wrapped-UV cases (CTest `p4.raster`) |
 | `win32_d3d_dispatch_probe` | Phase 3B.6.7B.7 production NASM D3D11 service ABI, palette/frame recording, readback diagnostics, Win32 file handles, and lifecycle witness (CTest `win32.d3d_dispatch`) |
+| `audio_dispatch_probe` | Phase 3B.6.7B.8 production NASM namespace-vk audio forwarding, disabled-mode defaults, log ABI, and shutdown witness (CTest `audio.dispatch`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3-4 production NASM module/command-line/DPI handoff and complete host coordination; only the minimal CRT `WinMain` shim remains, reference retains the C++ host |
@@ -220,14 +221,14 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` mode/entry dispatcher | Phase 3B.6.7B.2 production NASM selector precedence, part-start ModPos table, self-test/audio-check modes, crash-filter handoff, and DemoStart32 result propagation |
 | `VOODKA` startup coordinator | Phase 3B.6.7B.3 production NASM progress/input/arena/timing/audio/presenter/diagnostic/automation order and ordinary-failure rollback; reference retains C++ behavior |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
-| `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
+| `d3d11_dispatch.cpp` | Phase 3B.6.7B.7 reference-only historical dispatch; production uses `win32_d3d_dispatch.asm` |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |
 | `VOODKA --asm-audio --part 1` | Phase 2R real demo P1 integration with assembly tracker/mixer/WASAPI and clean shutdown (CTest `audio.assembly_demo_p1`) |
 | `VOODKA --asm-audio` | Phase 2T full eight-part assembly producer service witness: scene progression, seek/timeline behavior, and clean WASAPI teardown |
 | `VOODKA --part 1` | Phase 2W production-default assembly-audio P1 integration and clean shutdown (CTest `audio.assembly_demo_p1`) |
 | `VOODKA_REFERENCE --libxmp-audio --part 1 --auto-close-ms 2000` | Phase 2X non-shipped C++/libxmp reference-path initialization and teardown (CTest `audio.reference_demo_close`) |
 | `VOODKA --libxmp-audio --part 1` | Phase 2X production dependency-boundary rejection (CTest `audio.production_reference_rejected`) |
-| `audio_dispatch.cpp` | Phase 2X production audio ABI dispatch into the dedicated assembly player |
+| `audio_dispatch.asm` | Phase 3B.6.7B.8 production namespace-vk audio ABI dispatch into the dedicated assembly player |
 | `VOODKA_REFERENCE` | Phase 2X non-shipped host target retaining `audio.cpp` and `xmp_static` for differential validation |
 | `asm_audio_ring_thread_entry` | Phase 2U assembly-owned CreateThread entry for the live WASAPI worker (exercised by the production assembly-audio CTests) |
 | `asm_audio_service_storage_init` | Phase 2V assembly-owned MOD loading, fixed tracker/timeline storage, PCM ring buffers, producer scratch, and mixer history initialization |

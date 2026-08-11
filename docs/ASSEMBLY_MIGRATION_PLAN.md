@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.7 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.8 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -997,12 +997,19 @@ owns the decorated presenter ABI, palette and self-test state, frame recording,
 bounded GPU readback diagnostics, Win32 file handles, VirtualAlloc storage, and
 presenter lifecycle; the real 67-test suite including production P1/pause/close
 playback passes, while the reference presenter remains C++.
+Phase 3B.6.7B.8 now removes the production `audio_dispatch.cpp` object. NASM
+owns the exact decorated namespace-vk audio forwarding ABI, preserving enabled
+and disabled-mode results, the rejection log, floating-point elapsed-time
+return, and unconditional shutdown while the dedicated player orchestration
+remains the C++ transitional owner. The focused dispatch probe and complete
+68-test suite pass, including live WASAPI, seek/stress, and P1/pause/close
+playback gates.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.8: reduce
-the remaining production bridge, audio-dispatch, timing, input/pause, and
-progress/resource wrappers while retaining the reference target as the
-differential oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.9: migrate
+the C++ audio orchestration in risk order—seek/timeline state, worker and
+synchronization ownership, then storage/path helpers—while retaining the
+reference target as the differential oracle.

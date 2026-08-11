@@ -703,6 +703,20 @@ target_link_libraries(win32_d3d_dispatch_probe PRIVATE kernel32)
 add_test(NAME win32.d3d_dispatch COMMAND win32_d3d_dispatch_probe)
 set_tests_properties(win32.d3d_dispatch PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.8 first boundary: the shipped namespace-vk audio dispatch is
+# NASM while the dedicated player implementation remains the tested C++ host
+# orchestration.  The probe supplies player stubs and verifies every forward,
+# disabled-mode default, variadic log call, and unconditional shutdown path.
+add_executable(audio_dispatch_probe
+    tools/validate/audio_dispatch_probe.cpp
+    platform/audio_dispatch.asm)
+target_compile_definitions(audio_dispatch_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_dispatch_probe PRIVATE
+    platform "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+target_link_libraries(audio_dispatch_probe PRIVATE kernel32)
+add_test(NAME audio.dispatch COMMAND audio_dispatch_probe)
+set_tests_properties(audio.dispatch PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.
