@@ -13,6 +13,8 @@ extern "C" int asm_log_init(void);
 extern "C" void asm_log_write(const char*, unsigned);
 extern "C" void asm_log_flush(void);
 extern "C" void asm_log_shutdown(void);
+extern "C" int asm_log_format_supported(const char*);
+extern "C" int asm_log_vformat(char*, unsigned, const char*, const char*);
 #endif
 
 namespace vk {
@@ -47,6 +49,17 @@ void logPrint(const char* fmt, ...) {
     char buf[2048];
     va_list ap;
     va_start(ap, fmt);
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+    if (asm_log_format_supported(fmt)) {
+        const int length = asm_log_vformat(buf, sizeof buf, fmt, ap);
+        va_end(ap);
+        if (length >= 0) {
+            asm_log_write(buf, static_cast<unsigned>(length));
+            return;
+        }
+        va_start(ap, fmt);
+    }
+#endif
     std::vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
 #if !defined(VOODKA_ASSEMBLY_PLATFORM)

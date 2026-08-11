@@ -392,9 +392,49 @@ remaining production logging dependency is the C++ formatting stage and its
 CRT/STL startup context; path resolution and broader startup orchestration are
 also still C++.
 
-## Next gate: Phase 3B.6.4
+## Phase 3B.6.4 production integer/string formatter
 
-Phase 3B.6.4 should inventory and migrate the production format subset or an
-isolated startup service. Any formatter replacement must preserve all existing
-diagnostic bytes, numeric formatting, concurrent writes, and crash-path output
-before the C++ formatting stage can be removed.
+The first production formatter slice is now native x64 assembly in
+`win32_log_format.asm`.
+
+- `asm_log_format_supported` scans the format grammar without touching the
+  argument cursor. `asm_log_vformat` then consumes the MSVC x64 `va_list`
+  eight-byte slots and formats integer, pointer, character, narrow-string,
+  wide-string, literal-percent, width, sign, and zero-padding conversions.
+- The Windows `long` width remains 32-bit, while `ll` and `z` consume qwords;
+  `%p` uses the MSVC-compatible 16-digit zero-padded representation. The
+  output is caller-owned and bounded, so concurrent log calls retain the
+  assembly sink's serialization contract.
+- Production `log.cpp` selects the assembly formatter before consuming the
+  varargs. Floating-point and unsupported conversions intentionally retain the
+  C++ `vsnprintf` oracle path; this gate therefore reduces, but does not yet
+  eliminate, the production CRT formatting dependency.
+- `win32_log_format_probe` compares representative output byte-for-byte with
+  MSVC `snprintf`, including `%S` and truncation. `win32_log_api_probe` drives
+  the real production `vk::logInit`/`vk::logPrint`/`vk::logShutdown` wrapper.
+
+### Phase 3B.6.4 validation
+
+```text
+Release production/reference/tools rebuild             passed
+logging sink/formatter/API focused gates               3/3 passed; 0.14 s
+production lifecycle gates after relink               5/5 passed; 56.69 s
+full regression suite                                  58/58 passed; 104.87 s
+integer/string/pointer formatter                        NASM x64
+floating/unsupported formatter fallback                C++ CRT oracle
+reference/VIRTUAL logging paths                        C++ differential paths
+```
+
+This is a **GO** for the next boundary. The remaining production logging
+formatter dependency is now specifically floating-point and any future
+unsupported format grammar; host/startup orchestration and the broader C++
+platform layer remain unchanged.
+
+## Next gate: Phase 3B.6.5
+
+Phase 3B.6.5 should inventory the live floating-point diagnostics and either
+implement a byte-compatible NASM conversion path or isolate the remaining
+formatting service behind a formally bounded assembly ABI. It must preserve
+rounding, signs, precision, scientific/general formats if present, truncation,
+concurrent writes, and crash-path output before `vsnprintf` can be removed from
+the shipped target.

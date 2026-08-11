@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.3 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.4 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -943,28 +943,29 @@ parses the production flags, scalar/path selectors, seek controls, and
 recording/diagnostic switches, and owns the 128-byte key map plus the main
 thread message pump. The parser preserves the former C++ token behavior so
 this is an implementation migration rather than a command-line redesign.
-The C++ `vsnprintf` formatting stage, host orchestration, and startup
-orchestration remain C++ for now. Phase 3B.6 moved the production pause/close
+The C++ floating-point/unsupported `vsnprintf` fallback, host orchestration,
+and startup orchestration remain C++ for now. Phase 3B.6 moved the production pause/close
 automation worker,
 its event/thread state, and deterministic join/handle cleanup into NASM.
 Phase 3B.6.1 now moves the production global shutdown coordinator, atomic
 one-shot guard, window-state handoff, teardown order, and quit-to-ExitProcess
 path into NASM. The C++ host retains narrow service wrappers; the reference
 target retains the complete C++ coordinator. Release validation includes the
-56-test suite and focused normal/ESC/close lifecycle gates. Phase 3B.6.2 moved
+58-test suite and focused normal/ESC/close lifecycle gates. Phase 3B.6.2 moved
 the production exception formatter into NASM while preserving the C++ logging
 sink and reference formatter. Its synthetic ABI witness verifies the complete
-three-line output and Win64 stack arguments. Phase 3B.6.3 now moves the
-production file/path/critical-section/write/flush/close sink into NASM while
-retaining C++ formatting. The next sub-gate is Phase 3B.6.4: migrate the
-production format subset or another isolated startup service with equivalent
-byte-level and failure-path evidence.
+three-line output and Win64 stack arguments. Phase 3B.6.3 moved the production
+file/path/critical-section/write/flush/close sink into NASM. Phase 3B.6.4 now
+moves the proven integer/string/pointer formatter subset into NASM and retains
+C++ only for floating-point and unsupported conversions. The next sub-gate is
+Phase 3B.6.5: remove that remaining formatter fallback or isolate it behind a
+bounded assembly ABI with equivalent byte-level and failure-path evidence.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.4: move the
-production format subset or another isolated startup service behind
-assembly-owned interfaces, while retaining the reference target until those
-boundaries have equivalent byte-level evidence.
+libxmp for differential validation. The next gate is Phase 3B.6.5: remove the
+production floating-point/unsupported formatting fallback or move it behind a
+bounded assembly-owned interface, while retaining the reference target until
+those boundaries have equivalent byte-level evidence.

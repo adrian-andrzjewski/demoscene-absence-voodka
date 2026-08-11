@@ -579,6 +579,26 @@ target_link_libraries(win32_log_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.log_sink COMMAND win32_log_probe)
 set_tests_properties(win32.log_sink PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.4 feasibility witness: compare the NASM integer/string
+# formatter against the MSVC printf oracle, including Win64 va_list slots.
+add_executable(win32_log_format_probe tools/validate/win32_log_format_probe.cpp)
+target_compile_definitions(win32_log_format_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(win32_log_format_probe PRIVATE voodka_core)
+add_test(NAME win32.log_format COMMAND win32_log_format_probe)
+set_tests_properties(win32.log_format PROPERTIES TIMEOUT 10)
+
+# Phase 3B.6.4 integration witness: exercise the real production C++ logger
+# wrapper, its va_start boundary, NASM formatter, and NASM sink together.
+add_executable(win32_log_api_probe
+    tools/validate/win32_log_api_probe.cpp
+    platform/log.cpp)
+target_compile_definitions(win32_log_api_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN VOODKA_ASSEMBLY_PLATFORM=1)
+target_include_directories(win32_log_api_probe PRIVATE platform)
+target_link_libraries(win32_log_api_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.log_api COMMAND win32_log_api_probe)
+set_tests_properties(win32.log_api PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.
