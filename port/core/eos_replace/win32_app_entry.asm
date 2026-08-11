@@ -13,7 +13,7 @@ DEFAULT REL
 
 extern GetModuleHandleA
 extern GetCommandLineA
-extern SetProcessDpiAwarenessContext
+extern GetProcAddress
 extern ExitProcess
 extern asm_parse_command_line
 extern asm_voodka_host_main
@@ -25,7 +25,40 @@ section .bss
 align 8
 asm_instance_storage:       resq 1
 
+section .rdata
+user32_dll_name:            db 'user32.dll', 0
+dpi_v2_proc_name:           db 'SetProcessDpiAwarenessContext', 0
+
 section .text
+
+; Resolve the Windows 10 1703+ DPI-V2 API at runtime. USER32 is already an
+; import of the production image, but the symbol itself is not present on
+; earlier Windows 10 releases. A missing module/export is a valid fallback:
+; the process continues with the system's default DPI policy instead of
+; failing in the PE loader before the demo can start.
+asm_apply_dpi_awareness:
+        push    rbp
+        mov     rbp, rsp
+        sub     rsp, 0x20                    ; RSP%16 == 0 at every CALL
+
+        lea     rcx, [rel user32_dll_name]
+        call    GetModuleHandleA
+        test    rax, rax
+        jz      .done
+
+        mov     rcx, rax
+        lea     rdx, [rel dpi_v2_proc_name]
+        call    GetProcAddress
+        test    rax, rax
+        jz      .done
+
+        mov     rcx, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+        call    rax
+
+.done:
+        add     rsp, 0x20
+        pop     rbp
+        ret
 
 ; int asm_voodka_winmain(HINSTANCE, HINSTANCE, LPSTR, int)
 ;
@@ -54,8 +87,7 @@ asm_voodka_winmain:
         mov     rcx, r14
         call    asm_parse_command_line
 
-        mov     rcx, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
-        call    SetProcessDpiAwarenessContext
+        call    asm_apply_dpi_awareness
 
         mov     rcx, r13                     ; HINSTANCE
         mov     rdx, r14                     ; raw command line
@@ -90,8 +122,7 @@ asm_voodka_process_entry:
         mov     rcx, r13
         call    asm_parse_command_line
 
-        mov     rcx, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
-        call    SetProcessDpiAwarenessContext
+        call    asm_apply_dpi_awareness
 
         mov     rcx, r12
         mov     rdx, r13
