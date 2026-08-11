@@ -8,6 +8,8 @@ param(
     [switch]$RunTests,
     [switch]$FullRun,
     [switch]$PackageRun,
+    [ValidateRange(1, 20)]
+    [int]$PackageRepeats = 3,
     [int]$P4SmokeMs = 3000,
     [int]$FullRunTimeoutSec = 330
 )
@@ -231,9 +233,16 @@ try {
         Write-Host "Package: isolated VOODKA.exe + data\vodka.dat + music\amnezja2.mod"
     }
 
-    Invoke-ProductionRun "P4 scene smoke" @(
-        "--part", "4", "--auto-close-ms", $P4SmokeMs.ToString()
-    ) 30 $runExePath $runWorkingDirectory
+    $packageSmokeRepeats = if ($PackageRun) { $PackageRepeats } else { 1 }
+    for ($packageSmokeIndex = 1; $packageSmokeIndex -le $packageSmokeRepeats; ++$packageSmokeIndex) {
+        $smokeName = "P4 scene smoke"
+        if ($packageSmokeRepeats -gt 1) {
+            $smokeName = "P4 scene smoke ($packageSmokeIndex/$packageSmokeRepeats)"
+        }
+        Invoke-ProductionRun $smokeName @(
+            "--part", "4", "--auto-close-ms", $P4SmokeMs.ToString()
+        ) 30 $runExePath $runWorkingDirectory
+    }
 
     if ($FullRun) {
         $timeline = Join-Path -Path $timelineRoot -ChildPath ("production_verify_{0:yyyyMMdd_HHmmss}.log" -f (Get-Date))

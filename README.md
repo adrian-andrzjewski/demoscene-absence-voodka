@@ -1,9 +1,9 @@
-# VOODKA — a 1996 demoscene production, brought back to life
+# VOODKA — 30th Anniversary Windows x64 Port (1996–2026)
 
-**VOODKA** is a native Windows x64 port of the 1996 MS-DOS demo by the
+**VOODKA** is the 30th Anniversary Windows x64 port of the 1996 MS-DOS demo by the
 Polish demogroup **Absence**. The original was written in 32-bit x86 assembly
 for a 386-class PC, an FPU, 8 MB of RAM, VGA mode 13h, and a Sound Blaster.
-The port runs the production's eight parts on modern Windows hardware while
+The port runs the production's eight scenes on modern Windows hardware while
 preserving its 320×200 indexed-palette character, fixed-point arithmetic,
 music-driven timeline, and wonderfully strange late-1990s atmosphere.
 
@@ -24,8 +24,53 @@ cd port
 The build produces a self-contained `port/bin/Release/` directory with the
 demo, packed data, and soundtrack. The window is 1280×800: an exact 4×,
 point-sampled presentation of the original 320×200 logical framebuffer. The
-demo runs at approximately 70 frames per second and plays all eight parts from
+demo runs at approximately 70 frames per second and plays all eight scenes from
 beginning to end.
+
+## Why this port exists
+
+This project is personal before it is technical. I first discovered **Voodka**,
+together with **Budyn**, as a kid on a CD bundled with *CD-Action*. They were
+among my first encounters with the demoscene, and Voodka in particular became
+one of the productions that made me fall in love with it.
+
+My first experiences with it were not straightforward. I repeatedly had
+problems getting Voodka to run correctly on my computer. At one point I tried
+downloading different copies from several sources over a **56 kbps modem**—a
+slow and expensive process at the time—only to find that the versions I could
+get were incomplete or broken.
+
+Eventually I managed to "hack" one of those copies enough to make the demo
+run. The original soundtrack/MOD was missing or corrupted, though, so I
+substituted another module simply to experience the visuals. I never found a
+working copy of the original soundtrack back then. As a result, I never
+experienced the complete production correctly on my original machine.
+
+Much later, I finally saw Voodka as it was meant to look and sound: first in
+recordings such as YouTube captures, and eventually by running the original
+production through DOSBox. That history is a major reason this port exists.
+It is an attempt to preserve the thing I could not properly experience as a
+child, and to make it easy to experience on a current Windows system.
+
+The **2026 Windows x64 port was created with substantial assistance from AI**
+for programming, reverse engineering, analysis, and debugging. Some people
+in the demoscene may dismiss AI-assisted work as "AI slop", and I understand
+that reaction. I do not pretend that this port represents the same kind of
+achievement as writing an MS-DOS demo in assembly in 1996. The original
+authors did that work themselves, under severe limits on hardware, memory,
+CPU time, graphics, tools, and information.
+
+This release is a **30th Anniversary Windows x64 Port of Voodka (1996–2026)**:
+an act of preservation and a personal tribute to **Warlock and the original
+team**, to the programmers, musicians, artists, and scene people who created
+Voodka, and more broadly to the creativity and technical ingenuity of the
+1996 demoscene. Modern hardware and AI-assisted development make the technical
+environment completely different from the one in which the demo was made.
+The purpose of this port is not to compete with or diminish that achievement,
+but to understand it, preserve it, and keep it accessible. Without the
+original authors and their work there would be nothing here to port; this
+project exists because a demo found on a CD-ROM by a kid remained memorable
+enough to come back to three decades later.
 
 ## A little history
 
