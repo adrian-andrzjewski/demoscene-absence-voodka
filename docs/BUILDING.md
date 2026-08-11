@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (80 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (88 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -69,16 +69,27 @@ audio_live_wasapi_probe.exe --longrun sustained 15-second live handoff gate
 from elsewhere). To distribute, zip those three files (add `VIRTUAL.exe` +
 `data\world` for the viewer).
 
+For a release audit on the build host or on a Windows 11 validation machine,
+run the PE/source/import checks and the live P4 smoke with:
+
+```powershell
+.\port\verify_production.ps1 -Config Release
+.\port\verify_production.ps1 -Config Release -RunTests -FullRun
+```
+
+The second command runs the CTest matrix, the live P4 gate, and the complete
+production playback while recording an A/V timeline under `port/build/`.
+
 The shipped `VOODKA.exe` registers the NASM x64 callback in
 `core/eos_replace/win32_app_wndproc.asm`. `VOODKA_REFERENCE.exe` intentionally
 keeps the C++ callback so close, pause, input, and lifecycle behavior can be
 compared against the assembly production path. Production window
 class registration, monitor-aware geometry, creation, focus, and teardown are
-also implemented in `core/eos_replace/win32_app_window.asm`. Production CRT
-handoff, raw command-line acquisition, module-handle acquisition, and DPI
-setup are implemented in `core/eos_replace/win32_app_entry.asm`; true custom
-`/ENTRY` startup remains deferred until the C++ host no longer needs CRT/STL
-initialization. Production raw command-line storage, exception-filter entry,
+also implemented in `core/eos_replace/win32_app_window.asm`. Production raw
+command-line acquisition, module-handle acquisition, DPI setup, and direct
+`/ENTRY` startup are implemented in `core/eos_replace/win32_app_entry.asm`;
+the shipped image does not use CRT/STL initialization. Production raw
+command-line storage, exception-filter entry,
 and the global Escape watcher lifecycle are also implemented in
 `core/eos_replace/win32_crash.asm`, `core/eos_replace/win32_input.asm`, and
 `core/eos_replace/win32_log.asm`; crash formatting, the key map, message pump,
