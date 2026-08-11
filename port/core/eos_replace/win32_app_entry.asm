@@ -14,6 +14,8 @@ DEFAULT REL
 extern GetModuleHandleA
 extern GetCommandLineA
 extern GetProcAddress
+extern LoadLibraryA
+extern FreeLibrary
 extern ExitProcess
 extern asm_parse_command_line
 extern asm_voodka_host_main
@@ -28,35 +30,81 @@ asm_instance_storage:       resq 1
 section .rdata
 user32_dll_name:            db 'user32.dll', 0
 dpi_v2_proc_name:           db 'SetProcessDpiAwarenessContext', 0
+shcore_dll_name:            db 'shcore.dll', 0
+dpi_legacy_proc_name:       db 'SetProcessDpiAwareness', 0
+dpi_system_proc_name:       db 'SetProcessDPIAware', 0
 
 section .text
 
-; Resolve the Windows 10 1703+ DPI-V2 API at runtime. USER32 is already an
-; import of the production image, but the symbol itself is not present on
-; earlier Windows 10 releases. A missing module/export is a valid fallback:
-; the process continues with the system's default DPI policy instead of
-; failing in the PE loader before the demo can start.
+; Resolve the DPI API at runtime. USER32 is already an import of the
+; production image, but the DPI-V2 symbol itself is not present on earlier
+; Windows 10 releases. Fall back to the Windows 8.1+ shcore API, then to the
+; older user32 system-DPI API. Every path avoids a loader-time dependency and
+; keeps the strongest DPI policy supported by the host.
 asm_apply_dpi_awareness:
         push    rbp
         mov     rbp, rsp
-        sub     rsp, 0x20                    ; RSP%16 == 0 at every CALL
+        push    r12
+        sub     rsp, 0x28                    ; RSP%16 == 0 at every CALL
 
         lea     rcx, [rel user32_dll_name]
         call    GetModuleHandleA
+        mov     r12, rax                     ; retain USER32 for legacy fallback
         test    rax, rax
-        jz      .done
+        jz      .legacy_shcore
 
         mov     rcx, rax
         lea     rdx, [rel dpi_v2_proc_name]
         call    GetProcAddress
         test    rax, rax
-        jz      .done
+        jz      .legacy_shcore
 
         mov     rcx, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
         call    rax
+        jmp     .done
+
+.legacy_shcore:
+        lea     rcx, [rel shcore_dll_name]
+        call    LoadLibraryA
+        test    rax, rax
+        jz      .system_user32
+        mov     [rbp - 0x10], rax
+
+        mov     rcx, rax
+        lea     rdx, [rel dpi_legacy_proc_name]
+        call    GetProcAddress
+        test    rax, rax
+        jz      .free_shcore
+
+        mov     ecx, 2                       ; PROCESS_PER_MONITOR_DPI_AWARE
+        call    rax
+
+.free_shcore:
+        mov     rcx, [rbp - 0x10]
+        call    FreeLibrary
+        jmp     .done
+
+.system_user32:
+        test    r12, r12
+        jnz     .system_proc
+        lea     rcx, [rel user32_dll_name]
+        call    GetModuleHandleA
+        mov     r12, rax
+        test    rax, rax
+        jz      .done
+
+.system_proc:
+        mov     rcx, r12
+        lea     rdx, [rel dpi_system_proc_name]
+        call    GetProcAddress
+        test    rax, rax
+        jz      .done
+        xor     ecx, ecx
+        call    rax
 
 .done:
-        add     rsp, 0x20
+        add     rsp, 0x28
+        pop     r12
         pop     rbp
         ret
 
