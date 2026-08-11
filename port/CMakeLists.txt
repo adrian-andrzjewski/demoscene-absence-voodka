@@ -667,6 +667,19 @@ target_link_libraries(win32_app_host_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.app_host COMMAND win32_app_host_probe)
 set_tests_properties(win32.app_host PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.5 witness: link the production NASM-decorated vk namespace
+# symbols directly and verify logger/timeline sink and formatter contracts.
+add_executable(win32_platform_abi_probe
+    tools/validate/win32_platform_abi_probe.cpp
+    platform/win32_platform_abi.asm)
+target_compile_definitions(win32_platform_abi_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_platform_abi_probe PRIVATE
+    platform "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+target_link_libraries(win32_platform_abi_probe PRIVATE kernel32)
+add_test(NAME win32.platform_abi COMMAND win32_platform_abi_probe)
+set_tests_properties(win32.platform_abi PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

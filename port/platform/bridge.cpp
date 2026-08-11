@@ -77,6 +77,9 @@ uint64_t vk_wait_vbl() {
 }
 uint32_t vk_get_modpos()    { vk::audioPump(); return vk::getModPos(); }
 uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
+uint64_t vk_audio_elapsed_us() {
+    return static_cast<uint64_t>(vk::audioElapsedSec() * 1000000.0);
+}
 
 // palette + present helpers: take 768-byte buffer / nothing.
 void vk_set_palette(const uint8_t* rgb) {

@@ -2,12 +2,10 @@
 
 set(VOODKA_PLATFORM_COMMON_SOURCES
     arena.cpp
-    log.cpp
     input.cpp
     timer.cpp
     audio_asm.cpp
     progress.cpp
-    timeline.cpp
     pause.cpp
     bridge.cpp
 )
@@ -17,10 +15,13 @@ set(VOODKA_PLATFORM_SOURCES
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_dispatch.cpp
     audio_dispatch.cpp
+    win32_platform_abi.asm
 )
 
 set(VOODKA_REFERENCE_SOURCES
     app.cpp
+    log.cpp
+    timeline.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_present.cpp
     audio.cpp
@@ -34,7 +35,9 @@ target_include_directories(${target} PRIVATE "${CMAKE_SOURCE_DIR}/tools/validate
 target_link_libraries(${target} PRIVATE voodka_core)
 
 if(MSVC)
-    target_compile_options(${target} PRIVATE /W4)
+    # Keep C++ warning flags off NASM sources.  CMake otherwise appends /W4
+    # to the NASM command line, where it is parsed as another input file.
+    target_compile_options(${target} PRIVATE $<$<COMPILE_LANGUAGE:CXX>:/W4>)
     target_compile_definitions(${target} PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 endif()
 

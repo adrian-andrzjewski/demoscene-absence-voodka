@@ -703,10 +703,45 @@ blockers are the C++ platform services: bridge/P4 rasterization, dedicated
 audio orchestration, D3D11 capture/diagnostics, timing, input/pause, progress,
 timeline/log adapters, and their CRT/STL imports.
 
-## Next gate: Phase 3B.6.7B.5
+## Phase 3B.6.7B.5 production logging/timeline ABI
 
-Phase 3B.6.7B.5 should remove the production C++ logger/timeline adapters and
-then re-audit the bridge and platform service ownership. Import measurements,
-full-demo playback, A/V synchronization, and failure/lifecycle probes remain
-mandatory; custom `/ENTRY` is still deferred until no production C++ object
-requires CRT initialization.
+The shipped target no longer compiles the production implementations in
+`log.cpp` or `timeline.cpp`. `win32_platform_abi.asm` now exports the exact
+MSVC-decorated symbols declared by `platform_abi.h`:
+
+- `vk::logInit`, `vk::logPrint`, `vk::logFlush`, and `vk::logShutdown` forward
+  to the assembly sink/formatter while retaining `vk_log_printf` only as the
+  narrow variadic bridge still needed by other C++ services;
+- `vk::timelineInit`, `vk::timelineFrame`, and `vk::timelineClose` own the
+  timeline header, frame-line formatting, audio-clock sample, file writes,
+  flush, and close sequence; and
+- the reference target retains the original C++ logger and timeline files as
+  differential behavior oracles.
+
+The phase also fixes the platform target's CMake language filter so C++ `/W4`
+does not get passed to NASM when a platform target contains assembly sources.
+The focused probe checks decorated-symbol linkage, Win64 variadic forwarding,
+the exact timeline bytes, flush/close ordering, and the audio-clock call.
+
+### Phase 3B.6.7B.5 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM platform-ABI probe                                    1/1 passed; 0.08 s
+full regression suite                                      65/65 passed; 104.69 s
+production log.cpp/timeline.cpp                            not compiled
+reference log.cpp/timeline.cpp                             retained as oracle
+```
+
+This is a **GO** for the next boundary. The production logger and timeline
+implementation objects are now assembly-owned. The remaining substantial
+production C++ boundary is bridge/render-service orchestration, followed by
+the smaller timing/input/progress/resource wrappers and the CRT/STL imports.
+
+## Next gate: Phase 3B.6.7B.6
+
+Phase 3B.6.7B.6 should measure and reduce the remaining production bridge and
+render-service C++ surface, beginning with P4/rasterization and D3D11 capture
+helpers. Import attribution, full-demo playback, A/V synchronization, and
+failure/lifecycle probes remain mandatory; custom `/ENTRY` is still deferred
+until no production C++ object requires CRT initialization.
