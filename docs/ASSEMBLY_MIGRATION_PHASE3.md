@@ -1546,6 +1546,51 @@ changing scene boundaries, title text, timeline cadence, soundtrack
 synchronization, or full-demo playback. The remaining shipped C++ platform
 logic is concentrated in `bridge.cpp` and the CRT-owned entry shim.
 
+## Phase 3B.6.7C.6.5 application bridge boundary
+
+The shipped target no longer compiles `bridge.cpp`. `bridge_application.asm`
+now owns the remaining production C ABI adapters and the decorated shutdown
+symbols required by the assembly host:
+
+- seek-by-ModPos, milliseconds, order, part, and scene, including canonical
+  scene-token normalization and entry-scene state;
+- no-seek/self-test/audio-check/demo-start/music/failure/automation logging;
+- startup forwarding for progress, input, platform, timer, timeline,
+  recording, dedicated audio, presenter, and diagnostics;
+- bool-result normalization for input/platform/quit/diagnostic/presenter
+  queries at the `int` C ABI boundary;
+- the Win32 key, pause, quit, and message-pump adapters; and
+- the assembly music-path resolver and `vk::shutdownAll`/
+  `vk::shutdownAndExit` definitions.
+
+The implementation calls only assembly-owned decorated services, the native
+formatter/logger ABI, or the native path/shutdown services. `bridge.cpp` is
+retained unchanged in `VOODKA_REFERENCE.exe` as the differential oracle; it
+is reference-only in CMake and cannot enter the shipped dependency graph.
+
+### Phase 3B.6.7C.6.5 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM application bridge ABI probe                           1/1 passed
+full regression suite                                      86/86 passed; 106.28 s
+full assembly P1/pause/close playback                       passed
+live WASAPI seek/stress/long-run                             passed
+production-reference audio rejection                        passed
+visual/audio/A-V/reference differential gates                passed
+production bridge.cpp                                       not compiled
+reference bridge.cpp                                        retained as oracle
+```
+
+This is a **GO**. The shipped application bridge is now native x64 assembly
+without changing scene selection, seek results, logging, startup rollback,
+input routing, shutdown, soundtrack synchronization, or full-demo playback.
+The only remaining C++ source in the shipped platform target is the minimal
+`production_entry.cpp` CRT transfer shim. The next gate is the CRT/custom
+entry boundary: remove that shim only after PE imports, process startup,
+SEH/crash behavior, global initialization, and Windows 10/11 smoke runs are
+validated together.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1558,7 +1603,7 @@ remaining boundary:
 | `input.cpp` | Reference-only namespace implementation | Shipped target now uses decorated ABI exports from `win32_input.asm`; reference retains C++ watcher/state oracle | Reference target only |
 | `pause.cpp` | Reference-only pause namespace implementation | Shipped target now uses `bridge_pause.asm`; reference retains C++ state/logging oracle | Reference target only |
 | `progress.cpp` | Reference-only progress implementation | Shipped target now uses `bridge_progress.asm`; reference retains C++ scene/title/timeline oracle | Reference target only |
-| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, logging, arena, input, pause, and progress services are now in assembly; remaining application adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
+| `bridge.cpp` | Reference-only C ABI oracle | All shipped selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, logging, arena, input, pause, progress, and application adapters are now assembly; the reference copy remains for differential validation | Closed for shipped target |
 
 `dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
 `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
@@ -1570,11 +1615,10 @@ or deliberately retained before a custom `/ENTRY` claim.
 
 ## Next gate: Phase 3B.6.7C.6.5 remaining application bridge adapters
 
-The next risk-first slice must map and migrate the remaining production
-application/startup namespace and WndProc adapters in `bridge.cpp`. It must
-preserve command-line modes, scene selection, self-test/audio-check behavior,
-window message routing, failure rollback, and the existing startup/shutdown
-contracts while keeping the reference target unchanged.
-The C++ bridge must not be deleted and custom `/ENTRY` must not be attempted
-until these symbols have assembly implementations, the PE import set is
-re-attributed, and full playback plus close/failure paths remain equivalent.
+The application bridge gate is complete. The next risk-first slice is the
+remaining `production_entry.cpp` CRT transfer shim. It must preserve raw
+command-line acquisition, module-handle/DPI setup, exception-filter
+registration, process return behavior, and all existing full-demo gates while
+keeping the reference target unchanged. Custom `/ENTRY` must not be claimed
+until the PE import set is re-attributed and startup, crash, close/failure,
+audio, and full playback paths remain equivalent.

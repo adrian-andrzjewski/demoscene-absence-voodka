@@ -72,7 +72,7 @@ from elsewhere). To distribute, zip those three files (add `VIRTUAL.exe` +
 The shipped `VOODKA.exe` registers the NASM x64 callback in
 `core/eos_replace/win32_app_wndproc.asm`. `VOODKA_REFERENCE.exe` intentionally
 keeps the C++ callback so close, pause, input, and lifecycle behavior can be
-compared while the remaining application host is migrated. Production window
+compared against the assembly production path. Production window
 class registration, monitor-aware geometry, creation, focus, and teardown are
 also implemented in `core/eos_replace/win32_app_window.asm`. Production CRT
 handoff, raw command-line acquisition, module-handle acquisition, and DPI
@@ -84,8 +84,10 @@ and the global Escape watcher lifecycle are also implemented in
 `core/eos_replace/win32_log.asm`; crash formatting, the key map, message pump,
 low-level logging sink, and formatted timeline/file sink are now assembly-owned;
 production arena, archive loading, log, progress, crash-trace, fixed-point
-float, and timeline record formatting are NASM-owned; the broader host remains
-C++ for the current gate.
+float, timeline record formatting, and application bridge adapters are
+NASM-owned. The only remaining C++ source in the shipped platform target is
+the CRT `WinMain` transfer shim; custom `/ENTRY` startup remains a separate
+validation gate.
 
 ## Running
 
@@ -118,7 +120,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-85 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+86 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -233,6 +235,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_input_abi_probe` | Phase 3B.6.7C.6.2 production decorated `vk::` input ABI, worker, key-map, ESC, and quit-state witness (CTest `win32.input_abi`) |
 | `win32_pause_abi_probe` | Phase 3B.6.7C.6.3 production decorated `vk::` pause ABI, atomic transitions, logging, and audio-pump witness (CTest `win32.pause_abi`) |
 | `win32_progress_abi_probe` | Phase 3B.6.7C.6.4 production decorated `vk::` progress ABI, scene/timeline/formatting and transition-log witness (CTest `win32.progress_abi`) |
+| `win32_application_abi_probe` | Phase 3B.6.7C.6.5 complete NASM application bridge, scene/seek/log/startup/WndProc/shutdown/path ABI witness (CTest `win32.application_abi`) |
 | `win32_music_path_probe` | Phase 3B.6.7B.1 production NASM soundtrack-path override, executable-directory, and fallback witness (CTest `win32.music_path`) |
 | `win32_app_modes_probe` | Phase 3B.6.7B.2 production NASM seek precedence, part-start, self-test, audio-check, and result ABI witness (CTest `win32.app_modes`) |
 | `win32_app_startup_probe` | Phase 3B.6.7B.3 production NASM subsystem order, Win64 POD arguments, quit checkpoints, and rollback witness (CTest `win32.app_startup`) |

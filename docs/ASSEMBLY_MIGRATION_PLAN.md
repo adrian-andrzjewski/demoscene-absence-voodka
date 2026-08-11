@@ -592,23 +592,41 @@ services, the 70 Hz QPC timer, and the bridge ABI groups (selectors,
 palette, presentation, fixed overlay pointers, arena forwarders, wait-vbl,
 ModPos, dedicated-audio forwarding, archive loading, and key-map copying). The
 reference target and host tools remain C++ where they provide the differential
-oracle. The current bridge gate is 85/85 Release tests green, including live
-WASAPI, P1 playback, pause, close, file/input forwarding, and the direct
-decorated input ABI probe, as well as the new
-shutdown/logging bridge probes. The P4 rasterizer is already assembly-owned
-and remains covered by its framebuffer-equivalence probe. The shipped arena
-namespace veneer has also been removed; `bridge_arena.asm` now exposes the
-decorated `vk::` ABI over the native archive service while reference/tools keep
-the C++ oracle. The shipped pause namespace veneer has now also been removed;
-`bridge_pause.asm` owns the synchronized state transition and audio-pump
-handoff.
+oracle. The current bridge gate is 86/86 Release tests green, including live
+WASAPI, P1 playback, pause, close, file/input forwarding, the direct
+decorated input/pause/progress/application ABI probes, and the production
+reference-audio rejection gate. The P4 rasterizer is already assembly-owned
+and remains covered by its framebuffer-equivalence probe. The shipped arena,
+input, pause, progress, and application namespace veneers have been removed;
+their NASM implementations expose the decorated `vk::` ABI over the native
+archive, input, synchronization, reporting, and startup services while
+reference/tools keep the C++ oracles.
 
-The shipped input, pause, and progress namespace veneers have now been
-removed; the next gate is the remaining application/startup bridge surface.
-This
-keeps the executable buildable after each slice and postpones removal of the
-C++ bridge, CRT startup, and remaining CRT imports until the high-risk platform
-behavior and lifecycle contracts are proven equivalent.
+The shipped application bridge is now `bridge_application.asm`; `bridge.cpp`
+is reference-only and remains unchanged for differential validation. The only
+remaining C++ source in the shipped platform target is
+`production_entry.cpp`, a minimal CRT `WinMain` transfer shim. The next gate
+is custom/no-CRT process entry and PE-import attribution; the executable stays
+buildable after each slice, and the shim remains until startup, SEH, global
+initialization, Windows 10/11 smoke, and all playback/failure contracts are
+proven equivalent.
+
+### Phase 3B.6.7C.6.5 application bridge gate
+
+`bridge_application.asm` replaces every shipped `bridge.cpp` application
+adapter: seek and scene selection, entry-scene state, startup service
+forwarding, logging helpers, audio/presenter/diagnostic result propagation,
+music-path resolution, shutdown aliases, and the Win32 key/pause/quit/message
+wrappers. The implementation explicitly zero-extends C++ `bool` results before
+returning the historical C ABI `int` values and keeps the reference C++ bridge
+in `VOODKA_REFERENCE.exe` only.
+
+The direct `win32.application_abi` probe covers the full adapter surface with
+deterministic service stubs. The 86-test Release matrix then covers the real
+assembly audio/WASAPI lifecycle, visual playback, synchronization, pause,
+close, failure rollback, and production rejection of the libxmp/reference
+audio path. This is a **GO** for the final CRT-entry gate; it is not yet a
+claim that the shipped PE is free of CRT startup/runtime imports.
 
 ---
 

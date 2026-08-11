@@ -670,6 +670,21 @@ target_link_libraries(win32_progress_abi_probe PRIVATE kernel32 user32)
 add_test(NAME win32.progress_abi COMMAND win32_progress_abi_probe)
 set_tests_properties(win32.progress_abi PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.6.5 gate: exercise the complete shipped NASM application
+# bridge against namespace-vk stubs.  This covers scene parsing, seek/log
+# adapters, startup forwarding, WndProc forwarding, and the path resolver.
+add_executable(win32_application_abi_probe
+    tools/validate/win32_application_abi_probe.cpp
+    platform/bridge_application.asm)
+target_compile_definitions(win32_application_abi_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_application_abi_probe PRIVATE
+    platform core/inc core/eos_replace
+    "${CMAKE_BINARY_DIR}/generated")
+target_link_libraries(win32_application_abi_probe PRIVATE kernel32)
+add_test(NAME win32.application_abi COMMAND win32_application_abi_probe)
+set_tests_properties(win32.application_abi PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B witness: exercise the production NASM soundtrack-path
 # resolver, including override identity and staged executable-directory data.
 add_executable(win32_music_path_probe tools/validate/win32_music_path_probe.cpp)
