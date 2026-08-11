@@ -1023,6 +1023,12 @@ add_test(NAME audio.live_wasapi_longrun
 add_test(NAME audio.assembly_demo_oko_szklo
          COMMAND VOODKA --scene oko-szklo)
 set_tests_properties(audio.assembly_demo_oko_szklo PROPERTIES TIMEOUT 90)
+# The raster primitive cross-check does not exercise the live P4 face loop;
+# keep a short scene-level smoke gate so saved-register/local-stack regressions
+# fail before the unrestricted production run.
+add_test(NAME render.assembly_p4_scene
+         COMMAND VOODKA --part 4 --auto-close-ms 3000)
+set_tests_properties(render.assembly_p4_scene PROPERTIES TIMEOUT 30)
 add_test(NAME audio.assembly_demo_pause
          COMMAND VOODKA --scene oko-szklo --auto-pause-ms 1000)
 set_tests_properties(audio.assembly_demo_pause PROPERTIES TIMEOUT 90)

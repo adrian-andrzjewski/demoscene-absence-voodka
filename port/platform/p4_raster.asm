@@ -16,16 +16,19 @@ DEFAULT REL
 %define ARG_COLOR    56
 
 ; A local vertex is four doubles: x, y, u, v.
-%define V0           -0x20
-%define V1           -0x40
-%define V2           -0x60
-%define EDGE_LONG    -0x80
-%define EDGE_SHORT   -0xa0
-%define EDGE_LEFT    -0xc0
-%define EDGE_RIGHT   -0xe0
-%define TEXTURE      -0xf0
-%define SCREEN       -0xf8
-%define COLOR        -0xfc
+; Keep every local below the saved-register area.  The prologue stores
+; rbx..r15 at rbp-08..rbp-38; the former V0/V1 offsets overlapped those
+; slots (V1+24 == rbp-28), restoring a vertex double into r13 on return.
+%define V0           -0x60
+%define V1           -0x80
+%define V2           -0xa0
+%define EDGE_LONG    -0xc0
+%define EDGE_SHORT   -0xe0
+%define EDGE_LEFT    -0x100
+%define EDGE_RIGHT   -0x120
+%define TEXTURE      -0x130
+%define SCREEN       -0x138
+%define COLOR        -0x13c
 
 global vk_processorek_nevosolek_draw_triangle
 global vk_processorek_nevosolek_draw_triangle_asm
