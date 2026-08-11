@@ -1281,6 +1281,49 @@ seek, rendering, or teardown regression. The remaining bridge risk is file
 loading, key-map copying, shutdown/logging forwarding, and the P4 rasterizer
 adapter.
 
+## Phase 3B.6.7C.4 file and input bridge services
+
+This slice moves `vk_load_internal_file` and `vk_key_map_copy` out of
+`bridge.cpp` and into `bridge_file_input.asm` for the shipped target. File
+loading forwards to the existing native arena/archive owner and preserves the
+unknown/null diagnostic through the assembly logging boundary. Key-map copying
+forwards to the native input state, copies exactly 128 entries, and preserves
+the old nonzero-to-one normalization contract used by the P8 snapshot. The
+reference executable retains both C++ bridge bodies as its oracle.
+
+### Assembly interfaces and dependencies
+
+```text
+vk_load_internal_file
+vk_key_map_copy
+```
+
+The file adapter depends on `asm_arena_load_internal_file` and the existing
+`vk_log_printf` C ABI for failure diagnostics. The input adapter depends on
+`asm_input_key_map`. Dedicated probes stub the unused half of the shared
+adapter object, verify pointer/return-value forwarding, test unknown and null
+file diagnostics, and check bounded 128-byte normalized copies with sentinels.
+The production gate additionally exercises the real archive, loading path,
+input state, full scene sequence, and teardown.
+
+### Phase 3B.6.7C.4 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM file bridge probe                                       1/1 passed
+NASM input bridge probe                                      1/1 passed
+full regression suite                                      80/80 passed; 106.07 s
+full assembly P1/pause/close playback                       passed
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. The shipped archive/file and key-map C ABI services are now
+native x64 assembly without changing asset resolution, loading, key-state
+normalization, rendering, soundtrack, synchronization, or lifecycle behavior.
+The remaining bridge work is shutdown/logging forwarding and the P4 rasterizer
+adapter.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1293,7 +1336,7 @@ remaining boundary:
 | `input.cpp` | Namespace-vk wrappers, quit flag, reference-only C++ watcher branch | Production state/worker already lives in `win32_input.asm`; bool and byte-map ABI must remain exact | Medium, after bridge consumers are mapped |
 | `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
 | `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
-| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer and timing/audio services are now in assembly; internal-file, key-map, shutdown/logging, and P4 adapter paths still retain C++ calls, variadic forwarding, `/GS`, and CRT helpers | Next highest-risk platform gate |
+| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, and key-map services are now in assembly; shutdown/logging and P4 adapter paths still retain C++ calls, variadic forwarding, `/GS`, and CRT helpers | Next highest-risk platform gate |
 
 `dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
 `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
@@ -1304,14 +1347,14 @@ remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
 objects and must be removed or deliberately retained before a custom `/ENTRY`
 claim.
 
-## Next gate: Phase 3B.6.7C.4 file and input bridge services
+## Next gate: Phase 3B.6.7C.5 shutdown, logging, and P4 bridge services
 
-The next risk-first slice must migrate `vk_load_internal_file` against the
-assembly arena/archive service, then `vk_key_map_copy` against the existing
-input state. File offsets, archive bounds, cached ownership, 128-byte key-map
-normalization, and the loading/scene-start path each need dedicated probes.
-Only after those pass should the lower-risk shutdown/logging wrappers and the
-P4 rasterizer adapter be removed from `bridge.cpp`. Do not remove the C++
-bridge or attempt custom `/ENTRY` until every production bridge symbol has an
-assembly implementation, the PE import set is understood, and full playback
-plus close/failure paths remain equivalent.
+The next risk-first slice must migrate the shutdown/logging forwarding surface
+and the P4 processorek adapter. Shutdown must preserve idempotent ordering,
+worker joins, COM/D3D release, selector reset, window destruction, and log
+flush/close. Logging must preserve the variadic ABI and byte-level formatting;
+the rasterizer must remain pixel-equivalent against the C++ oracle. Each group
+needs a dedicated ABI/output probe and the full playback/close/failure suite.
+Do not remove the C++ bridge or attempt custom `/ENTRY` until every production
+bridge symbol has an assembly implementation, the PE import set is understood,
+and full playback plus close/failure paths remain equivalent.

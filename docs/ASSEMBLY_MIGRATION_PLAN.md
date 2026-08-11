@@ -588,18 +588,17 @@ Go only if:
 The risk-first platform migration is active. The shipped target now has native
 x64 assembly implementations for the D3D11/COM presenter, the dedicated MOD
 player and WASAPI path, the Win32 substrate, logging/timeline/arena/startup
-services, the 70 Hz QPC timer, and the first bridge ABI groups (selectors,
+services, the 70 Hz QPC timer, and the bridge ABI groups (selectors,
 palette, presentation, fixed overlay pointers, arena forwarders, wait-vbl,
-ModPos, and dedicated-audio forwarding). The
+ModPos, dedicated-audio forwarding, archive loading, and key-map copying). The
 reference target and host tools remain C++ where they provide the differential
-oracle. The current bridge gate is 78/78 Release tests green, including live
-WASAPI, P1 playback, pause, close, and the timing/audio bridge probe.
+oracle. The current bridge gate is 80/80 Release tests green, including live
+WASAPI, P1 playback, pause, close, and the file/input bridge probes.
 
-The next gate is the remaining bridge service surface: internal-file and
-key-map adapters, then shutdown/logging and the P4 rasterizer boundary. This
-keeps the executable buildable after each slice and postpones removal of the
-C++ bridge, CRT startup, and remaining CRT imports until the high-risk
-platform behavior is proven equivalent.
+The next gate is the remaining bridge service surface: shutdown/logging and
+the P4 rasterizer boundary. This keeps the executable buildable after each
+slice and postpones removal of the C++ bridge, CRT startup, and remaining CRT
+imports until the high-risk platform behavior is proven equivalent.
 
 ---
 

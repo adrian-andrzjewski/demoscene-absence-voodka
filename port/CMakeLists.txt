@@ -821,6 +821,24 @@ target_link_libraries(bridge_timing_audio_probe PRIVATE kernel32)
 add_test(NAME bridge.timing_audio COMMAND bridge_timing_audio_probe)
 set_tests_properties(bridge.timing_audio PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.4 file/key-map bridge gates: exercise NASM forwarding to the
+# existing arena/input owners and preserve the 128-byte normalization contract.
+add_executable(bridge_file_probe
+    tools/validate/bridge_file_probe.cpp
+    platform/bridge_file_input.asm)
+target_compile_definitions(bridge_file_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(bridge_file_probe PRIVATE kernel32)
+add_test(NAME bridge.file COMMAND bridge_file_probe)
+set_tests_properties(bridge.file PROPERTIES TIMEOUT 10)
+
+add_executable(bridge_input_probe
+    tools/validate/bridge_input_probe.cpp
+    platform/bridge_file_input.asm)
+target_compile_definitions(bridge_input_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(bridge_input_probe PRIVATE kernel32)
+add_test(NAME bridge.input COMMAND bridge_input_probe)
+set_tests_properties(bridge.input PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe

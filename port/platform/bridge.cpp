@@ -88,7 +88,9 @@ uint64_t vk_audio_elapsed_us() {
 }
 #endif
 
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
+#endif
 
 // palette + present helpers: take 768-byte buffer / nothing.
 #if !defined(VOODKA_ASSEMBLY_PLATFORM)
@@ -376,11 +378,13 @@ void vk_processorek_nevosolek_draw_triangle(const ProcessorekNevosolekDrawArgs* 
 }
 #endif
 
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 // copy the platform key map (128 PC scancodes, 1=pressed) into dst
 void vk_key_map_copy(uint8_t* dst) {
     const uint8_t* src = vk::rawKeyMap();
     for (int i = 0; i < 128; i++) dst[i] = src[i] ? 1 : 0;
 }
+#endif
 
 } // extern "C"
 
