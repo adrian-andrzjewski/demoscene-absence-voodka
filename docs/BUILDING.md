@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (59 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (60 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -83,8 +83,9 @@ and the global Escape watcher lifecycle are also implemented in
 `core/eos_replace/win32_crash.asm`, `core/eos_replace/win32_input.asm`, and
 `core/eos_replace/win32_log.asm`; crash formatting, the key map, message pump,
 low-level logging sink, and formatted timeline/file sink are now assembly-owned;
-production log, progress, crash-trace, fixed-point float, and timeline record
-formatting are NASM-owned; the broader host remains C++ for the current gate.
+production arena, archive loading, log, progress, crash-trace, fixed-point
+float, and timeline record formatting are NASM-owned; the broader host remains
+C++ for the current gate.
 
 ## Running
 
@@ -115,7 +116,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-59 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+60 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -197,6 +198,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_log_format_probe` | Phase 3B.6.4-5 byte-level MSVC-oracle comparison for NASM integer/string/pointer/fixed-float formatting (CTest `win32.log_format`) |
 | `win32_log_api_probe` | Phase 3B.6.4 real production `vk::logPrint` va_list/formatter/sink integration witness (CTest `win32.log_api`) |
 | `win32_timeline_probe` | Phase 3B.6.6 byte-level production NASM timeline formatter/file-sink witness (CTest `win32.timeline_sink`) |
+| `win32_arena_probe` | Phase 3B.6.7A production NASM arena/archive discovery, copy, alignment, and teardown witness (CTest `win32.arena_service`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3 production NASM module/command-line/DPI handoff into the C++ host; reference remains direct C++ |
@@ -206,6 +208,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` shutdown coordinator | Phase 3B.6.1 production NASM atomic shutdown claim, teardown ordering, window destruction, log close, and quit-to-ExitProcess handoff; reference retains C++ behavior |
 | `VOODKA` crash formatter | Phase 3B.6.2 production NASM exception-record/context formatting and log-flush handoff; reference retains the C++ formatter |
 | `VOODKA` log sink | Phase 3B.6.3 production NASM path/file/critical-section/write/flush/close sink; Phase 3B.6.4-6 NASM integer/string/pointer/fixed-float/timeline formatting and file output; reference/VIRTUAL retain C++ paths |
+| `VOODKA` arena/archive service | Phase 3B.6.7A production NASM 64 MiB arena, Win32 archive discovery/read, aligned zeroed allocation, and cached `Load_internal_file`; reference/VIRTUAL retain C++ paths |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |

@@ -611,6 +611,18 @@ target_link_libraries(win32_timeline_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.timeline_sink COMMAND win32_timeline_probe)
 set_tests_properties(win32.timeline_sink PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7A feasibility witness: exercise the production NASM arena,
+# archive discovery/loading, zeroed bump allocation, and teardown boundary.
+add_executable(win32_arena_probe
+    tools/validate/win32_arena_probe.cpp
+    platform/arena.cpp)
+target_compile_definitions(win32_arena_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN VOODKA_ASSEMBLY_PLATFORM=1)
+target_include_directories(win32_arena_probe PRIVATE platform)
+target_link_libraries(win32_arena_probe PRIVATE voodka_core kernel32 user32)
+add_test(NAME win32.arena_service COMMAND win32_arena_probe)
+set_tests_properties(win32.arena_service PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

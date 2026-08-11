@@ -499,10 +499,71 @@ The remaining production C++ surface is now concentrated in host orchestration,
 CRT/STL startup, path/asset service boundaries, and the higher-level platform
 wrappers. Those must be reassessed before attempting custom `/ENTRY` startup.
 
-## Next gate: Phase 3B.6.7
+## Phase 3B.6.7A production arena/archive service
 
-Phase 3B.6.7 should inventory the remaining production CRT/STL and host
-orchestration ownership, then define the smallest ABI needed to remove each
-surviving C++ object. It is a feasibility gate, not a license to start a broad
-mechanical rewrite: the production executable must remain buildable and the
-reference target must continue to provide differential behavior throughout.
+The production EOS memory and packaged-asset boundary is now native x64
+assembly in `win32_arena.asm`.
+
+- `asm_arena_platform_init` preserves the existing 64 MiB arena layout and
+  archive search order: executable `data\vodka.dat`, executable `vodka.dat`,
+  then the configure-time development-tree fallback.
+- `asm_arena_alloc` preserves 16-byte alignment, zero-filled allocations,
+  the fixed overlay reservation, and the existing fail-fast exhaustion path.
+  `asm_arena_platform_shutdown` releases both the archive block and arena.
+- `asm_arena_load_internal_file` preserves case-insensitive `voodka.dat` /
+  `vodka.dat` resolution, one cached arena copy, and the 32-bit offset ABI.
+  The C++ reference target retains its `std::vector`/`std::wstring` loader;
+  the production `arena.cpp` branch is now only a narrow C ABI adapter.
+- `win32_arena_probe` validates base allocation, zeroing, alignment, mixed-case
+  archive lookup, archive-header copy, and post-shutdown state. The probe also
+  caught and closed Win64 shadow-space and nonvolatile-register violations
+  before the production gate was accepted.
+
+### Phase 3B.6.7A validation
+
+```text
+Release production/reference rebuild                         passed
+assembly arena/archive focused gate                           1/1 passed; 0.07 s
+full regression suite                                        60/60 passed; 104.78 s
+production arena/archive ownership                            NASM x64
+reference/VIRTUAL arena/archive paths                         C++ differential paths
+```
+
+This is a **GO** for the next host inventory boundary. It removes the largest
+remaining production STL/data-loading owner without changing scene bytes,
+overlay offsets, audio, timing, or rendering. It does **not** yet qualify the
+process for custom `/ENTRY`: the shipped image still imports CRT/STL support
+through the host, diagnostics, and optional capture paths.
+
+## Phase 3B.6.7 production ownership inventory
+
+The post-arena binary and source audit identifies the remaining shipped C++
+owners:
+
+| Component | Current production ownership | Migration risk |
+|---|---|---|
+| `app.cpp` | Host orchestration, music-path resolution, subsystem ordering, seek/self-test dispatch, CRT `WinMain` handoff target | Very high: `std::string`/`std::wstring`/`std::vector`, allocation, CRT exception/startup state, and many failure paths are coupled here |
+| `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
+| `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
+| `d3d11_dispatch.cpp` | Production presenter adapter, palette state, frame recording and GPU/source diagnostics | Medium-high: normal COM calls are assembly, but optional capture uses `std::string`, `std::vector`, `fopen_s`, `fwrite`, and `fflush` |
+| `timer.cpp` | QPC calibration, 70 Hz wait, pause/quit choke point | Medium-high: timing changes can alter every scene and A/V boundary |
+| `input.cpp` / `pause.cpp` | Main-thread message pump, key-state bridge, atomics, pause state | Medium: the assembly WndProc/watcher already exist, but queue semantics and global cancellation remain live C++ behavior |
+| `progress.cpp` | Scene table, title updates, transition bookkeeping | Low-medium: bounded state and Win32 `SetWindowTextA`, but title/log timing is observable |
+| `audio_dispatch.cpp` | Thin C++ dispatch into the dedicated player | Low: mostly ABI forwarding; safe after the audio orchestration contract is frozen |
+| `timeline.cpp` / `log.cpp` | Public C++ adapters over assembly formatter/sinks | Low: no production formatted CRT path remains, but adapters still contribute C++ objects until final removal |
+
+The shipped import audit still reports `MSVCP140`, `VCRUNTIME140`, UCRT
+runtime/string/math/stdio/heap/locale imports, plus `ceil`, `floor`,
+`fopen_s`, `fwrite`, `fflush`, `malloc`, and `free`. D3D11/COM and Win32
+imports are expected platform dependencies; the CRT/STL imports are the
+remaining all-assembly blocker. `audio.cpp`, `d3d11_present.cpp`, asset viewer,
+VIRTUAL, and packaging/validation tools remain intentionally outside the
+shipped production dependency boundary.
+
+## Next gate: Phase 3B.6.7B
+
+Phase 3B.6.7B should migrate the remaining host orchestration in risk order,
+starting with the path/argument/result ABI around `app.cpp`, while measuring
+the CRT import set after every slice. The reference target must remain
+buildable and behaviorally comparable; no custom `/ENTRY` attempt is justified
+until the host no longer constructs C++ runtime objects during startup.

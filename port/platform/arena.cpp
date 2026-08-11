@@ -4,6 +4,78 @@
 // exposed to NASM) maps offset->real pointer, mirroring EOS semantics.
 
 #include "platform_abi.h"
+
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+
+#include <cstddef>
+#include <cstdint>
+
+extern "C" int asm_arena_platform_init(const char* repositoryRoot);
+extern "C" void asm_arena_platform_shutdown(void);
+extern "C" uint8_t* asm_arena_base(void);
+extern "C" uint32_t asm_arena_alloc(uint32_t bytes);
+extern "C" void asm_arena_free(uint32_t offset);
+extern "C" uint32_t asm_arena_load_internal_file(const char* name);
+extern "C" const void* asm_arena_archive_base(void);
+extern "C" uint32_t asm_arena_archive_size(void);
+extern "C" const char* asm_arena_archive_path(void);
+
+namespace vk {
+
+const uint32_t kBackbufferOffset = 0x00010000;
+const uint32_t kFramebufferOffset = 0x00020000;
+
+uint8_t* arena() {
+    return asm_arena_base();
+}
+
+bool platformInit() {
+    if (!asm_arena_platform_init(VOODKA_REPO_ROOT)) return false;
+    const uint32_t size = asm_arena_archive_size();
+    if (size != 0) {
+        logPrint("[arena] loaded archive %s (%u bytes)\n",
+                 asm_arena_archive_path(), size);
+        logPrint("[arena] arena ready, 64 MB, base=%p\n",
+                 static_cast<void*>(arena()));
+    } else {
+        logPrint("[arena] warning: archive not found\n");
+    }
+    return true;
+}
+
+void platformShutdown() {
+    asm_arena_platform_shutdown();
+}
+
+uint32_t arenaAlloc(uint32_t bytes) {
+    return asm_arena_alloc(bytes);
+}
+
+void arenaFree(uint32_t offset) {
+    asm_arena_free(offset);
+}
+
+uint32_t loadInternalFile(const char* name) {
+    const uint32_t offset = asm_arena_load_internal_file(name);
+    if (offset == 0) {
+        logPrint("[arena] loadInternalFile: unknown internal file '%s'\n",
+                 name ? name : "(null)");
+    }
+    return offset;
+}
+
+const void* archiveBytes() {
+    return asm_arena_archive_base();
+}
+
+size_t archiveSize() {
+    return asm_arena_archive_size();
+}
+
+}  // namespace vk
+
+#else
+
 #include <windows.h>
 #include <cstdio>
 #include <cstdarg>
@@ -133,3 +205,5 @@ const void* archiveBytes() { return g_archive.data(); }
 size_t archiveSize() { return g_archive.size(); }
 
 }  // namespace vk
+
+#endif
