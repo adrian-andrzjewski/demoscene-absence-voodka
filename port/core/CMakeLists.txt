@@ -26,6 +26,7 @@ set(VOODKA_CORE_ASM
     eos_replace/win32_log_format.asm
     eos_replace/win32_timeline.asm
     eos_replace/win32_arena.asm
+    eos_replace/win32_paths.asm
     eos_replace/boot.asm
     eos_replace/toonel.asm
     inc/globals.asm

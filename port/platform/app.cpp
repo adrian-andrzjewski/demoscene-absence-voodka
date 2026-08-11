@@ -30,8 +30,10 @@ extern "C" LONG WINAPI vk_crash_report(EXCEPTION_POINTERS* ep) {
     return EXCEPTION_CONTINUE_SEARCH;
 }
 #endif
+#if defined(VOODKA_REFERENCE_BUILD)
 #include <string>
 #include <vector>
+#endif
 
 // bridge symbols (extern "C"): select which part the assembly core runs
 extern "C" void vk_set_entry_part(int part);
@@ -40,7 +42,7 @@ extern "C" HWND asm_create_voodka_window(HINSTANCE);
 extern "C" void asm_destroy_voodka_window(HWND, HINSTANCE);
 extern "C" int vk_voodka_host_main(HINSTANCE, LPSTR, int);
 extern "C" int asm_voodka_winmain(HINSTANCE, HINSTANCE, LPSTR, int);
-extern "C" const char* asm_voodka_command_line(void);
+extern "C" const char* asm_voodka_resolve_music_path(const char*, const char*);
 extern "C" void asm_install_crash_filter(void);
 extern "C" uint32_t asm_voodka_arg_libxmp(void);
 extern "C" const char* asm_voodka_arg_record(void);
@@ -173,6 +175,7 @@ bool startAutomation(HWND hwnd, long pauseAtMs, long closeAtMs) {
 // amnezja2.mod), then the dev-tree copy under VOODKA_REPO_ROOT. Missing file
 // is tolerated by the reference C++ path; the default assembly path reports
 // initialization failure so a release build cannot silently lose the soundtrack.
+#if defined(VOODKA_REFERENCE_BUILD)
 static std::string resolveMusicPath(const char* overridePath) {
     if (overridePath && overridePath[0]) return overridePath;
     wchar_t exePath[MAX_PATH] = {};
@@ -199,6 +202,7 @@ static std::string resolveMusicPath(const char* overridePath) {
     }
     return std::string();
 }
+#endif
 
 LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
     switch (m) {
@@ -252,14 +256,14 @@ LRESULT CALLBACK WndProc(HWND h, UINT m, WPARAM w, LPARAM l) {
 extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
 #if defined(VOODKA_REFERENCE_BUILD)
     g_hInst = hInst;
+#else
+    (void)lpCmd;
 #endif
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
 
+#if defined(VOODKA_REFERENCE_BUILD)
     const char* commandLine = lpCmd;
-#if !defined(VOODKA_REFERENCE_BUILD)
-    if (const char* storedCommandLine = asm_voodka_command_line())
-        commandLine = storedCommandLine;
 #endif
 
     // Per-monitor DPI awareness: window geometry is expressed in physical
@@ -287,6 +291,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     bool referenceAudio = false;
     long autoPauseMs = -1;
     long autoCloseMs = -1;
+#if defined(VOODKA_REFERENCE_BUILD)
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
         std::string f = "--" + std::string(flag);
         auto p = cmd.find(f);
@@ -299,6 +304,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         while (!dir.empty() && dir.back() == '"') dir.pop_back();
         return dir.empty() ? nullptr : _strdup(dir.c_str());
     };
+#endif
     {
 #if !defined(VOODKA_REFERENCE_BUILD)
         const uint32_t assemblyArgFlags = asm_voodka_arg_libxmp();
@@ -472,10 +478,17 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     vk::timerInit();
     vk::timelineInit(timelinePath);
     vk::recInit(recDir);
-    std::string musicPath = resolveMusicPath(musicOverride);
-    vk::logPrint("[app] music module: '%s'\n", musicPath.empty() ? "(none)" : musicPath.c_str());
+#if defined(VOODKA_REFERENCE_BUILD)
+    const std::string musicPath = resolveMusicPath(musicOverride);
+    const char* musicPathValue = musicPath.c_str();
+#else
+    const char* musicPathValue =
+        asm_voodka_resolve_music_path(musicOverride, VOODKA_REPO_ROOT);
+#endif
+    vk::logPrint("[app] music module: '%s'\n",
+                 musicPathValue && musicPathValue[0] ? musicPathValue : "(none)");
     vk::audioSetAssemblyMode(asmAudio);
-    const int audioOk = vk::audioInit(musicPath.c_str(), 44100);
+    const int audioOk = vk::audioInit(musicPathValue ? musicPathValue : "", 44100);
     if ((asmAudio || referenceAudio) && !audioOk) {
         vk::logPrint(referenceAudio
                          ? "[app] reference audio initialization failed\n"
@@ -577,8 +590,8 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     // ---- self-test or run the demo core (assembly) --------------------------
     uint8_t* ab = vk::arena();
     int rcode = 0;
-    std::string cmdline = commandLine ? commandLine : "";
 #if defined(VOODKA_REFERENCE_BUILD)
+    std::string cmdline = commandLine ? commandLine : "";
     bool selftest = cmdline.find("--selftest") != std::string::npos;
 #else
     bool selftest = asm_voodka_arg_selftest() != 0;

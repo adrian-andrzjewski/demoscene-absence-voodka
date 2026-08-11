@@ -19,12 +19,10 @@ extern asm_parse_command_line
 extern vk_voodka_host_main
 
 global asm_voodka_winmain
-global asm_voodka_command_line
 
 section .bss
 align 8
 asm_instance_storage:       resq 1
-asm_command_line_storage:   resq 1
 
 section .text
 
@@ -52,7 +50,6 @@ asm_voodka_winmain:
         call    GetCommandLineA
         mov     r14, rax
         mov     [rel asm_instance_storage], r13
-        mov     [rel asm_command_line_storage], r14
         mov     rcx, r14
         call    asm_parse_command_line
 
@@ -69,11 +66,6 @@ asm_voodka_winmain:
         pop     r13
         pop     r12
         pop     rbp
-        ret
-
-; const char* asm_voodka_command_line(void)
-asm_voodka_command_line:
-        mov     rax, [rel asm_command_line_storage]
         ret
 
 section .note.GNU-stack noalloc noexec nowrite progbits

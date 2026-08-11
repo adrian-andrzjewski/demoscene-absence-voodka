@@ -623,6 +623,15 @@ target_link_libraries(win32_arena_probe PRIVATE voodka_core kernel32 user32)
 add_test(NAME win32.arena_service COMMAND win32_arena_probe)
 set_tests_properties(win32.arena_service PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B witness: exercise the production NASM soundtrack-path
+# resolver, including override identity and staged executable-directory data.
+add_executable(win32_music_path_probe tools/validate/win32_music_path_probe.cpp)
+target_compile_definitions(win32_music_path_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(win32_music_path_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.music_path COMMAND win32_music_path_probe)
+set_tests_properties(win32.music_path PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

@@ -1,8 +1,8 @@
 # Phase 3 progress: pure Win32/thread runtime and callback integration
 
-Status: **Phase 3A passed; Phase 3B.1/3B.2 and the 3B.3 host handoff passed.**
+Status: **Phase 3A and Phase 3B.1-3B.6.7B.1 passed; remaining host migration is in progress.**
 
-Snapshot date: **2026-08-10**
+Snapshot date: **2026-08-11**
 
 Phase 3 begins the highest-risk remaining platform work. It tests whether a
 native x64 assembly process can perform the Windows startup, window, message,
@@ -542,7 +542,7 @@ owners:
 
 | Component | Current production ownership | Migration risk |
 |---|---|---|
-| `app.cpp` | Host orchestration, music-path resolution, subsystem ordering, seek/self-test dispatch, CRT `WinMain` handoff target | Very high: `std::string`/`std::wstring`/`std::vector`, allocation, CRT exception/startup state, and many failure paths are coupled here |
+| `app.cpp` | Host orchestration, subsystem ordering, seek/self-test dispatch, CRT `WinMain` handoff target; production music-path resolution is now an assembly ABI | Very high: subsystem ordering, CRT exception/startup state, and many failure paths remain coupled here; reference-only STL code remains the oracle |
 | `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
 | `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
 | `d3d11_dispatch.cpp` | Production presenter adapter, palette state, frame recording and GPU/source diagnostics | Medium-high: normal COM calls are assembly, but optional capture uses `std::string`, `std::vector`, `fopen_s`, `fwrite`, and `fflush` |
@@ -560,10 +560,42 @@ remaining all-assembly blocker. `audio.cpp`, `d3d11_present.cpp`, asset viewer,
 VIRTUAL, and packaging/validation tools remain intentionally outside the
 shipped production dependency boundary.
 
-## Next gate: Phase 3B.6.7B
+## Phase 3B.6.7B.1 production soundtrack path ABI
 
-Phase 3B.6.7B should migrate the remaining host orchestration in risk order,
-starting with the path/argument/result ABI around `app.cpp`, while measuring
-the CRT import set after every slice. The reference target must remain
+The production host no longer constructs a C++ string/vector path object for
+the soundtrack. `win32_paths.asm` now preserves the existing resolver contract:
+
+- a non-empty `--music` override is returned unchanged;
+- `<exe>\music\amnezja2.mod` is tried first;
+- `<exe>\amnezja2.mod` is tried second; and
+- the configure-time repository fallback is tried last.
+
+The assembly service owns the fixed path buffer, `GetModuleFileNameA`, and
+regular-file checks. The reference executable retains the original wide Win32
+plus STL resolver. The production host now passes the returned stable pointer
+directly to the dedicated assembly audio initializer, and the obsolete
+production command-line getter/storage path was removed from the host handoff.
+
+### Phase 3B.6.7B.1 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+assembly arena/path focused gates                           2/2 passed; 0.20 s
+full regression suite                                      61/61 passed; 105.03 s
+production soundtrack path resolution                      NASM x64
+reference soundtrack path resolution                       C++ differential path
+```
+
+This is a **GO** for the next host slice. It removes one production STL/path
+owner without changing the module search order, audio initialization contract,
+soundtrack, scene timing, or reference behavior. The process still cannot use
+custom `/ENTRY`: remaining production C++ host, diagnostic, timing, bridge,
+and audio-orchestration objects still contribute CRT/STL imports.
+
+## Next gate: Phase 3B.6.7B.2
+
+Phase 3B.6.7B.2 should continue the remaining host orchestration in risk order,
+starting with the production seek/self-test/result ABI around `app.cpp`, while
+measuring the CRT import set after every slice. The reference target must remain
 buildable and behaviorally comparable; no custom `/ENTRY` attempt is justified
 until the host no longer constructs C++ runtime objects during startup.
