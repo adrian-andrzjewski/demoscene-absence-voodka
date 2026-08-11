@@ -1631,7 +1631,7 @@ PE machine/subsystem audit                                 x64 / Windows GUI
 PE entry-point disassembly                                 asm_voodka_process_entry
 PE CRT and libxmp import audit                             none
 NASM production-entry close smoke                          passed; repeated 5/5
-full regression suite                                      87/87 passed; 109.93 s
+full regression suite                                      88/88 passed; 112.45 s
 ```
 
 This is a **GO** for the no-CRT production boundary. The linker, PE audit, and
@@ -1640,6 +1640,35 @@ source/object and startup-runtime boundary while preserving the established
 visual, audio, synchronization, failure, and teardown gates. Cross-machine
 Windows 10/11 release smoke remains a release-distribution check rather than
 an unverified claim from this single build host.
+
+## Phase 3B.6.7C.6.7 P4 live-scene register and stack regression
+
+The first unrestricted no-CRT full-demo run exposed an assembly-only P4 crash
+at the live face loop. The P4 raster bridge preserved its nonvolatile-register
+save/restore sequence, but its vertex-local offsets overlapped the saved
+register area: `V1+24` occupied the saved `r13` slot. Returning from the first
+triangle converted a vertex double into `r13`, and the next face dereference
+faulted. The fix moves every raster local below `rbp-0x40` and documents the
+stack invariant in `platform/p4_raster.asm`.
+
+The primitive cross-check alone could not detect this caller-visible register
+corruption, so CTest now includes `render.assembly_p4_scene`, a live P4 scene
+smoke that runs the actual face loop before the rest of the production suite.
+
+### Phase 3B.6.7C.6.7 validation
+
+```text
+Release build and regression suite                         passed; 88/88, 112.45 s
+direct P4 playback (`--part 4`, 30 seconds)                exit 0
+unrestricted full production playback                     exit 0; 251.36 s
+timeline terminal record                                   frame 17,592; ModPos 0x2803
+host used for runtime validation                           Windows 10 Pro x64, build 19045
+production PE imports                                      no CRT/C++ runtime/libxmp
+```
+
+This is a **GO** for the local final-production gate. The Windows 11
+cross-machine smoke and archival A/V capture review remain release-distribution
+checks; they are not claimed from the Windows 10 build host alone.
 
 ## Phase 3B.6.7C production platform audit
 
@@ -1664,8 +1693,9 @@ host-tool dependencies are outside the shipped target.
 
 ## Next gate: final production validation
 
-The no-CRT process-entry gate is complete: the 87-test Release matrix passed,
-the process-entry smoke passed five consecutive repeats, and the PE has no CRT
-or libxmp imports. The remaining release task is cross-machine Windows 10/11
-distribution smoke and archival A/V capture review; the repository's shipped
-`VOODKA.exe` is now technically an assembly-only Windows production.
+The no-CRT process-entry gate is complete: the 88-test Release matrix passed,
+the live P4 scene gate passed, the unrestricted full production playback exited
+cleanly, and the PE has no CRT or libxmp imports. The remaining release task is
+cross-machine Windows 10/11 distribution smoke and archival A/V capture review;
+the repository's shipped `VOODKA.exe` is now technically an assembly-only
+Windows production.

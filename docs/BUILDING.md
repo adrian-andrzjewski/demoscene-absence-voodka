@@ -242,6 +242,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_app_host_probe` | Phase 3B.6.7B.4 production NASM host configuration, window/startup failure, seek/run, arena-size, and final-shutdown witness (CTest `win32.app_host`) |
 | `win32_platform_abi_probe` | Phase 3B.6.7B.5 exact MSVC-decorated `vk::log*`/`vk::timeline*` assembly ABI, variadic logger forwarding, timeline formatting, audio-clock sampling, flush, and close witness (CTest `win32.platform_abi`) |
 | `processorek_nevosolek_raster_probe` | Phase 3B.6.7B.6 deterministic NASM-vs-C++ processorek Nevosolek (P4) textured-triangle scan-conversion comparison across sorting, clipping, degenerate, horizontal, and wrapped-UV cases (CTest `processorek_nevosolek.raster`) |
+| `VOODKA --part 4 --auto-close-ms 3000` | Phase 3B.6.7C P4 live-scene smoke gate covering the assembly face loop and rasterizer saved-register contract (CTest `render.assembly_p4_scene`) |
 | `win32_d3d_dispatch_probe` | Phase 3B.6.7B.7 production NASM D3D11 service ABI, palette/frame recording, readback diagnostics, Win32 file handles, and lifecycle witness (CTest `win32.d3d_dispatch`) |
 | `audio_dispatch_probe` | Phase 3B.6.7B.8 production NASM namespace-vk audio forwarding, disabled-mode defaults, log ABI, and shutdown witness (CTest `audio.dispatch`) |
 | `audio_lookup_probe` | Phase 3B.6.7B.9.1 NASM lower-bound seek-index primitive vs `std::lower_bound` over duplicate and boundary tables (CTest `audio.lookup`) |

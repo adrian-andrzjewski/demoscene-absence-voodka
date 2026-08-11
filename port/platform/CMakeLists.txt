@@ -29,6 +29,16 @@ set(VOODKA_PLATFORM_SOURCES
     win32_d3d_dispatch.asm
 )
 
+# The shipped image is deliberately assembly-only. Keep this invariant at
+# configure time so an accidental C/C++ source addition cannot silently put
+# runtime, STL, exception, or CRT code back into VOODKA.exe.
+foreach(_voodka_production_source IN LISTS VOODKA_PLATFORM_SOURCES)
+    if(_voodka_production_source MATCHES "\\.(c|cc|cpp|cxx)$")
+        message(FATAL_ERROR
+            "VOODKA production target must remain assembly-only: ${_voodka_production_source}")
+    endif()
+endforeach()
+
 set(VOODKA_REFERENCE_SOURCES
     app.cpp
     log.cpp

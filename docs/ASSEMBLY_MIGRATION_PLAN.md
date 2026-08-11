@@ -592,11 +592,12 @@ services, the 70 Hz QPC timer, and the bridge ABI groups (selectors,
 palette, presentation, fixed overlay pointers, arena forwarders, wait-vbl,
 ModPos, dedicated-audio forwarding, archive loading, and key-map copying). The
 reference target and host tools remain C++ where they provide the differential
-oracle. The current production gate is 87/87 Release tests green, including live
+oracle. The current production gate is 88/88 Release tests green, including live
 WASAPI, P1 playback, pause, close, file/input forwarding, the direct
 decorated input/pause/progress/application ABI probes, and the production
-reference-audio rejection gate. The P4 rasterizer is already assembly-owned
-and remains covered by its framebuffer-equivalence probe. The shipped arena,
+reference-audio rejection gate. The P4 rasterizer is assembly-owned and is
+covered both by its framebuffer-equivalence probe and a live P4 scene smoke
+gate. The shipped arena,
 input, pause, progress, and application namespace veneers have been removed;
 their NASM implementations expose the decorated `vk::` ABI over the native
 archive, input, synchronization, reporting, and startup services while
@@ -637,8 +638,8 @@ source graph. The PE audit is x64/Windows GUI, points at the NASM process-entry
 body, and finds neither CRT nor libxmp imports.
 
 The dedicated production-entry close smoke passed five consecutive repeats,
-and the complete 87-test Release matrix passed in 109.93 seconds, including
-all visual, audio, synchronization, failure, and teardown gates.
+and the complete 88-test Release matrix passed in 112.45 seconds, including
+all visual, audio, synchronization, failure, P4 scene, and teardown gates.
 
 ---
 
