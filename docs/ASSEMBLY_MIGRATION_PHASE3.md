@@ -1422,6 +1422,51 @@ assembly without changing archive bytes, allocation offsets, overlay layout,
 asset loading, rendering, audio, timing, or teardown. The next boundary is the
 remaining input, pause/progress, and application bridge namespace surface.
 
+## Phase 3B.6.7C.6.2 input namespace boundary
+
+The shipped target no longer compiles `input.cpp`. The production
+`win32_input.asm` now exports the exact decorated `vk::` input ABI over its
+existing assembly-owned watcher, message pump, 128-byte key map, ESC queue,
+and quit state. It preserves the C ABI `vk_request_quit` callback used by the
+existing WndProc/worker path while making the namespace quit flag itself
+atomic and assembly-owned. The reference target retains the C++ input
+implementation as its oracle.
+
+### Assembly interfaces and dependencies
+
+```text
+vk::inputInit / vk::inputShutdown / vk::updateInput
+vk::isKeyDown / vk::keyDown / vk::keyUp / vk::keyReset
+vk::rawKeyMap / vk::clearEscapeQueue / vk::escapeQueued
+vk::requestQuit / vk::quitRequested
+```
+
+The decorated wrappers are direct jumps where the existing service already
+owns the behavior; byte-sized scancodes are explicitly zero-extended before
+dispatch. Quit publication uses an interlocked exchange and the read uses a
+locked compare-exchange load, retaining the cross-thread ordering needed by
+the ESC watcher. `win32_input_abi_probe` exercises worker start/stop, map
+reset, key transitions, ESC queuing, and quit publication directly through
+the namespace ABI.
+
+### Phase 3B.6.7C.6.2 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM decorated input ABI probe                               1/1 passed
+focused runtime + arena + input + P1/pause/close gates       5/6 passed; close repeated 5/5 passed
+full regression suite                                      83/83 passed; 107.26 s
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+The focused group encountered one non-reproducible close crash during the
+first grouped invocation; the exact close test passed five consecutive
+isolated repetitions and then passed in the complete 83-test matrix. This is
+a **GO** for the input boundary, with the full matrix serving as the release
+gate. The remaining shipped C++ platform sources are now concentrated in
+pause/progress and the application bridge wrappers.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1431,10 +1476,10 @@ remaining boundary:
 |---|---|---|---|
 | `production_entry.cpp` | CRT `WinMain` transfer to `asm_voodka_winmain` | Small code footprint, but it retains CRT initialization and the last CRT imports | Final host gate after C++ global/runtime dependencies are gone |
 | `arena.cpp` | Reference/VIRTUAL namespace implementation | Shipped target now uses `bridge_arena.asm`; C++ remains only as the behavioral/tool oracle | Reference/tool targets only |
-| `input.cpp` | Namespace-vk wrappers, quit flag, reference-only C++ watcher branch | Production state/worker already lives in `win32_input.asm`; bool and byte-map ABI must remain exact | Medium, after bridge consumers are mapped |
+| `input.cpp` | Reference-only namespace implementation | Shipped target now uses decorated ABI exports from `win32_input.asm`; reference retains C++ watcher/state oracle | Reference target only |
 | `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
 | `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
-| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, and logging services are now in assembly; remaining application/startup namespace adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
+| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, and logging services are now in assembly; remaining application/startup adapters and final CRT/helper consumers still require audit | Next highest-risk platform gate |
 
 `dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
 `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
@@ -1445,11 +1490,11 @@ remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
 objects and must be removed or deliberately retained before a custom `/ENTRY`
 claim.
 
-## Next gate: Phase 3B.6.7C.6.2 remaining application and startup adapters
+## Next gate: Phase 3B.6.7C.6.3 pause, progress, and application adapters
 
 The next risk-first slice must map and migrate the remaining production
 application/startup namespace wrappers in `bridge.cpp`, `progress.cpp`,
-`pause.cpp`, and `input.cpp`. It must preserve command-line modes,
+and `pause.cpp`. It must preserve command-line modes,
 window title/progress output, pause/audio pumping, input state, archive
 ownership, and failure rollback while keeping the reference target unchanged.
 The C++ bridge must not be deleted and custom `/ENTRY` must not be attempted

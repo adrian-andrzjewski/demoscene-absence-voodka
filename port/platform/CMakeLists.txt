@@ -1,7 +1,6 @@
 # platform/CMakeLists.txt - the C++ Windows integration layer.
 
 set(VOODKA_PLATFORM_COMMON_SOURCES
-    input.cpp
     audio_controller.asm
     audio_lifecycle.asm
     audio_lookup.asm
@@ -37,6 +36,7 @@ set(VOODKA_REFERENCE_SOURCES
     timeline.cpp
     timer.cpp
     arena.cpp
+    input.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_present.cpp
     audio.cpp

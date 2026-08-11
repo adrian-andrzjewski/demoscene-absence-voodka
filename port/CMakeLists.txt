@@ -632,6 +632,17 @@ target_link_libraries(win32_arena_probe PRIVATE voodka_core kernel32 user32)
 add_test(NAME win32.arena_service COMMAND win32_arena_probe)
 set_tests_properties(win32.arena_service PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.6.2 input namespace gate: exercise the decorated vk:: ABI
+# directly against the production NASM key map, quit state, and worker.
+add_executable(win32_input_abi_probe
+    tools/validate/win32_input_abi_probe.cpp)
+target_compile_definitions(win32_input_abi_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_input_abi_probe PRIVATE platform)
+target_link_libraries(win32_input_abi_probe PRIVATE voodka_core kernel32 user32)
+add_test(NAME win32.input_abi COMMAND win32_input_abi_probe)
+set_tests_properties(win32.input_abi PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B witness: exercise the production NASM soundtrack-path
 # resolver, including override identity and staged executable-directory data.
 add_executable(win32_music_path_probe tools/validate/win32_music_path_probe.cpp)

@@ -37,6 +37,18 @@ global asm_input_key_is_down
 global asm_input_clear_escape
 global asm_input_escape_queued
 global asm_input_update
+global ?inputInit@vk@@YA_NPEAX@Z
+global ?inputShutdown@vk@@YAXXZ
+global ?isKeyDown@vk@@YAHH@Z
+global ?updateInput@vk@@YAXXZ
+global ?keyDown@vk@@YAXE@Z
+global ?keyUp@vk@@YAXE@Z
+global ?keyReset@vk@@YAXXZ
+global ?rawKeyMap@vk@@YAPEAEXZ
+global ?clearEscapeQueue@vk@@YAXXZ
+global ?escapeQueued@vk@@YA_NXZ
+global ?requestQuit@vk@@YAXXZ
+global ?quitRequested@vk@@YA_NXZ
 
 section .bss
 align 8
@@ -45,6 +57,8 @@ asm_input_stop:      resq 1
 asm_input_thread:    resq 1
 asm_input_keys:      resb 128
 asm_input_escape:    resb 1
+align 4
+asm_input_quit_requested: resd 1
 align 8
 asm_input_message:   resb 48
 
@@ -266,6 +280,67 @@ asm_input_update:
 .message_done:
         add     rsp, 0x30
         pop     rbp
+        ret
+
+; ---- decorated vk:: input ABI ---------------------------------------------
+;
+; These exports replace input.cpp for the shipped target. The C ABI
+; vk_request_quit callback remains a narrow bridge used by the watcher and
+; WndProc path; the namespace quit state itself is owned here.
+
+; bool vk::inputInit(void* hwnd)
+?inputInit@vk@@YA_NPEAX@Z:
+        jmp     asm_input_init
+
+; void vk::inputShutdown(void)
+?inputShutdown@vk@@YAXXZ:
+        jmp     asm_input_shutdown
+
+; int vk::isKeyDown(int scancode)
+?isKeyDown@vk@@YAHH@Z:
+        jmp     asm_input_key_is_down
+
+; void vk::updateInput(void)
+?updateInput@vk@@YAXXZ:
+        jmp     asm_input_update
+
+; void vk::keyDown(uint8_t scancode)
+?keyDown@vk@@YAXE@Z:
+        movzx   ecx, cl
+        jmp     asm_input_key_down
+
+; void vk::keyUp(uint8_t scancode)
+?keyUp@vk@@YAXE@Z:
+        movzx   ecx, cl
+        jmp     asm_input_key_up
+
+; void vk::keyReset(void)
+?keyReset@vk@@YAXXZ:
+        jmp     asm_input_key_reset
+
+; uint8_t* vk::rawKeyMap(void)
+?rawKeyMap@vk@@YAPEAEXZ:
+        jmp     asm_input_key_map
+
+; void vk::clearEscapeQueue(void)
+?clearEscapeQueue@vk@@YAXXZ:
+        jmp     asm_input_clear_escape
+
+; bool vk::escapeQueued(void)
+?escapeQueued@vk@@YA_NXZ:
+        jmp     asm_input_escape_queued
+
+; void vk::requestQuit(void)
+?requestQuit@vk@@YAXXZ:
+        mov     eax, 1
+        xchg    dword [rel asm_input_quit_requested], eax
+        ret
+
+; bool vk::quitRequested(void)
+?quitRequested@vk@@YA_NXZ:
+        xor     eax, eax
+        lock cmpxchg dword [rel asm_input_quit_requested], eax
+        setne   al
         ret
 
 section .note.GNU-stack noalloc noexec nowrite progbits
