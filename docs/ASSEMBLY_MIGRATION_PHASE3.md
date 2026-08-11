@@ -1655,13 +1655,12 @@ remaining boundary:
 | `progress.cpp` | Reference-only progress implementation | Shipped target now uses `bridge_progress.asm`; reference retains C++ scene/title/timeline oracle | Reference target only |
 | `bridge.cpp` | Reference-only C ABI oracle | All shipped selector/palette/present/fixed-pointer, timing/audio, file, key-map, shutdown, logging, arena, input, pause, progress, and application adapters are now assembly; the reference copy remains for differential validation | Closed for shipped target |
 
-`dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
-`ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
-and the API-set CRT runtime/math/stdio/locale/heap DLLs. The production image
-has no libxmp dependency. The CRT imports are therefore not evidence that the
-demo core or audio player still uses C++; they are attributable to the
-remaining `production_entry.cpp` and `bridge.cpp` objects and must be removed
-or deliberately retained before a custom `/ENTRY` claim.
+`dumpbin /DEPENDENTS` on the current shipped executable reports only
+`d3d11.dll`, `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, and `GDI32.dll`.
+The production image has no CRT, C++ runtime, exception-runtime, or libxmp
+dependency. These imports are the intentional Win32, COM, and Direct3D 11
+platform surface used by the assembly implementation; the C++ reference and
+host-tool dependencies are outside the shipped target.
 
 ## Next gate: final production validation
 
