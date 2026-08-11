@@ -1,4 +1,4 @@
-# platform/CMakeLists.txt - the C++ Windows integration layer.
+# platform/CMakeLists.txt - Windows platform sources and C++ reference/tool layer.
 
 set(VOODKA_PLATFORM_COMMON_SOURCES
     audio_controller.asm
@@ -12,7 +12,6 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 )
 
 set(VOODKA_PLATFORM_SOURCES
-    production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     bridge_arena.asm
     bridge_pause.asm
@@ -46,6 +45,11 @@ set(VOODKA_REFERENCE_SOURCES
 )
 
 add_executable(VOODKA WIN32 ${VOODKA_PLATFORM_SOURCES})
+set_target_properties(VOODKA PROPERTIES LINKER_LANGUAGE ASM_NASM)
+target_link_options(VOODKA PRIVATE
+    "/ENTRY:asm_voodka_process_entry"
+    "/NODEFAULTLIB"
+    "/SUBSYSTEM:WINDOWS")
 
 function(configure_voodka_platform_target target)
 target_include_directories(${target} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}")

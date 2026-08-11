@@ -1591,6 +1591,56 @@ entry boundary: remove that shim only after PE imports, process startup,
 SEH/crash behavior, global initialization, and Windows 10/11 smoke runs are
 validated together.
 
+## Phase 3B.6.7C.6.6 no-CRT process entry
+
+The shipped target no longer contains `production_entry.cpp`. CMake now builds
+`VOODKA` from NASM sources only, sets `LINKER_LANGUAGE ASM_NASM`, and uses
+`/ENTRY:asm_voodka_process_entry`, `/NODEFAULTLIB`, and
+`/SUBSYSTEM:WINDOWS`. The new process entry in
+`core/eos_replace/win32_app_entry.asm` acquires the module handle and raw
+command line directly from Win32, invokes the existing assembly command-line
+parser, applies the existing per-monitor DPI policy, calls the assembly host,
+and terminates through `ExitProcess` with the host result. It never returns to
+a nonexistent CRT caller. The callable `asm_voodka_winmain` adapter remains
+for the reference/ABI boundary but is not the shipped PE entry.
+
+The reference executable still uses its C++ `WinMain` and full C++ lifecycle;
+the asset viewer and validation tools remain outside the production target.
+No C++ global constructors, CRT startup, STL objects, exception runtime, or
+libxmp object is linked into `VOODKA.exe`.
+
+### Assembly interfaces and dependencies
+
+```text
+asm_voodka_process_entry
+asm_voodka_winmain                  ; callable compatibility adapter
+GetModuleHandleA / GetCommandLineA
+SetProcessDpiAwarenessContext / ExitProcess
+asm_parse_command_line / asm_voodka_host_main
+```
+
+The process-entry stack is aligned explicitly before every Win64 call, and
+the host's existing assembly shutdown path remains responsible for normal,
+close, worker, COM, and audio teardown before the final `ExitProcess`.
+
+### Phase 3B.6.7C.6.6 validation
+
+```text
+Release no-CRT production build                           passed
+PE machine/subsystem audit                                 x64 / Windows GUI
+PE entry-point disassembly                                 asm_voodka_process_entry
+PE CRT and libxmp import audit                             none
+NASM production-entry close smoke                          passed; repeated 5/5
+full regression suite                                      87/87 passed; 109.93 s
+```
+
+This is a **GO** for the no-CRT production boundary. The linker, PE audit, and
+full Release matrix prove that the shipped image is assembly-only at the
+source/object and startup-runtime boundary while preserving the established
+visual, audio, synchronization, failure, and teardown gates. Cross-machine
+Windows 10/11 release smoke remains a release-distribution check rather than
+an unverified claim from this single build host.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1598,7 +1648,7 @@ remaining boundary:
 
 | Component | Shipped role | Current dependency/risk | Conversion order |
 |---|---|---|---|
-| `production_entry.cpp` | CRT `WinMain` transfer to `asm_voodka_winmain` | Small code footprint, but it retains CRT initialization and the last CRT imports | Final host gate after C++ global/runtime dependencies are gone |
+| `production_entry.cpp` | Removed from shipped target | `VOODKA` now enters through `asm_voodka_process_entry`; the deleted C++ shim remains only in history | Closed for shipped target |
 | `arena.cpp` | Reference/VIRTUAL namespace implementation | Shipped target now uses `bridge_arena.asm`; C++ remains only as the behavioral/tool oracle | Reference/tool targets only |
 | `input.cpp` | Reference-only namespace implementation | Shipped target now uses decorated ABI exports from `win32_input.asm`; reference retains C++ watcher/state oracle | Reference target only |
 | `pause.cpp` | Reference-only pause namespace implementation | Shipped target now uses `bridge_pause.asm`; reference retains C++ state/logging oracle | Reference target only |
@@ -1613,12 +1663,10 @@ demo core or audio player still uses C++; they are attributable to the
 remaining `production_entry.cpp` and `bridge.cpp` objects and must be removed
 or deliberately retained before a custom `/ENTRY` claim.
 
-## Next gate: Phase 3B.6.7C.6.5 remaining application bridge adapters
+## Next gate: final production validation
 
-The application bridge gate is complete. The next risk-first slice is the
-remaining `production_entry.cpp` CRT transfer shim. It must preserve raw
-command-line acquisition, module-handle/DPI setup, exception-filter
-registration, process return behavior, and all existing full-demo gates while
-keeping the reference target unchanged. Custom `/ENTRY` must not be claimed
-until the PE import set is re-attributed and startup, crash, close/failure,
-audio, and full playback paths remain equivalent.
+The no-CRT process-entry gate is complete: the 87-test Release matrix passed,
+the process-entry smoke passed five consecutive repeats, and the PE has no CRT
+or libxmp imports. The remaining release task is cross-machine Windows 10/11
+distribution smoke and archival A/V capture review; the repository's shipped
+`VOODKA.exe` is now technically an assembly-only Windows production.

@@ -1029,6 +1029,11 @@ set_tests_properties(audio.assembly_demo_pause PROPERTIES TIMEOUT 90)
 add_test(NAME audio.assembly_demo_close
          COMMAND VOODKA --scene oko-szklo --auto-close-ms 2000)
 set_tests_properties(audio.assembly_demo_close PROPERTIES TIMEOUT 30)
+# Phase 3B.6.7C.6.6: the shipped image must enter and exit through the native
+# NASM process entry, not the CRT WinMain transfer that preceded it.
+add_test(NAME win32.production_entry
+         COMMAND VOODKA --scene oko-szklo --auto-close-ms 2000)
+set_tests_properties(win32.production_entry PROPERTIES TIMEOUT 30)
 add_test(NAME audio.assembly_audio_fail_device
          COMMAND VOODKA --scene oko-szklo)
 set_tests_properties(audio.assembly_audio_fail_device PROPERTIES

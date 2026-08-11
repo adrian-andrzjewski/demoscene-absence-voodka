@@ -1,9 +1,8 @@
-; win32_app_entry.asm - production x64 assembly host handoff.
+; win32_app_entry.asm - production x64 assembly process/host entry.
 ;
-; The CRT still owns the external WinMain entry while the minimal C++ shim
-; immediately transfers control here. The complete production host is NASM;
-; custom /ENTRY remains a later gate until the remaining platform C++ objects
-; no longer require CRT initialization.
+; The shipped target enters through asm_voodka_process_entry with no CRT.
+; asm_voodka_winmain remains a callable WinMain-shaped adapter for the
+; reference/ABI boundary and for differential host tests.
 
 BITS 64
 DEFAULT REL
@@ -15,10 +14,12 @@ DEFAULT REL
 extern GetModuleHandleA
 extern GetCommandLineA
 extern SetProcessDpiAwarenessContext
+extern ExitProcess
 extern asm_parse_command_line
 extern asm_voodka_host_main
 
 global asm_voodka_winmain
+global asm_voodka_process_entry
 
 section .bss
 align 8
@@ -67,5 +68,38 @@ asm_voodka_winmain:
         pop     r12
         pop     rbp
         ret
+
+; Process entry used by the shipped /SUBSYSTEM:WINDOWS, /NODEFAULTLIB image.
+; The OS does not provide WinMain arguments here, so acquire the two values
+; required by the existing assembly host directly from Win32 and terminate
+; through ExitProcess with the host result.  No return address is assumed.
+asm_voodka_process_entry:
+        push    rbp
+        mov     rbp, rsp
+        push    r12
+        push    r13
+        and     rsp, -16
+        sub     rsp, 0x20                    ; Win64 shadow space
+
+        xor     ecx, ecx
+        call    GetModuleHandleA
+        mov     r12, rax
+
+        call    GetCommandLineA
+        mov     r13, rax
+        mov     rcx, r13
+        call    asm_parse_command_line
+
+        mov     rcx, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
+        call    SetProcessDpiAwarenessContext
+
+        mov     rcx, r12
+        mov     rdx, r13
+        xor     r8d, r8d                     ; nCmdShow is not used by host
+        call    asm_voodka_host_main
+
+        mov     ecx, eax
+        call    ExitProcess
+        int3                                    ; ExitProcess is noreturn
 
 section .note.GNU-stack noalloc noexec nowrite progbits

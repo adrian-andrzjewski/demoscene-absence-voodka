@@ -592,7 +592,7 @@ services, the 70 Hz QPC timer, and the bridge ABI groups (selectors,
 palette, presentation, fixed overlay pointers, arena forwarders, wait-vbl,
 ModPos, dedicated-audio forwarding, archive loading, and key-map copying). The
 reference target and host tools remain C++ where they provide the differential
-oracle. The current bridge gate is 86/86 Release tests green, including live
+oracle. The current production gate is 87/87 Release tests green, including live
 WASAPI, P1 playback, pause, close, file/input forwarding, the direct
 decorated input/pause/progress/application ABI probes, and the production
 reference-audio rejection gate. The P4 rasterizer is already assembly-owned
@@ -603,13 +603,11 @@ archive, input, synchronization, reporting, and startup services while
 reference/tools keep the C++ oracles.
 
 The shipped application bridge is now `bridge_application.asm`; `bridge.cpp`
-is reference-only and remains unchanged for differential validation. The only
-remaining C++ source in the shipped platform target is
-`production_entry.cpp`, a minimal CRT `WinMain` transfer shim. The next gate
-is custom/no-CRT process entry and PE-import attribution; the executable stays
-buildable after each slice, and the shim remains until startup, SEH, global
-initialization, Windows 10/11 smoke, and all playback/failure contracts are
-proven equivalent.
+is reference-only and remains unchanged for differential validation. The
+former `production_entry.cpp` shim has now been removed from the shipped
+target. `VOODKA` is linked from NASM sources with a native process entry and
+`/NODEFAULTLIB`; the reference executable and tools retain their C++ startup
+where it is useful as an oracle.
 
 ### Phase 3B.6.7C.6.5 application bridge gate
 
@@ -627,6 +625,20 @@ assembly audio/WASAPI lifecycle, visual playback, synchronization, pause,
 close, failure rollback, and production rejection of the libxmp/reference
 audio path. This is a **GO** for the final CRT-entry gate; it is not yet a
 claim that the shipped PE is free of CRT startup/runtime imports.
+
+### Phase 3B.6.7C.6.6 no-CRT process-entry gate
+
+`win32_app_entry.asm` now exports `asm_voodka_process_entry`, and the shipped
+`VOODKA` target uses it as `/ENTRY` with `/NODEFAULTLIB`. The entry acquires
+the process instance and raw command line directly, applies DPI policy,
+dispatches the existing assembly parser/host, and calls `ExitProcess` with
+the host result. `production_entry.cpp` is no longer part of the production
+source graph. The PE audit is x64/Windows GUI, points at the NASM process-entry
+body, and finds neither CRT nor libxmp imports.
+
+The dedicated production-entry close smoke passed five consecutive repeats,
+and the complete 87-test Release matrix passed in 109.93 seconds, including
+all visual, audio, synchronization, failure, and teardown gates.
 
 ---
 
