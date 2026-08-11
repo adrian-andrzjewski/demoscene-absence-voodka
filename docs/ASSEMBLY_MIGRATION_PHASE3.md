@@ -915,11 +915,40 @@ This is a **GO** for synchronization ownership. The next slice must move the
 Win32 worker handles and acknowledgement loops while preserving PCM output,
 pause/seek semantics, failure injection, and deterministic join/teardown.
 
-## Next gate: Phase 3B.6.7B.9.3
+## Phase 3B.6.7B.9.3 state-command acknowledgement
 
-Phase 3B.6.7B.9.3 should migrate the audio worker creation, control-state
-acknowledgement, seek quiescence, and deterministic join/teardown in assembly.
-Import attribution, PCM/perceptual audio comparison, full-demo playback, A/V
-synchronization, and failure/lifecycle probes remain mandatory; custom
-`/ENTRY` is still deferred until no production C++ object requires CRT
+The first synchronization slice moves `issueState` from `audio_asm.cpp` to
+`audio_sync.asm`. The assembly helper preserves the former contract: atomic
+requested-state publication, atomic sequence increment, a bounded 5000-poll
+one-millisecond acknowledgement wait, matching state/sequence validation,
+cached-state updates, and the optional sequence output.
+
+`audio_sync_probe` uses a real Win32 helper thread to acknowledge the published
+command asynchronously and checks the complete control record plus cached
+outputs. The full Release suite passes 70/70, including live WASAPI
+control/seek/stress, device-failure cleanup, and P1/pause/close playback. The
+worker creation, handle ownership, seek quiescence, and teardown remain C++.
+
+### Phase 3B.6.7B.9.3 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM state-sync probe                                      1/1 passed; 0.03 s
+full regression suite                                      70/70 passed; 105.28 s
+production issueState loop                                 NASM x64
+real asynchronous acknowledgement                          passed
+worker creation/join/teardown                              C++ transitional owner
+```
+
+This is a **GO** for the next synchronization slice. The remaining risk is
+moving worker creation and deterministic join/teardown without allowing a
+producer or WASAPI thread to outlive the assembly-owned runtime block.
+
+## Next gate: Phase 3B.6.7B.9.4
+
+Phase 3B.6.7B.9.4 should migrate worker creation and deterministic
+join/teardown in assembly, then apply the same boundary to seek quiescence and
+ring flushing. Import attribution, PCM/perceptual audio comparison, full-demo
+playback, A/V synchronization, and failure/lifecycle probes remain mandatory;
+custom `/ENTRY` is still deferred until no production C++ object requires CRT
 initialization.

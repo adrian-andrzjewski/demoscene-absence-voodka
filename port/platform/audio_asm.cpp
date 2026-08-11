@@ -22,6 +22,11 @@ extern "C" uint32_t asm_audio_lower_bound_u32(const uint32_t* values,
                                                 uint32_t count,
                                                 uint32_t key);
 extern "C" unsigned char asm_audio_runtime_state[0x2000];
+extern "C" uint32_t asm_audio_issue_state(AudioLiveControl* control,
+                                             uint32_t state,
+                                             uint32_t* lastState,
+                                             uint32_t* lastSequence,
+                                             uint32_t* sequenceOut);
 
 namespace vk {
 
@@ -69,23 +74,10 @@ static_assert(sizeof(Runtime) <= 0x2000,
 #define g_runtime (*reinterpret_cast<Runtime*>(asm_audio_runtime_state))
 
 bool issueState(Runtime* runtime, uint32_t state, uint32_t* sequenceOut) {
-    InterlockedExchange(
-        reinterpret_cast<volatile LONG*>(&runtime->control.requestedState),
-        static_cast<LONG>(state));
-    const LONG sequence = InterlockedIncrement(
-        reinterpret_cast<volatile LONG*>(&runtime->control.requestSequence));
-    for (uint32_t i = 0; i < 5000; ++i) {
-        if (runtime->control.acknowledgedSequence ==
-                static_cast<uint32_t>(sequence) &&
-            (state & 1) == runtime->control.acknowledgedState) {
-            runtime->lastControlState = state & 1;
-            runtime->lastControlSequence = static_cast<uint32_t>(sequence);
-            if (sequenceOut) *sequenceOut = static_cast<uint32_t>(sequence);
-            return true;
-        }
-        Sleep(1);
-    }
-    return false;
+    return asm_audio_issue_state(&runtime->control, state,
+                                 &runtime->lastControlState,
+                                 &runtime->lastControlSequence,
+                                 sequenceOut) != 0;
 }
 
 bool issueSeek(Runtime* runtime, uint32_t targetTick,

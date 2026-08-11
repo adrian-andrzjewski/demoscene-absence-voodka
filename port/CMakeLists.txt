@@ -728,6 +728,17 @@ target_link_libraries(audio_lookup_probe PRIVATE kernel32)
 add_test(NAME audio.lookup COMMAND audio_lookup_probe)
 set_tests_properties(audio.lookup PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.9.3 first synchronization slice: exercise the NASM state
+# publish/increment/acknowledgement loop with a real Win32 helper thread.
+add_executable(audio_sync_probe
+    tools/validate/audio_sync_probe.cpp
+    platform/audio_sync.asm)
+target_compile_definitions(audio_sync_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(audio_sync_probe PRIVATE platform)
+target_link_libraries(audio_sync_probe PRIVATE kernel32)
+add_test(NAME audio.sync COMMAND audio_sync_probe)
+set_tests_properties(audio.sync PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.
