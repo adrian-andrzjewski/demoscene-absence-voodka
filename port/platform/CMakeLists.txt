@@ -8,6 +8,7 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
     audio_lookup.asm
     audio_runtime_state.asm
     audio_sync.asm
+    audio_workers.asm
     progress.cpp
     pause.cpp
     bridge.cpp

@@ -27,6 +27,10 @@ extern "C" uint32_t asm_audio_issue_state(AudioLiveControl* control,
                                              uint32_t* lastState,
                                              uint32_t* lastSequence,
                                              uint32_t* sequenceOut);
+extern "C" uint32_t asm_audio_create_worker(
+    HANDLE* slot, LPTHREAD_START_ROUTINE entry, void* argument);
+extern "C" DWORD asm_audio_wait_worker(HANDLE handle, DWORD timeout);
+extern "C" uint32_t asm_audio_close_worker(HANDLE* slot);
 
 namespace vk {
 
@@ -205,12 +209,10 @@ int audioAsmInit(const char* modPath, int) {
         &g_runtime.workerReport,
         reinterpret_cast<volatile uint32_t*>(&g_runtime.workerControllerResult),
     };
-    g_runtime.producerHandle = CreateThread(
-        nullptr, 0,
-        reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_producer_thread),
-        &g_runtime.producerArgs,
-        0, nullptr);
-    if (!g_runtime.producerHandle || !prebuffered(&g_runtime)) {
+    if (!asm_audio_create_worker(
+            &g_runtime.producerHandle,
+            reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_producer_thread),
+            &g_runtime.producerArgs) || !prebuffered(&g_runtime)) {
         logPrint("[audio-asm] producer prebuffer failed failed=%ld done=%ld "
                  "error=%ld write=%u read=%u\n",
                  g_runtime.producerFailed, g_runtime.producerDone,
@@ -220,17 +222,16 @@ int audioAsmInit(const char* modPath, int) {
         return 0;
     }
 
-    g_runtime.workerControllerHandle = CreateThread(
-        nullptr, 0,
-        reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_ring_thread_entry),
-        &g_runtime.workerServiceArgs, 0, nullptr);
-    if (!g_runtime.workerControllerHandle) {
+    if (!asm_audio_create_worker(
+            &g_runtime.workerControllerHandle,
+            reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_ring_thread_entry),
+            &g_runtime.workerServiceArgs)) {
         logPrint("[audio-asm] worker controller creation failed\n");
         audioAsmShutdown();
         return 0;
     }
     Sleep(250);
-    if (WaitForSingleObject(g_runtime.workerControllerHandle, 0) ==
+    if (asm_audio_wait_worker(g_runtime.workerControllerHandle, 0) ==
         WAIT_OBJECT_0) {
         logPrint("[audio-asm] assembly WASAPI worker exited during startup\n");
         audioAsmShutdown();
@@ -256,14 +257,12 @@ void audioAsmShutdown() {
             2);
         InterlockedIncrement(
             reinterpret_cast<volatile LONG*>(&g_runtime.control.requestSequence));
-        WaitForSingleObject(g_runtime.workerControllerHandle, INFINITE);
-        CloseHandle(g_runtime.workerControllerHandle);
-        g_runtime.workerControllerHandle = nullptr;
+        asm_audio_wait_worker(g_runtime.workerControllerHandle, INFINITE);
+        asm_audio_close_worker(&g_runtime.workerControllerHandle);
     }
     if (g_runtime.producerHandle) {
-        WaitForSingleObject(g_runtime.producerHandle, INFINITE);
-        CloseHandle(g_runtime.producerHandle);
-        g_runtime.producerHandle = nullptr;
+        asm_audio_wait_worker(g_runtime.producerHandle, INFINITE);
+        asm_audio_close_worker(&g_runtime.producerHandle);
     }
     if (g_runtime.ring.samples) asm_audio_ring_close(&g_runtime.ring);
     logPrint("[audio-asm] stopped: device_frames=%u underruns=%u markers=%u\n",

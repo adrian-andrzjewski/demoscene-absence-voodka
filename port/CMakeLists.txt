@@ -739,6 +739,16 @@ target_link_libraries(audio_sync_probe PRIVATE kernel32)
 add_test(NAME audio.sync COMMAND audio_sync_probe)
 set_tests_properties(audio.sync PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.9.4 first lifecycle slice: exercise NASM CreateThread,
+# WaitForSingleObject, and CloseHandle ownership with a real delayed worker.
+add_executable(audio_workers_probe
+    tools/validate/audio_workers_probe.cpp
+    platform/audio_workers.asm)
+target_compile_definitions(audio_workers_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_workers_probe PRIVATE kernel32)
+add_test(NAME audio.workers COMMAND audio_workers_probe)
+set_tests_properties(audio.workers PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

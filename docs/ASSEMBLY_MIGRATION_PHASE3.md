@@ -944,10 +944,44 @@ This is a **GO** for the next synchronization slice. The remaining risk is
 moving worker creation and deterministic join/teardown without allowing a
 producer or WASAPI thread to outlive the assembly-owned runtime block.
 
-## Next gate: Phase 3B.6.7B.9.4
+## Phase 3B.6.7B.9.4 worker handle ownership
 
-Phase 3B.6.7B.9.4 should migrate worker creation and deterministic
-join/teardown in assembly, then apply the same boundary to seek quiescence and
+The first worker-lifecycle slice moves the Win32 handle calls used by
+`audio_asm.cpp` into `audio_workers.asm`:
+
+- `asm_audio_create_worker` owns the exact `CreateThread` ABI and stores the
+  returned handle into the caller-owned Runtime slot;
+- `asm_audio_wait_worker` preserves the original `WaitForSingleObject` status
+  and timeout behavior; and
+- `asm_audio_close_worker` owns `CloseHandle` and clears the slot, including
+  safe null-slot cleanup.
+
+The C++ orchestration still controls producer-before-worker startup, prebuffer
+rollback, the worker-exited-during-startup check, stop-state publication, and
+join order. `audio_workers_probe` exercises a real delayed thread, timeout,
+completion, marker publication, slot clearing, and null cleanup. The full
+Release suite passes 71/71, including live WASAPI lifecycle/seek/stress,
+device-failure cleanup, and P1/pause/close playback.
+
+### Phase 3B.6.7B.9.4 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM worker-handle probe                                   1/1 passed; 0.05 s
+full regression suite                                      71/71 passed; 104.79 s
+production CreateThread/wait/close calls                   NASM x64
+startup/rollback and join ordering                         C++ transitional owner
+producer/WASAPI playback                                   fully green
+```
+
+This is a **GO** for the next worker slice. The remaining risk is moving the
+startup/rollback choreography itself, including prebuffer failure, worker
+early-exit detection, stop-state publication, and guaranteed join ordering.
+
+## Next gate: Phase 3B.6.7B.9.5
+
+Phase 3B.6.7B.9.5 should migrate the worker startup/rollback choreography and
+join ordering in assembly, then apply the same boundary to seek quiescence and
 ring flushing. Import attribution, PCM/perceptual audio comparison, full-demo
 playback, A/V synchronization, and failure/lifecycle probes remain mandatory;
 custom `/ENTRY` is still deferred until no production C++ object requires CRT
