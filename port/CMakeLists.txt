@@ -739,8 +739,8 @@ target_link_libraries(audio_sync_probe PRIVATE kernel32)
 add_test(NAME audio.sync COMMAND audio_sync_probe)
 set_tests_properties(audio.sync PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.9.4 first lifecycle slice: exercise NASM CreateThread,
-# WaitForSingleObject, and CloseHandle ownership with a real delayed worker.
+# Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
+# and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe
     tools/validate/audio_workers_probe.cpp
     platform/audio_workers.asm)

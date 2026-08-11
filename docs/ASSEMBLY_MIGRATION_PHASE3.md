@@ -978,11 +978,54 @@ This is a **GO** for the next worker slice. The remaining risk is moving the
 startup/rollback choreography itself, including prebuffer failure, worker
 early-exit detection, stop-state publication, and guaranteed join ordering.
 
-## Next gate: Phase 3B.6.7B.9.5
+## Phase 3B.6.7B.9.5 startup, rollback, and join choreography
 
-Phase 3B.6.7B.9.5 should migrate the worker startup/rollback choreography and
-join ordering in assembly, then apply the same boundary to seek quiescence and
-ring flushing. Import attribution, PCM/perceptual audio comparison, full-demo
-playback, A/V synchronization, and failure/lifecycle probes remain mandatory;
-custom `/ENTRY` is still deferred until no production C++ object requires CRT
-initialization.
+This slice moves the remaining worker-lifecycle control flow from
+`audio_asm.cpp` into `audio_workers.asm` while preserving the existing
+fixed-layout `AudioWorkerLifecycleArgs` boundary.  The assembly routine now
+owns producer creation, 8192-frame prebuffer polling, producer-failure
+detection, controller creation, the 250 ms early-exit check, status-coded
+rollback, stop-state publication, worker-before-producer join ordering, and
+handle-slot cleanup.  C++ retains only the record construction, diagnostic
+messages, and the synchronization records themselves.
+
+The production failure branches remain intentionally reversible: a producer
+creation/prebuffer failure returns status 1, controller creation failure
+returns status 2 with the producer handle available for the caller's shutdown
+path, and an early controller exit returns status 3 with both handles
+available for rollback.  This keeps the reference target and the C++
+behavioral oracle unchanged while the shipped target crosses the higher-risk
+thread-lifecycle boundary.
+
+`audio_workers_probe` now covers normal startup, a live worker, early worker
+exit, controller-creation failure, producer-creation failure, idempotent
+rollback, stop-state publication, join ordering, and handle-slot clearing.
+The canonical Release suite remains the gate for live WASAPI lifecycle,
+seek/stress, device-failure cleanup, and full P1/pause/close playback.
+
+### Phase 3B.6.7B.9.5 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM worker lifecycle probe                                passed
+full regression suite                                      71/71 passed; 105.15 s
+startup/prebuffer/rollback/join choreography               NASM x64
+producer/WASAPI playback                                   fully green
+reference behavioral oracle                                retained
+```
+
+This is a **GO**.  The production audio path has now crossed the worker
+creation and teardown gate without changing the soundtrack contract.  The
+next risk is seek-time quiescence and ring flushing, where producer and WASAPI
+threads must observe a precise pause boundary before the controller rewrites
+ring ownership state.
+
+## Next gate: Phase 3B.6.7B.9.6
+
+Phase 3B.6.7B.9.6 should migrate seek-time quiescence, ring flushing, and
+resume publication into assembly.  It must prove that no producer write or
+WASAPI read crosses the captured logical boundary, including repeated seeks
+and shutdown during an in-flight seek.  Import attribution, PCM/perceptual
+audio comparison, full-demo playback, A/V synchronization, and
+failure/lifecycle probes remain mandatory; custom `/ENTRY` is still deferred
+until no production C++ object requires CRT initialization.

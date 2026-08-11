@@ -2,8 +2,9 @@
 //
 // The tracker, mixer, PCM ring, timeline markers, and WASAPI render worker
 // are native x64 assembly.  This file is intentionally only the transitional
-// host shim: it owns Win32 thread handles and synchronization records, and
-// translates the existing platform audio ABI into the assembly contracts.
+// host shim: it owns synchronization records and translates the existing
+// platform audio ABI into the assembly contracts.  Worker creation, rollback,
+// joining, and handle cleanup live in audio_workers.asm.
 // The old audio.cpp/libxmp path remains available as the behavioral oracle.
 
 #include "platform_abi.h"
@@ -12,6 +13,7 @@
 #include "../tools/validate/audio_service_abi.h"
 #include "../tools/validate/audio_thread_abi.h"
 #include "../tools/validate/audio_tick_abi.h"
+#include "../tools/validate/audio_workers_abi.h"
 
 #include <windows.h>
 
@@ -27,10 +29,6 @@ extern "C" uint32_t asm_audio_issue_state(AudioLiveControl* control,
                                              uint32_t* lastState,
                                              uint32_t* lastSequence,
                                              uint32_t* sequenceOut);
-extern "C" uint32_t asm_audio_create_worker(
-    HANDLE* slot, LPTHREAD_START_ROUTINE entry, void* argument);
-extern "C" DWORD asm_audio_wait_worker(HANDLE handle, DWORD timeout);
-extern "C" uint32_t asm_audio_close_worker(HANDLE* slot);
 
 namespace vk {
 
@@ -209,31 +207,31 @@ int audioAsmInit(const char* modPath, int) {
         &g_runtime.workerReport,
         reinterpret_cast<volatile uint32_t*>(&g_runtime.workerControllerResult),
     };
-    if (!asm_audio_create_worker(
-            &g_runtime.producerHandle,
-            reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_producer_thread),
-            &g_runtime.producerArgs) || !prebuffered(&g_runtime)) {
-        logPrint("[audio-asm] producer prebuffer failed failed=%ld done=%ld "
-                 "error=%ld write=%u read=%u\n",
-                 g_runtime.producerFailed, g_runtime.producerDone,
-                 g_runtime.producerError,
-                 g_runtime.ring.writeFrame, g_runtime.ring.readFrame);
-        audioAsmShutdown();
-        return 0;
-    }
-
-    if (!asm_audio_create_worker(
-            &g_runtime.workerControllerHandle,
-            reinterpret_cast<LPTHREAD_START_ROUTINE>(asm_audio_ring_thread_entry),
-            &g_runtime.workerServiceArgs)) {
-        logPrint("[audio-asm] worker controller creation failed\n");
-        audioAsmShutdown();
-        return 0;
-    }
-    Sleep(250);
-    if (asm_audio_wait_worker(g_runtime.workerControllerHandle, 0) ==
-        WAIT_OBJECT_0) {
-        logPrint("[audio-asm] assembly WASAPI worker exited during startup\n");
+    const AudioWorkerLifecycleArgs workerLifecycle{
+        reinterpret_cast<void**>(&g_runtime.producerHandle),
+        reinterpret_cast<uint64_t>(asm_audio_producer_thread),
+        &g_runtime.producerArgs,
+        &g_runtime.ring,
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
+        reinterpret_cast<void**>(&g_runtime.workerControllerHandle),
+        reinterpret_cast<uint64_t>(asm_audio_ring_thread_entry),
+        &g_runtime.workerServiceArgs,
+        &g_runtime.control,
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
+    };
+    const uint32_t workerStatus = asm_audio_start_workers(&workerLifecycle);
+    if (workerStatus != 0) {
+        if (workerStatus == 1) {
+            logPrint("[audio-asm] producer prebuffer failed failed=%ld done=%ld "
+                     "error=%ld write=%u read=%u\n",
+                     g_runtime.producerFailed, g_runtime.producerDone,
+                     g_runtime.producerError,
+                     g_runtime.ring.writeFrame, g_runtime.ring.readFrame);
+        } else if (workerStatus == 2) {
+            logPrint("[audio-asm] worker controller creation failed\n");
+        } else {
+            logPrint("[audio-asm] assembly WASAPI worker exited during startup\n");
+        }
         audioAsmShutdown();
         return 0;
     }
@@ -249,21 +247,19 @@ void audioAsmShutdown() {
     if (g_runtime.shuttingDown) return;
     InterlockedExchange(&g_runtime.shuttingDown, 1);
     InterlockedExchange(&g_runtime.playing, 0);
-    InterlockedExchange(&g_runtime.producerStop, 1);
-
-    if (g_runtime.workerControllerHandle) {
-        InterlockedExchange(
-            reinterpret_cast<volatile LONG*>(&g_runtime.control.requestedState),
-            2);
-        InterlockedIncrement(
-            reinterpret_cast<volatile LONG*>(&g_runtime.control.requestSequence));
-        asm_audio_wait_worker(g_runtime.workerControllerHandle, INFINITE);
-        asm_audio_close_worker(&g_runtime.workerControllerHandle);
-    }
-    if (g_runtime.producerHandle) {
-        asm_audio_wait_worker(g_runtime.producerHandle, INFINITE);
-        asm_audio_close_worker(&g_runtime.producerHandle);
-    }
+    const AudioWorkerLifecycleArgs workerLifecycle{
+        reinterpret_cast<void**>(&g_runtime.producerHandle),
+        0,
+        nullptr,
+        nullptr,
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
+        reinterpret_cast<void**>(&g_runtime.workerControllerHandle),
+        0,
+        nullptr,
+        &g_runtime.control,
+        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
+    };
+    asm_audio_stop_workers(&workerLifecycle);
     if (g_runtime.ring.samples) asm_audio_ring_close(&g_runtime.ring);
     logPrint("[audio-asm] stopped: device_frames=%u underruns=%u markers=%u\n",
              g_runtime.workerReport.common.frames,
