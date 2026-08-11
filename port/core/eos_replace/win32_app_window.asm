@@ -1,7 +1,8 @@
 ; win32_app_window.asm - production VOODKA window bootstrap in x64 assembly.
 ;
-; Phase 3B.2 moves the Win32 class/window ownership out of app.cpp for the
-; shipped target. The C++ reference executable retains its original path.
+; The shipped target owns Win32 class/window registration, geometry, focus,
+; and teardown here. The C++ reference executable retains its original path
+; solely as a differential oracle.
 
 BITS 64
 DEFAULT REL

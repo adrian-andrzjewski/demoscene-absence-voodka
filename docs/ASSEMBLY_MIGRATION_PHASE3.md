@@ -4,6 +4,10 @@ Status: **Production Phase 3 migration complete; local final gate passed; Window
 
 Snapshot date: **2026-08-11**
 
+This document is a historical phase record. The local release gate is now
+closed; final build, playback, synchronization, shutdown, and import evidence
+is recorded in `RELEASE_COMPLETION.md`.
+
 The detailed sections below are chronological records of the migration gates.
 The current production result and remaining release gate are summarized at the
 end of this document.

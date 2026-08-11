@@ -2,8 +2,8 @@ cmake_minimum_required(VERSION 3.24)
 
 # =============================================================================
 # VOODKA - native Windows x64 port of the 1990s Absence demoscene demo.
-# Builds with Visual Studio 2022 (or 2026). Pure assembly core (NASM x64) +
-# C++ Windows integration layer. Everything is vendored under modules/.
+# The shipped demo is a no-CRT NASM x64 image. C++ is used only by the
+# separate reference executable and host-side validation/packaging tools.
 # =============================================================================
 
 project(VOODKA LANGUAGES C CXX ASM_NASM)
@@ -12,9 +12,9 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Build-selected window-title policy shared by the production ASM core and
-# platform bridge, plus the C++ reference executable. Release is the implicit
-# default; only Debug opts into runtime scene information.
+# Build-selected window-title policy shared by the production ASM image and
+# the non-shipped reference executable. Release is the implicit default; only
+# Debug opts into runtime scene information.
 set(VOODKA_DEBUG_TITLE_DEFINITION
     "$<$<CONFIG:Debug>:VOODKA_DEBUG_TITLE=1>")
 set(VOODKA_DEBUG_TITLE_ASM_OPTION
@@ -440,7 +440,7 @@ if(Python3_Interpreter_FOUND)
                      "${CMAKE_BINARY_DIR}/core/voodka_core.dir/$<CONFIG>")
 endif()
 
-# ---- libxmp (vendored MOD player) ------------------------------------------
+# ---- libxmp (vendored reference oracle) ------------------------------------
 add_subdirectory("${CMAKE_SOURCE_DIR}/../modules/libxmp"
                  "${CMAKE_BINARY_DIR}/libxmp")
 
@@ -555,13 +555,11 @@ add_test(NAME audio.live_ring
 # ---- V3D asset viewer (standalone validation tool) ---------------------------
 add_subdirectory(tools/asset_viewer)
 
-# ---- platform layer + assembly core (phases >0) -----------------------------
+# ---- platform layer + assembly core -----------------------------------------
 add_subdirectory(core)
 add_subdirectory(platform)
 
-# Phase 3A feasibility gate: a standalone no-CRT process owns the Win32
-# window/thread substrate in native x64 assembly.  This deliberately stays
-# outside VOODKA.exe until the ABI and teardown contract is proven repeatedly.
+# Standalone no-CRT validation probe for the native x64 Win32/thread substrate.
 add_executable(win32_runtime_probe WIN32
     core/eos_replace/win32_runtime_probe.asm)
 target_include_directories(win32_runtime_probe PRIVATE
@@ -576,7 +574,7 @@ target_link_libraries(win32_runtime_probe PRIVATE kernel32 user32)
 add_test(NAME win32.runtime_probe COMMAND win32_runtime_probe)
 set_tests_properties(win32.runtime_probe PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.2 feasibility witness: invoke the production NASM exception
+# Validation witness: invoke the production NASM exception
 # filter with synthetic EXCEPTION_POINTERS and verify all varargs register
 # values, including the fifth/sixth Win64 stack arguments.
 add_executable(win32_crash_probe tools/validate/win32_crash_probe.cpp)
@@ -585,7 +583,7 @@ target_link_libraries(win32_crash_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.crash_report COMMAND win32_crash_probe)
 set_tests_properties(win32.crash_report PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.3 feasibility witness: exercise the production NASM file sink,
+# Validation witness: exercise the production NASM file sink,
 # critical section, flush, close, and on-disk marker through the real path.
 add_executable(win32_log_probe tools/validate/win32_log_probe.cpp)
 target_compile_definitions(win32_log_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
@@ -593,7 +591,7 @@ target_link_libraries(win32_log_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.log_sink COMMAND win32_log_probe)
 set_tests_properties(win32.log_sink PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.4 feasibility witness: compare the NASM integer/string
+# Validation witness: compare the NASM integer/string
 # formatter against the MSVC printf oracle, including Win64 va_list slots.
 add_executable(win32_log_format_probe tools/validate/win32_log_format_probe.cpp)
 target_compile_definitions(win32_log_format_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
@@ -601,7 +599,7 @@ target_link_libraries(win32_log_format_probe PRIVATE voodka_core)
 add_test(NAME win32.log_format COMMAND win32_log_format_probe)
 set_tests_properties(win32.log_format PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.4 integration witness: exercise the real production C++ logger
+# Integration witness: exercise the C++ wrapper over the production
 # wrapper, its va_start boundary, NASM formatter, and NASM sink together.
 add_executable(win32_log_api_probe
     tools/validate/win32_log_api_probe.cpp
@@ -613,7 +611,7 @@ target_link_libraries(win32_log_api_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.log_api COMMAND win32_log_api_probe)
 set_tests_properties(win32.log_api PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.6 feasibility witness: exercise the production NASM timeline
+# Validation witness: exercise the production NASM timeline
 # formatter and Win32 file handle/write/flush/close boundary byte-for-byte.
 add_executable(win32_timeline_probe
     tools/validate/win32_timeline_probe.cpp
@@ -625,7 +623,7 @@ target_link_libraries(win32_timeline_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.timeline_sink COMMAND win32_timeline_probe)
 set_tests_properties(win32.timeline_sink PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7A feasibility witness: exercise the production NASM arena,
+# Validation witness: exercise the production NASM arena,
 # archive discovery/loading, zeroed bump allocation, and teardown boundary.
 add_executable(win32_arena_probe
     tools/validate/win32_arena_probe.cpp
@@ -640,7 +638,7 @@ target_link_libraries(win32_arena_probe PRIVATE voodka_core kernel32 user32)
 add_test(NAME win32.arena_service COMMAND win32_arena_probe)
 set_tests_properties(win32.arena_service PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7C.6.2 input namespace gate: exercise the decorated vk:: ABI
+# Validation witness: exercise the decorated vk:: input ABI
 # directly against the production NASM key map, quit state, and worker.
 add_executable(win32_input_abi_probe
     tools/validate/win32_input_abi_probe.cpp)
@@ -651,7 +649,7 @@ target_link_libraries(win32_input_abi_probe PRIVATE voodka_core kernel32 user32)
 add_test(NAME win32.input_abi COMMAND win32_input_abi_probe)
 set_tests_properties(win32.input_abi PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7C.6.3 pause namespace gate: verify atomic state transitions,
+# Validation witness: verify atomic pause state transitions,
 # exact formatted diagnostics, and the audio-pump handoff through NASM.
 add_executable(win32_pause_abi_probe
     tools/validate/win32_pause_abi_probe.cpp
@@ -664,7 +662,7 @@ target_link_libraries(win32_pause_abi_probe PRIVATE kernel32)
 add_test(NAME win32.pause_abi COMMAND win32_pause_abi_probe)
 set_tests_properties(win32.pause_abi PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7C.6.4 progress namespace gate: validate scene boundaries,
+# Validation witness: validate scene boundaries,
 # per-frame timeline calls, elapsed formatting, and transition-only logging.
 add_executable(win32_progress_abi_probe
     tools/validate/win32_progress_abi_probe.cpp
@@ -678,7 +676,7 @@ target_link_libraries(win32_progress_abi_probe PRIVATE kernel32 user32)
 add_test(NAME win32.progress_abi COMMAND win32_progress_abi_probe)
 set_tests_properties(win32.progress_abi PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7C.6.5 gate: exercise the complete shipped NASM application
+# Validation witness: exercise the complete shipped NASM application
 # bridge against namespace-vk stubs.  This covers scene parsing, seek/log
 # adapters, startup forwarding, WndProc forwarding, and the path resolver.
 add_executable(win32_application_abi_probe
@@ -693,7 +691,7 @@ target_link_libraries(win32_application_abi_probe PRIVATE kernel32)
 add_test(NAME win32.application_abi COMMAND win32_application_abi_probe)
 set_tests_properties(win32.application_abi PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B witness: exercise the production NASM soundtrack-path
+# Validation witness: exercise the production NASM soundtrack-path
 # resolver, including override identity and staged executable-directory data.
 add_executable(win32_music_path_probe tools/validate/win32_music_path_probe.cpp)
 target_compile_definitions(win32_music_path_probe PRIVATE
@@ -702,7 +700,7 @@ target_link_libraries(win32_music_path_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.music_path COMMAND win32_music_path_probe)
 set_tests_properties(win32.music_path PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.2 witness: exercise NASM seek precedence, scene-start table,
+# Validation witness: exercise NASM seek precedence, scene-start table,
 # self-test loop, audio-check default, and demo result propagation with C ABI
 # service stubs; no window, GPU, or audio device is required.
 add_executable(win32_app_modes_probe
@@ -715,7 +713,7 @@ target_link_libraries(win32_app_modes_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.app_modes COMMAND win32_app_modes_probe)
 set_tests_properties(win32.app_modes PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.3 witness: verify the production NASM subsystem-startup
+# Validation witness: verify the production NASM subsystem-startup
 # coordinator's service order, argument ABI, quit checkpoints, and rollback
 # branches with platform/audio/GPU-free C ABI stubs.
 add_executable(win32_app_startup_probe
@@ -727,7 +725,7 @@ target_link_libraries(win32_app_startup_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.app_startup COMMAND win32_app_startup_probe)
 set_tests_properties(win32.app_startup PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.4 witness: exercise the shipped NASM host's logging,
+# Validation witness: exercise the shipped NASM host's logging,
 # configuration-record construction, window failure, startup failure, seek,
 # run, arena-size, and final-shutdown order with ABI stubs.
 add_executable(win32_app_host_probe
@@ -739,7 +737,7 @@ target_link_libraries(win32_app_host_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.app_host COMMAND win32_app_host_probe)
 set_tests_properties(win32.app_host PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.5 witness: link the production NASM-decorated vk namespace
+# Validation witness: link the production NASM-decorated vk namespace
 # symbols directly and verify logger/timeline sink and formatter contracts.
 add_executable(win32_platform_abi_probe
     tools/validate/win32_platform_abi_probe.cpp
@@ -752,7 +750,7 @@ target_link_libraries(win32_platform_abi_probe PRIVATE kernel32)
 add_test(NAME win32.platform_abi COMMAND win32_platform_abi_probe)
 set_tests_properties(win32.platform_abi PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.6 witness: compare the production NASM processorek Nevosolek
+# Validation witness: compare the production NASM processorek Nevosolek
 # scan converter
 # against the C++ reference algorithm on deterministic triangle cases.
 add_executable(processorek_nevosolek_raster_probe
@@ -764,7 +762,7 @@ target_include_directories(processorek_nevosolek_raster_probe PRIVATE
 add_test(NAME processorek_nevosolek.raster COMMAND processorek_nevosolek_raster_probe)
 set_tests_properties(processorek_nevosolek.raster PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.7 witness: validate the production NASM D3D11 service ABI,
+# Validation witness: validate the production NASM D3D11 service ABI,
 # palette/frame recording, readback diagnostics, and lifecycle state.
 add_executable(win32_d3d_dispatch_probe
     tools/validate/win32_d3d_dispatch_probe.cpp
@@ -776,9 +774,8 @@ target_link_libraries(win32_d3d_dispatch_probe PRIVATE kernel32)
 add_test(NAME win32.d3d_dispatch COMMAND win32_d3d_dispatch_probe)
 set_tests_properties(win32.d3d_dispatch PROPERTIES TIMEOUT 10)
 
-# Phase 3B.6.7B.8 first boundary: the shipped namespace-vk audio dispatch is
-# NASM while the dedicated player implementation remains the tested C++ host
-# orchestration.  The probe supplies player stubs and verifies every forward,
+# Validation witness: the shipped namespace-vk audio dispatch and dedicated
+# player are NASM. The probe supplies player stubs and verifies every forward,
 # disabled-mode default, variadic log call, and unconditional shutdown path.
 add_executable(audio_dispatch_probe
     tools/validate/audio_dispatch_probe.cpp
@@ -941,7 +938,9 @@ set_tests_properties(audio.workers PROPERTIES TIMEOUT 10)
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.
-add_executable(d3d11_asm_probe tools/validate/d3d11_asm_probe.cpp)
+add_executable(d3d11_asm_probe
+    tools/validate/d3d11_asm_probe.cpp
+    core/eos_replace/d3d11_asm_probe.asm)
 target_compile_definitions(d3d11_asm_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(d3d11_asm_probe PRIVATE
     voodka_core d3d11 dxgi ole32 user32 gdi32
@@ -959,7 +958,8 @@ add_test(NAME d3d11.asm_present_probe COMMAND d3d11_asm_present_probe)
 # COM initialization, WASAPI endpoint activation, event-driven client setup,
 # render-buffer acquisition/release, and ordered teardown.
 add_executable(audio_wasapi_asm_probe
-    tools/validate/audio_wasapi_asm_probe.cpp)
+    tools/validate/audio_wasapi_asm_probe.cpp
+    core/eos_replace/audio_wasapi_probe.asm)
 target_compile_definitions(audio_wasapi_asm_probe PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN)
 target_link_libraries(audio_wasapi_asm_probe PRIVATE

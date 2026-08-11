@@ -221,7 +221,9 @@ in `port/data/pal/`.
 - `music/amnezja2.mod` - the music: **14-channel** module ("<>Amnezja<>" by
   Sudi; libxmp identifies it as "Fast Tracker 14CH", 42 orders, 31
   instruments, 39 patterns), 381,890 bytes. Loaded by the original via EOS /
-  DIAMOND at 44,000 Hz; played by libxmp+WASAPI in the port.
+  DIAMOND at 44,000 Hz; played by the dedicated NASM tracker/mixer and
+  WASAPI worker in the shipped port. libxmp is used only by the reference
+  oracle and host-side audio comparisons.
 - `NFO/FO.TXT` - binary block-structured data (font/ANSI), not recovered as
   text; not used by the demo itself.
 

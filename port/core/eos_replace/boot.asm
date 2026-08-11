@@ -105,7 +105,7 @@ DemoStart32:
         ; ---- run the selected scene ----------------------------------------
         ; vk_get_entry_scene(): 0 = full sequence (default), 1..8 = run only
         ; that scene. The audio timeline was seeked by --scene or its numeric
-        ; --part compatibility alias.
+        ; --part historical selector.
         extern vk_get_entry_scene
         call    vk_get_entry_scene
 

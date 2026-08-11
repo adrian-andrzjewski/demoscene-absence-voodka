@@ -1,9 +1,8 @@
 ; win32_app_wndproc.asm - production VOODKA Win32 callback in x64 assembly.
 ;
-; Phase 3B migrates the callback that sits on the real demo window. Window
-; creation and the C++ reference lifecycle remain unchanged for this gate, but
-; the shipped target now handles keyboard, pause, activation, paint, close,
-; and destroy messages through this native Win64 entry point.
+; The shipped target handles keyboard, pause, activation, paint, close, and
+; destroy messages through this native Win64 entry point. The reference target
+; retains its C++ callback solely for differential validation.
 
 BITS 64
 DEFAULT REL

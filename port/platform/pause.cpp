@@ -1,4 +1,4 @@
-// pause.cpp - centralized pause/resume for the whole production (Space key).
+// pause.cpp - C++ reference pause/resume oracle for the whole demo (Space).
 //
 // Pausing stops every animated/overtime element at once by freezing the two
 // clocks the demo runs on:
@@ -20,7 +20,7 @@ namespace vk {
 
 namespace {
 volatile long g_paused = 0;            // 1 = paused (read by audio + timer)
-volatile long g_toggleCount = 0;       // total pause/resume toggles (debug)
+volatile long g_toggleCount = 0;       // total pause/resume toggles (diagnostic)
 }
 
 bool isPaused() { return g_paused != 0; }

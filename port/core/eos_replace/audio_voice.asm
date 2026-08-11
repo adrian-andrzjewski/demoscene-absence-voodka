@@ -1,4 +1,4 @@
-; audio_voice.asm - Phase 2D row-start voice identity state.
+; audio_voice.asm - production row-start voice identity state.
 ;
 ; This gate follows the module's row order and applies the instrument/note
 ; state changes needed to identify the active sample.  It intentionally does

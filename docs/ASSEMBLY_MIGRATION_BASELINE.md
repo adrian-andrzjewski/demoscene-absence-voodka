@@ -5,6 +5,10 @@ Snapshot date: **2026-08-09**
 Target: `port/bin/Release/VOODKA.exe`
 Scope: the demo executable only
 
+This is a historical baseline, not the final architecture. The migration
+completed on 2026-08-11; see `RELEASE_COMPLETION.md` for the validated
+assembly-only release boundary and evidence.
+
 This document records the starting point for the risk-first migration in
 [`ASSEMBLY_MIGRATION_PLAN.md`](ASSEMBLY_MIGRATION_PLAN.md). The asset viewer,
 `VIRTUAL.exe`, packers, and validation utilities are host tools and remain

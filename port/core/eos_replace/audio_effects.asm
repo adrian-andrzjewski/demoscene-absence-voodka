@@ -1,4 +1,4 @@
-; audio_effects.asm - Phase 2E native tracker tick/effect state gate.
+; audio_effects.asm - production tracker tick/effect state machine.
 ;
 ; This is an offline, module-specific state engine.  It reproduces the
 ; xmp_channel_info-equivalent visible state plus a logical sample position and

@@ -50,32 +50,33 @@ section .text
 ; r12 = runtime, r14d = target tick.
 ; Return the transaction status after committing metadata for status 1 or 2.
 audio_seek_tick:
+        sub     rsp, 0x28                    ; align transaction call
         lea     rax, [r12 + RUNTIME_CONTROL]
-        mov     [rsp + 0x50 + SEEK_CONTROL], rax
+        mov     [rsp + 0x78 + SEEK_CONTROL], rax
         lea     rax, [r12 + RUNTIME_RING]
-        mov     [rsp + 0x50 + SEEK_RING], rax
+        mov     [rsp + 0x78 + SEEK_RING], rax
         lea     rax, [r12 + RUNTIME_PRODUCER_FAILED]
-        mov     [rsp + 0x50 + SEEK_PRODUCER_FAILED], rax
-        mov     dword [rsp + 0x50 + SEEK_TARGET_TICK], r14d
-        mov     dword [rsp + 0x50 + 28], 0
+        mov     [rsp + 0x78 + SEEK_PRODUCER_FAILED], rax
+        mov     dword [rsp + 0x78 + SEEK_TARGET_TICK], r14d
+        mov     dword [rsp + 0x78 + 28], 0
         lea     rax, [r12 + RUNTIME_LAST_STATE]
-        mov     [rsp + 0x50 + SEEK_LAST_STATE], rax
+        mov     [rsp + 0x78 + SEEK_LAST_STATE], rax
         lea     rax, [r12 + RUNTIME_LAST_SEQUENCE]
-        mov     [rsp + 0x50 + SEEK_LAST_SEQUENCE], rax
-        lea     rax, [rsp + 0x40]
-        mov     [rsp + 0x50 + SEEK_BASE_OUT], rax
-        lea     rax, [rsp + 0x44]
-        mov     [rsp + 0x50 + SEEK_SEQUENCE_OUT], rax
-        mov     dword [rsp + 0x40], 0
-        mov     dword [rsp + 0x44], 0
+        mov     [rsp + 0x78 + SEEK_LAST_SEQUENCE], rax
+        lea     rax, [rsp + 0x68]
+        mov     [rsp + 0x78 + SEEK_BASE_OUT], rax
+        lea     rax, [rsp + 0x6c]
+        mov     [rsp + 0x78 + SEEK_SEQUENCE_OUT], rax
+        mov     dword [rsp + 0x68], 0
+        mov     dword [rsp + 0x6c], 0
 
-        lea     rcx, [rsp + 0x50]
+        lea     rcx, [rsp + 0x78]
         call    asm_audio_seek_transaction
         test    eax, eax
         jz      .seek_transaction_failed
         mov     r11d, eax
 
-        mov     eax, dword [rsp + 0x40]
+        mov     eax, dword [rsp + 0x68]
         mov     dword [r12 + RUNTIME_SEEK_BASE], eax
         mov     dword [r12 + RUNTIME_SEEK_SOURCE], r14d
         mov     rdx, [r12 + RUNTIME_STORAGE + STORAGE_TICK_STARTS]
@@ -85,10 +86,12 @@ audio_seek_tick:
         divsd   xmm0, [rel audio_seek_sample_rate]
         movsd   qword [r12 + RUNTIME_SEEK_TIME_BASE], xmm0
         mov     eax, r11d
+        add     rsp, 0x28
         ret
 
 .seek_transaction_failed:
         xor     eax, eax
+        add     rsp, 0x28
         ret
 
 ; uint32_t vk::audioAsmSeekRows(uint32_t modpos)

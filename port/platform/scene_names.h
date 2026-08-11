@@ -2,7 +2,7 @@
 //
 // These names come from the original VOODKA.NFO terminology as confirmed for
 // the port. Numeric part identifiers remain available only as stable
-// historical/debugging selectors (for example, --part 5).
+// historical numeric selectors (for example, --part 5).
 
 #pragma once
 

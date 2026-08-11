@@ -125,6 +125,10 @@ section .text
 ; Clear the assembly-owned runtime. The ring close is deliberately idempotent;
 ; this preserves the former C++ rollback behavior after a partial init.
 audio_clear_runtime:
+        push    rbp
+        mov     rbp, rsp
+        push    rdi
+        sub     rsp, 0x28                    ; aligned before ring close
         lea     rax, [rel asm_audio_runtime_state]
         cmp     qword [rax + RUNTIME_RING + RING_SAMPLES], 0
         je      .clear_zero
@@ -135,6 +139,9 @@ audio_clear_runtime:
         xor     eax, eax
         mov     ecx, RUNTIME_BYTES / 8
         rep     stosq
+        add     rsp, 0x28
+        pop     rdi
+        pop     rbp
         ret
 
 ; Fill the producer, worker, and lifecycle records from the fixed runtime

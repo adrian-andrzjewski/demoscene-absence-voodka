@@ -78,7 +78,7 @@ a second timing clock.
 
 This means that a difference in audio implementation or playback rate can
 change the wall-clock second at which a flash occurs, while the intended
-trigger remains the same `ModPos`. The original DOS playback and the libxmp
+trigger remains the same `ModPos`. The original DOS playback and the modern
 port also have a known small rate difference; compare phase/`ModPos`, not only
 elapsed seconds, when validating synchronization.
 
@@ -251,18 +251,18 @@ and flashes that palette before restoring the saved state. oko + szklo (P1) pass
 `intro_fade` does. The torus ustep village (P5) caller then performs two additional `v_sync` calls
 to preserve the source's three unchanged restore `pal_set` waits.
 
-The primitives call the platform bridge directly rather than `pal_set`, since
+The primitives call the NASM platform bridge directly rather than `pal_set`, since
 the latter does not present. Their prologues also preserve the Windows x64
-ABI rule that every NASM-to-C++ call has `RSP % 16 == 0`; this matters in
+ABI rule that every NASM-to-Windows call has `RSP % 16 == 0`; this matters in
 particular for nad czerwonym lampa (P8)'s one-register `brum` helper.
 
 ### D3D11 palette conversion
 
-`port/platform/bridge.cpp` exposes `vk_set_palette`, `vk_get_palette`, and
-`vk_present_frame` to NASM. `vk_set_palette` stores raw 6-bit values in the
+`port/platform/bridge_services.asm` exposes `vk_set_palette`, `vk_get_palette`,
+and `vk_present_frame` to NASM. `vk_set_palette` stores raw 6-bit values in the
 platform palette. The production `port/core/eos_replace/d3d11_asm_present.asm`
-then (with `port/platform/d3d11_dispatch.cpp` retaining the host-side
-recording/diagnostic ABI):
+then, with `win32_d3d_dispatch.asm` retaining the platform ABI and recording /
+diagnostic state:
 
 1. uploads the 320x200 indexed framebuffer to an `R8_UNORM` texture;
 2. converts each 0..63 DAC component to 8-bit using

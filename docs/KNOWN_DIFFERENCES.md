@@ -17,14 +17,15 @@ animation, rasterization, and outros, see docs/P4_P8_SCENES.md.
   confirmed against the original's scene behavior.
 - **Playback rate: the original plays ~5% slower.** Under DOSBox/SB16 the
   original's wall-clock scene times fit `W = B + M/0.950` (r = 0.950 vs
-  libxmp's nominal ProTracker timeline). The demo stays internally in sync in
+  the modern player's nominal ProTracker timeline). The demo stays internally in sync in
   both versions (scenes are ModPos-driven), so this shows only as absolute
   pacing/pitch. Leading hypothesis: DIAMOND programs the SB16 DSP time
   constant for the requested 44000 Hz and the SB16's nearest rate below is
   41667 Hz (TC=232) -> playback ~5.3% slow with a ~0.9 semitone pitch drop.
   Unverified without disassembling DIAMOND.OBJ (binary-only; EOS 2.07 source
   is not in the repo). The port plays the module as written at 44.1 kHz via
-  libxmp — the pitch-correct choice; documented, not "fixed".
+  its dedicated NASM tracker/mixer. libxmp is retained as a host-side oracle,
+  not as the shipped playback implementation.
 - **Frame rate: ~70 fps, like the original.** waitVbl is QPC-paced 70 Hz
   retrace emulation; the presenter uses immediate Present(0) (a former
   Present(1) vsync lock summed two clocks to ~31 fps). Per-frame deltas come
@@ -344,9 +345,10 @@ vs `bialy` substitutions below, now fixed:
   ASSET_FORMATS.md section 7). Square pixels vs the CRT's 1.2:1 tall-pixel
   stretch (same choice as DOSBox's default). Possible one-line tearing under
   Present(0), as on real VGA.
-- **Audio:** libxmp 4.6.2 vs the custom DIAMOND player (14-channel
-  FastTracker module). Playback-rate difference noted above; mixing/filter
-  nuances are those of libxmp's FT2-accurate mixer vs DIAMOND's SB16 output.
+- **Audio:** dedicated NASM tracker/mixer vs the custom DIAMOND player
+  (14-channel FastTracker module). Playback-rate difference noted above;
+  mixing/filter nuances are those of the port's 44.1 kHz WASAPI path vs
+  DIAMOND's SB16 output. libxmp remains a differential oracle only.
   The module file carries 233,984 trailing bytes (61%) past the well-formed
   module end - inert for both players (ASSET_FORMATS.md section 6.1).
 - **Palette flashes**: fixed 2026-08-09.  The original's full-screen flashes
@@ -367,8 +369,8 @@ vs `bialy` substitutions below, now fixed:
   MROTATE matrices, camera matrix, projection, normals, object loader, VR
   visibility/sort/prepare, the swiatynia city (P2) camera path and world data, and the toonel
   table: byte-exact vs C++ references re-deriving the original arithmetic
-  (27 CTests, incl. all five water drop tables, the V3D/V3M decode, and the
-  asset viewer's own v3d.viewer_parse).
+  (88 CTests, incl. all five water drop tables, the V3D/V3M decode, audio and
+  lifecycle gates, and the asset viewer's own v3d.viewer_parse).
 - Asset-level runtime checks (2026-08-05, frame-recorded): tunel + wygibasy (P3) palette ramp
   matches the original's 8-bit make_pal semantics for all 720 bytes; the swiatynia city (P2)
   water installs absence.pal exactly (768/768); the nad czerwonym lampa (P8) end screen equals

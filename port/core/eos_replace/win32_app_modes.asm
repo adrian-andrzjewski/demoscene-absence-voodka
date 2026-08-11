@@ -3,8 +3,8 @@
 ; The argument parser already owns the raw command-line interpretation. This
 ; layer owns the former app.cpp branch order, scene-start table, self-test loop,
 ; audio-check default, crash-filter handoff, and DemoStart32 result return.
-; Namespace-vk calls remain explicit C ABI adapters until those services are
-; migrated independently.
+; Namespace-vk calls remain explicit fixed-layout ABI adapters; their
+; implementations are NASM-owned in the production image.
 
 BITS 64
 DEFAULT REL

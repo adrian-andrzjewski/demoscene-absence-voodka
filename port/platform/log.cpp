@@ -32,7 +32,10 @@ void logInit() {
     InitializeCriticalSection(&g_logCs);
     wchar_t path[MAX_PATH] = {};
     GetModuleFileNameW(nullptr, path, MAX_PATH);
-    wcscpy(wcsrchr(path, L'\\') + 1, L"voodka.log");
+    if (wchar_t* leaf = wcsrchr(path, L'\\')) {
+        const size_t prefix = static_cast<size_t>(leaf - path) + 1;
+        wcscpy_s(path + prefix, MAX_PATH - prefix, L"voodka.log");
+    }
     g_log = CreateFileW(path, GENERIC_WRITE, FILE_SHARE_READ, nullptr,
                         CREATE_ALWAYS, 0, nullptr);
     g_logInit = true;

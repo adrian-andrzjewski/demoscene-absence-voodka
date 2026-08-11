@@ -1,8 +1,9 @@
 ; d3d11_asm_present.asm - assembly-owned indexed/palette D3D11 presenter.
 ;
-; Phase 1B candidate. Window creation and host-side validation remain outside
-; this file; all D3D11 objects, shader creation, uploads, draw calls, readback,
-; Present, and COM Release calls are performed here through explicit vtables.
+; Production ownership. Window creation and host-side validation remain
+; outside this file; all D3D11 objects, shader creation, uploads, draw calls,
+; readback, Present, and COM Release calls are performed here through
+; explicit vtables.
 
 BITS 64
 DEFAULT REL
@@ -267,7 +268,7 @@ pres_ps_end:
 %define PRES_VS_BYTES (pres_vs_end - pres_vs_blob)
 %define PRES_PS_BYTES (pres_ps_end - pres_ps_blob)
 
-; Release every interface currently held by the candidate. Called with the
+; Release every interface currently held by the presenter. Called with the
 ; caller's aligned frame still active; COM implementations preserve nonvolatile
 ; registers according to the same Win64 ABI as ordinary C++ calls.
 pres_release_all:

@@ -25,7 +25,9 @@ The build produces a self-contained `port/bin/Release/` directory with the
 demo, packed data, and soundtrack. The window is 1280×800: an exact 4×,
 point-sampled presentation of the original 320×200 logical framebuffer. The
 demo runs at approximately 70 frames per second and plays all eight scenes from
-beginning to end.
+beginning to end. `VOODKA.exe` is built entirely from NASM x64 modules: no C or
+C++ object, CRT, STL, exception runtime, or libxmp code is part of the shipped
+demo.
 
 ## Why this port exists
 
@@ -134,6 +136,21 @@ reference frame were compared together. That is the satisfying part of this
 project: the strange image on screen is usually a precise clue about a tiny
 piece of old machine code.
 
+## Migration completion
+
+The Windows production migration is complete. `VOODKA.exe` contains the
+ported demo, EOS replacement, Win32 startup/window/input services, D3D11
+presentation, dedicated tracker/audio worker, asset loading, logging, timing,
+controls, and shutdown as NASM x64 modules. It enters through a native
+assembly process entry and disables the default C/C++ libraries.
+
+The C++ sources intentionally retained under `port/platform/` and
+`port/tools/` are not production remnants: they form the separate
+`VOODKA_REFERENCE.exe`, asset packers, viewers, and differential validators.
+They provide migration evidence and cannot be linked into the shipped image.
+The complete migration record is in
+[`docs/ASSEMBLY_MIGRATION_PHASE3.md`](docs/ASSEMBLY_MIGRATION_PHASE3.md).
+
 ## What is preserved
 
 The port retains the original eight-scene structure and its music-driven progression.
@@ -155,11 +172,13 @@ texture. Nearest-neighbour sampling and integer scaling keep the hard-edged
 VGA look instead of smoothing it into a modern texture.
 
 The original soundtrack is the 14-channel FastTracker module `<>Amnezja<>`
-by Szudi, dated 29 July 1996 in the recovered asset metadata. The port uses
-the vendored libxmp player with an event-driven WASAPI output path. Its
-`ModPos` value is represented as `(order << 8) | row`, just as the demo expects,
-so scene changes, palette flashes, morphs, camera movement, and animation are
-driven by the same musical timeline rather than by an unrelated wall clock.
+by Szudi, dated 29 July 1996 in the recovered asset metadata. The shipped port
+uses a dedicated NASM tracker, mixer, ring, and event-driven WASAPI worker at
+44.1 kHz stereo. Its `ModPos` value is represented as `(order << 8) | row`, just
+as the demo expects, so scene changes, palette flashes, morphs, camera movement,
+and animation are driven by the same musical timeline rather than by an
+unrelated wall clock. Vendored libxmp remains only in `VOODKA_REFERENCE.exe`
+and host-side differential tests.
 
 ## Original authors: tribute and credits
 
@@ -206,8 +225,10 @@ silently rewritten as modern port credits.
 - CMake 3.24 or newer on `PATH`
 - PowerShell 7 or newer
 
-NASM 2.16.03 and libxmp 4.6.2 are vendored under `modules/`; no package
-manager, DOS compiler, TASM installation, or external audio library is needed.
+NASM 2.16.03 is vendored under `modules/`. libxmp 4.6.2 is also vendored, but
+is used only by the non-shipped C++ reference/oracle tools. No package manager,
+DOS compiler, TASM installation, or external runtime audio library is needed
+by `VOODKA.exe`.
 
 ### Build and test
 
@@ -225,10 +246,10 @@ For a clean rebuild:
 
 The script initializes the Visual Studio environment, configures CMake for
 x64, explicitly selects the vendored NASM, builds the demo and tools, and can
-run the complete CTest suite. The finished port currently has **27 tests**:
-assembly-versus-reference checks, archive and palette reproducibility checks,
-real V3D/V3M decoding, water-table verification, relocation hygiene, and
-viewer parsing.
+run the complete CTest suite. The finished port has **88 tests** covering
+assembly/reference equivalence, archive and palette reproducibility, real
+V3D/V3M decoding, water tables, tracker/mixer PCM, WASAPI lifecycle, A/V
+timeline behavior, shutdown, relocation hygiene, and asset-viewer parsing.
 
 If configuring CMake manually, pass the vendored assembler explicitly:
 
@@ -247,6 +268,7 @@ script avoids that trap.
 
 ```text
 VOODKA.exe                 the complete demo
+VOODKA_REFERENCE.exe       non-shipped C++/libxmp behavioral oracle
 VIRTUAL.exe                standalone VR-engine loader/viewer harness
 asset_viewer.exe           explorer for the original 3D assets
 data/vodka.dat             packed demo assets
@@ -325,34 +347,36 @@ is correct.
 ## Architecture
 
 ```text
-port/platform/   C++17 Win32 layer: window, D3D11, WASAPI, timer, input,
-                 archive loading, logging, and the EOS bridge
-        |
-        | MS x64 ABI, through the vk_* bridge
-        v
-port/core/       NASM x64 port of the demo: boot/EOS replacement, engine,
-                 rasterizers, VR worlds, the eight canonical scenes, tables, and data includes
-        |
-        v
-original source  TASM-era assembly, includes, assets, linker manifests,
-                 and the release executable kept for reference
+VOODKA.exe
+  port/core/ + port/platform/*.asm     NASM x64 demo, EOS replacement,
+                                        Win32/D3D11/WASAPI platform, audio,
+                                        renderer, scenes, and shutdown
+  Windows import libraries             Win32, COM, D3D11, DXGI, WASAPI support
+  generated shaders + vodka.dat        self-contained runtime assets
+
+VOODKA_REFERENCE.exe + host tools      C++ differential/oracle and packaging
+                                        programs; never linked into VOODKA.exe
+
+reference/                              original source, release, and captures
 ```
 
 The assembly core remains assembly on purpose. That preserves the original's
 16-bit and 32-bit truncation, signed arithmetic, x87 operations, fixed-point
 formats, save/restore discipline, and deliberately unusual data layout. The
-port's C++ reference implementations are primarily verification or platform
-code, not a replacement rendering engine.
+The retained C++ implementations are verification/oracle code, not the
+production platform or rendering engine. The production assembly calls only
+the documented Windows ABI and explicit NASM-owned service boundaries.
 
 The major platform substitutions are:
 
-- EOS memory, selectors, timing, input, and file services become a small
-  Win32/C++ compatibility layer over one 64 MB arena.
+- EOS memory, selectors, timing, input, file, logging, and lifecycle services
+  become a small NASM Win32 layer over one 64 MB arena.
 - The original `fs`-based selector convention becomes an explicit selector
   table because user-mode x64 cannot assign arbitrary segment bases.
 - VGA framebuffer copies become an R8 index texture plus a 256×1 palette
   lookup texture in D3D11.
-- The original Sound Blaster/DIAMOND path becomes libxmp plus WASAPI.
+- The original Sound Blaster/DIAMOND path becomes the dedicated NASM tracker,
+  mixer, and WASAPI worker.
 - DOS retrace waits become a QPC-paced ~70 Hz tick source. The audio position
   still supplies the scene timeline, so visual timing and soundtrack remain
   coupled.
@@ -384,7 +408,8 @@ be the same hardware:
   VGA mode 13h. It uses square pixels; the original CRT/DOS display had a
   different physical pixel aspect.
 - The original uses its binary-only DIAMOND player and Sound Blaster output.
-  The port uses libxmp at 44.1 kHz through WASAPI. Under DOSBox/SB16 the
+  The port uses its dedicated assembly player at 44.1 kHz through WASAPI. The
+  retained libxmp build is a reference oracle only. Under DOSBox/SB16 the
   original's measured playback is about five percent slower; both versions
   remain internally synchronized because scene changes are driven by
   `ModPos`.

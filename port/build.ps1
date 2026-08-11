@@ -2,8 +2,9 @@
 #
 # Locates a Visual Studio installation (2022 preferred, 2026 accepted),
 # imports its x64 dev environment via VsDevCmd.bat, then configures and
-# builds with CMake using the vendored NASM + libxmp. No external package
-# manager, no DOS toolchain.
+# builds with CMake using the vendored NASM. The C++ compiler is needed only
+# for host tools and the non-shipped reference oracle; VOODKA.exe itself is
+# assembly-only. No external package manager or DOS toolchain is required.
 #
 # Usage:
 #   .\build.ps1                # configure + build Debug

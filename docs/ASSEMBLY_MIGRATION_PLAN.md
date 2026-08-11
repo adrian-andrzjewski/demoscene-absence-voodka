@@ -18,6 +18,11 @@ by NASM. The C++ implementation remains only in the reference executable and
 host tools as a behavioral oracle. The migration must preserve the existing
 NASM core and its differential validation contracts.
 
+Completion note (2026-08-11): the target described above is now validated and
+tagged as `voodka-port-v1.1.0`. The phase sections below are the historical
+risk ledger; any earlier statement that production still used C++ or libxmp
+describes the state at that phase's snapshot date.
+
 The shortest credible answer to whether this is viable is not to port the easy
 code first. The first feasibility gates are:
 

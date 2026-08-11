@@ -1,4 +1,4 @@
-# core/CMakeLists.txt - the NASM assembly core (demo logic).
+# core/CMakeLists.txt - the NASM production core and its validated data tables.
 
 set(VOODKA_CORE_ASM
     eos_replace/eos_dispatch.asm
@@ -9,10 +9,10 @@ set(VOODKA_CORE_ASM
     eos_replace/audio_effects.asm
     eos_replace/audio_pcm.asm
     eos_replace/audio_ring.asm
-    eos_replace/audio_wasapi_probe.asm
+    # audio_thread_probe.asm is the production WASAPI worker implementation;
+    # its historical filename is retained for source/provenance continuity.
     eos_replace/audio_thread_probe.asm
     eos_replace/audio_service.asm
-    eos_replace/d3d11_asm_probe.asm
     eos_replace/d3d11_asm_present.asm
     eos_replace/win32_app_wndproc.asm
     eos_replace/win32_app_window.asm
@@ -63,7 +63,7 @@ add_library(voodka_core STATIC ${VOODKA_CORE_ASM})
 target_compile_options(voodka_core PRIVATE
     ${VOODKA_DEBUG_TITLE_ASM_OPTION})
 
-# NASM does not emit dependency edges for INCBIN payloads. Keep processorek Nevosolek (P4)'s embedded
+# NASM does not emit dependency edges for INCBIN payloads. Keep P4's embedded
 # palette inputs visible to the build graph so a palette correction is picked
 # up by an incremental build as well as a clean rebuild.
 set_source_files_properties(parts/p4.asm PROPERTIES

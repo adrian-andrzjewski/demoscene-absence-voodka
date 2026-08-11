@@ -45,17 +45,24 @@ static std::wstring exeDir() {
     return s == std::wstring::npos ? L"." : d.substr(0, s + 1);
 }
 
-int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR lpCmd, int) {
+int WINAPI WinMain(HINSTANCE hInst, HINSTANCE, LPSTR, int) {
     vk::logInit();
     vk::logPrint("[virtual] VIRTUAL viewer port starting\n");
 
-    bool checkOnly = lpCmd && std::strstr(lpCmd, "--check");
+    // CTest and the Visual Studio launcher can pass an empty WinMain command
+    // tail even when the process command line contains the switch. Read the
+    // authoritative process command line so --check is deterministic.
+    const char* commandLine = GetCommandLineA();
+    bool checkOnly = commandLine && std::strstr(commandLine, "--check");
 
     // arena + archive search paths (exe dir data\world, then dev tree)
     if (!vk::platformInit()) { vk::logPrint("[virtual] arena init failed\n"); return 1; }
 
     std::vector<std::wstring> cands = { exeDir() + L"data\\world", exeDir() + L"world" };
-    std::wstring dev(VOODKA_REPO_ROOT, VOODKA_REPO_ROOT + strlen(VOODKA_REPO_ROOT));
+    std::wstring dev;
+    for (const char* p = VOODKA_REPO_ROOT; *p; ++p) {
+        dev.push_back(static_cast<wchar_t>(static_cast<unsigned char>(*p)));
+    }
     cands.push_back(dev + L"/port/data/world");
     cands.push_back(dev + L"/demoscene-absence-voodka-master/VIRTUAL/OBJECTS/WORLD");
 

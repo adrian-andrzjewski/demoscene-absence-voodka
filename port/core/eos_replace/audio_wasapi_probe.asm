@@ -1,6 +1,6 @@
-; audio_wasapi_probe.asm - direct Win64 WASAPI/COM feasibility probe.
+; audio_wasapi_probe.asm - standalone Win64 WASAPI/COM validation probe.
 ;
-; This is a validation boundary, not production playback yet.  The C++ host
+; This is a validation boundary separate from production playback. The C++ host
 ; only receives the fixed-width report; COM initialization, endpoint
 ; activation, IAudioClient setup, event callback, render-buffer exercise, and
 ; teardown all happen here through Windows ABI calls and COM vtables.

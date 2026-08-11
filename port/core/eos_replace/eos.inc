@@ -9,9 +9,9 @@
 ;       mov edx, <bytes>
 ;       call eos_dispatch
 ;
-; eos_dispatch.asm adapts the EOS register convention to the C++ platform
-; layer (Microsoft x64 ABI) and copies results back, so the ported code
-; stays as close to the original as possible.
+; eos_dispatch.asm adapts the EOS register convention to the Windows platform
+; ABI (Microsoft x64) and copies results back, so the ported code stays as
+; close to the original as possible.
 ;
 ; == pointer model (IMPORTANT) ==
 ;   The arena base lives in the qword  Code32_addr  (== platform arena base).

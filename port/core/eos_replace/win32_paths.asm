@@ -6,7 +6,7 @@
 ;   3. <exe>\amnezja2.mod
 ;   4. <repositoryRoot>/music/amnezja2.mod
 ; A missing file returns an empty, stable string. The reference executable
-; retains the C++ implementation as the behavioral oracle.
+; retains the C++ implementation only as the behavioral oracle.
 
 BITS 64
 DEFAULT REL

@@ -1,5 +1,11 @@
 # Building & running the VOODKA Windows port
 
+The production migration is complete: `VOODKA.exe` is a native x64 NASM
+image with a custom assembly entry point and no C/C++ runtime dependency.
+`VOODKA_REFERENCE.exe` and the host tools remain separate C++ validation
+programs so the port can continue to be compared against the original
+behavior. Nothing in that reference graph is required at runtime by the demo.
+
 ## Prerequisites
 
 | Requirement | Notes |
@@ -8,7 +14,8 @@
 | Visual Studio 2022 (Build Tools suffice) | 2026 also accepted; `build.ps1` prefers 2022 |
 | CMake >= 3.24 | on PATH |
 | PowerShell 7+ | for `build.ps1` |
-| NASM + libxmp | **vendored** in `modules/` - nothing to install; libxmp is reference/tooling-only for the shipped demo |
+| NASM | **vendored** in `modules/` - the shipped `VOODKA.exe` is NASM-only |
+| libxmp | **vendored** in `modules/` - reference/oracle tooling only; never linked into `VOODKA.exe` |
 
 No package manager, no DOS toolchain, no external SDK.
 
@@ -34,9 +41,9 @@ checkout is relocatable.
 ## Outputs (`port/bin/<Config>/`)
 
 ```
-VOODKA.exe          the demo (assembly audio; no libxmp dependency)
+VOODKA.exe          the complete demo (100% NASM x64 production image)
 VOODKA_REFERENCE.exe non-shipped C++/libxmp behavioral-oracle build
-win32_runtime_probe.exe no-CRT assembly Win32/thread lifecycle feasibility gate
+win32_runtime_probe.exe standalone no-CRT assembly Win32/thread validation probe
 VIRTUAL.exe         the standalone VR-engine test viewer (Esc quits; --check loads+exits)
 asset_viewer.exe   the V3D/V3M asset viewer (loads all 9 3D models from data/vodka.dat)
 asset_viewer_selftest.exe  parse-only validation (CTest v3d.viewer_parse)
@@ -103,20 +110,20 @@ production arena, archive loading, log, progress, crash-trace, fixed-point
 float, timeline record formatting, application bridge adapters, and process
 entry are NASM-owned. `VOODKA.exe` is linked with `/ENTRY` and
 `/NODEFAULTLIB`; custom-entry startup is covered by the production-entry
-smoke gate. C++ remains in the reference executable and host tools only.
+smoke gate. C++ remains in the reference executable and host tools only; it is
+not part of the production source or link graph.
 
 ## Running
 
 ```
 VOODKA.exe                     full demo, all eight scenes (~70 fps, 1280x800 window)
-VOODKA.exe --scene <name>      start by canonical scene slug
 VOODKA.exe --scene <slug>      canonical scene selector (for example, gratki-woda)
 VOODKA.exe --part N             historical numeric scene selector alias (1..8)
 VOODKA.exe --modpos N          start at ModPos N  ((order<<8)|row)
 VOODKA.exe --order N           start at order N
 VOODKA.exe --ms N              start N milliseconds into the module
 VOODKA.exe --music <file>      override the module path
-VOODKA.exe --asm-audio          explicit alias for the default assembly player
+VOODKA.exe --asm-audio          historical alias for the default assembly player
 VOODKA_REFERENCE.exe --libxmp-audio  non-shipped C++/libxmp oracle path
 VOODKA.exe --libxmp-audio       rejected: production has no libxmp path
 VOODKA.exe --record <dir>      dump every frame (320x200 index + palette)
@@ -136,7 +143,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-88 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+88 tests: NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original

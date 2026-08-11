@@ -33,7 +33,6 @@ int64_t       g_nextTickCount = 0;
 void timerInit() {
     QueryPerformanceFrequency((LARGE_INTEGER*)&g_qpcFreq);
     QueryPerformanceCounter((LARGE_INTEGER*)&g_startCount);
-    double usPerQpc = 1e6 / (double)g_qpcFreq;
     // Calibrate to the actual QPC frequency precisely:
     g_nominalPeriodUs = 1e6 / kHertz;
     // start with next tick = now

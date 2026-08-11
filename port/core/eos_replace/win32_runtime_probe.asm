@@ -1,6 +1,6 @@
-; win32_runtime_probe.asm - no-CRT Win64 Win32/thread feasibility probe.
+; win32_runtime_probe.asm - standalone no-CRT Win64 Win32/thread validation probe.
 ;
-; Phase 3A deliberately keeps the scope small and observable.  The process
+; This standalone probe deliberately keeps the scope small and observable.  The process
 ; entry point, WNDCLASSEXA registration, hidden HWND, WndProc, message pump,
 ; worker thread, event, interlocked counter, exception-filter installation,
 ; and orderly teardown are all native x64 assembly.  The probe exits through
@@ -67,7 +67,7 @@ probe_window_title: db "VOODKA assembly runtime probe", 0
 
 section .text
 
-; The callback is installed as a real unhandled-exception filter.  Phase 3A
+; The callback is installed as a real unhandled-exception filter.  The probe
 ; validates registration and ABI reachability; later phases will add a
 ; deliberate exception and unwind-record verification.
 asm_runtime_probe_exception_filter:

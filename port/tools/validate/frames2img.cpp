@@ -14,8 +14,10 @@ static uint32_t crc32(const uint8_t* data, size_t n) {
     uint32_t crc = 0xFFFFFFFF;
     for (size_t i = 0; i < n; i++) {
         crc ^= data[i];
-        for (int k = 0; k < 8; k++)
-            crc = (crc >> 1) ^ (0xEDB88320 & -(crc & 1));
+        for (int k = 0; k < 8; k++) {
+            const uint32_t bit = crc & 1u;
+            crc = (crc >> 1) ^ (0xEDB88320u & (0u - bit));
+        }
     }
     return ~crc;
 }

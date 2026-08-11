@@ -1,9 +1,8 @@
-; win32_log_format.asm - the first production printf subset.
+; win32_log_format.asm - production fixed-format logger.
 ;
-; The shipped target keeps the C++ logger as a thin ABI wrapper while this
-; module owns the integer, pointer, character, narrow-string, wide-string,
-; and literal conversions. Floating-point and otherwise unsupported formats
-; deliberately remain on the C++ oracle path until their bytes are proven.
+; The shipped target owns integer, pointer, character, narrow-string,
+; wide-string, fixed-point floating-point, and literal conversions. The C++
+; implementation remains only in the non-shipped reference target.
 
 BITS 64
 DEFAULT REL

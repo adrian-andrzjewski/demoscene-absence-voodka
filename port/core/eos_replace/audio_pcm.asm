@@ -1,4 +1,4 @@
-; audio_pcm.asm - Phase 2F native 8-bit MOD sample mixer.
+; audio_pcm.asm - production 8-bit MOD sample mixer.
 ;
 ; The checked-in soundtrack uses signed 8-bit mono samples, forward loops,
 ; linear interpolation, stereo output, and libxmp's default integer downmix.

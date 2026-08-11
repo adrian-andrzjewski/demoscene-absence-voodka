@@ -1,4 +1,4 @@
-; audio_mod.asm - Phase 2B parser for the checked-in 14CH FastTracker module.
+; audio_mod.asm - production parser for the checked-in 14CH FastTracker module.
 ;
 ; This is an offline parser gate, not production playback yet.  It accepts the
 ; classic 14-channel MOD layout used by amnezja2.mod, validates all offsets and

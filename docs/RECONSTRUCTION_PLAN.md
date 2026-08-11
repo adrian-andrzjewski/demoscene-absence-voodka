@@ -1,10 +1,20 @@
 # Reconstruction plan & decision log
 
-Status snapshot: 2026-08-05 (Phase 7 asset-format audit complete). Updated
+## Final status (2026-08-11)
+
+The reconstruction and production migration are complete. The shipped
+`VOODKA.exe` is entirely NASM x64 with a native no-CRT entry point, NASM
+Win32/D3D11/WASAPI platform services, and the dedicated assembly audio player.
+The C++ reference and host tools remain intentionally separate for differential
+validation. The phase checklist below is retained as historical decision
+context, not as a list of unfinished production work.
+
+Historical status snapshots: 2026-08-05 (Phase 7 asset-format audit complete). Updated
 2026-08-06: processorek Nevosolek (P4) removed, then restored (see Phase 3 note). Updated
 2026-08-08: Phase 10 world-architecture analysis complete
 (`docs/WORLD_ARCHITECTURE.md`). This
-document records the audit, the decisions taken, and the remaining work.
+document records the audit, the decisions taken, and the historical work
+ledger; the final release state is recorded in `RELEASE_COMPLETION.md`.
 Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`,
 `WORLD_ARCHITECTURE.md` (the VR scene engine: worlds, objects, camera,
 render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
@@ -22,7 +32,8 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
   (`DIAMOND.OBJ`), `EOS.INC`, `macro.inc`, `sinus.inc`, and six compile-time
   `.pal` includes. A from-scratch TASM rebuild of the original is therefore
   impossible without reconstruction; the port replaces each piece
-  (`eos_replace/`, libxmp, generated sine tables, OBJ-recovered palettes).
+  (`eos_replace/`, the dedicated assembly audio player, generated sine tables,
+  and OBJ-recovered palettes).
 - **Assets:** all 76 runtime files exist in `CODE/LINKER/DANE/` and pack
   into `vodka.dat` (see `ASSETS.md` for the full index map). The release
   embeds the archive inside `VOODKA.EXE` (no external data file).
@@ -36,7 +47,7 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 
 | Decision | Choice | Rationale |
 |---|---|---|
-| Core language | **Keep the faithful NASM x64 core**; C++ references in the cross-check tests are the portable fallback | ~50 commits of validated work; byte-exact tests; zero regression risk. A full C++ retranslation was explicitly declined. |
+| Core language | **Keep the faithful NASM x64 demo and platform**; C++ references remain in separate cross-check targets | ~50 commits of validated work; byte-exact tests; zero regression risk. A full C++ retranslation was explicitly declined. |
 | Platform layer | Custom Win32 + D3D11 + WASAPI (no SDL) | Already complete and dependency-free; the brief allows this ("unless the repository already suggests a more suitable architecture"). |
 | VIRTUAL viewer | **Port at the end**, as a bonus exe | Not linked into the demo, not part of the shipped production; its VR engine is already ported (swiatynia city/torus ustep village (P2/P5)/P8 reuse it). |
 | Reference validation | **Scene-level DOSBox comparison + ModPos calibration** | Frame-exact automated diffing is unrealistic across different MOD players and timing bases; tolerance documented instead. |
@@ -132,8 +143,9 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
 - **ModPos calibration** (Phase 3): `kPartStartModPos` is derived from the
   parts' own exit thresholds; exact order/row at each scene transition in the
   *original* (DIAMOND player) may differ by a row - to be measured.
-- **14-channel module**: unusual (FastTracker 14CH per libxmp). DIAMOND was
-  a custom player; any playback nuance differences go to
+- **14-channel module**: unusual FastTracker 14CH format. DIAMOND was a custom
+  player; the shipped NASM player and the C++/libxmp oracle may have playback
+  nuances documented in
   `KNOWN_DIFFERENCES.md`. The file's 233,984-byte trailing region (61%) is
   inert for both players (ASSET_FORMATS.md 6.1).
 - **Odd-sized `.INC` blobs**: resolved by the Phase 7 audit - dimensions

@@ -1,9 +1,9 @@
 ; win32_app_startup.asm - production subsystem initialization coordinator.
 ;
-; The C++ host still owns configuration parsing and the reference executable
-; keeps its original C++ sequence.  Production passes one fixed-layout POD
-; record here so the shipped target owns the service order, quit checkpoints,
-; and ordinary-init rollback branches.
+; The production command-line parser constructs one fixed-layout configuration
+; record here, so the shipped target owns service order, quit checkpoints, and
+; ordinary-init rollback branches. The reference executable retains its C++
+; sequence solely as a differential oracle.
 
 BITS 64
 DEFAULT REL

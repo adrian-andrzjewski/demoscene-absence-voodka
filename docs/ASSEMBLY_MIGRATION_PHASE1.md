@@ -10,6 +10,10 @@ non-shipped `VOODKA_REFERENCE.exe` behavioral oracle.
 
 Snapshot date: **2026-08-10**
 
+This document is a historical phase record. Later migration work moved the
+remaining production Win32, audio, timing, logging, and lifecycle services to
+NASM; see `RELEASE_COMPLETION.md` for the final boundary.
+
 ## Gate structure
 
 Phase 1 was ordered from the riskiest interoperability proof to the real

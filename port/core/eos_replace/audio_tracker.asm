@@ -1,4 +1,4 @@
-; audio_tracker.asm - Phase 2C offline tracker/timing state machine.
+; audio_tracker.asm - production tracker/timing state machine.
 ;
 ; This is deliberately not production audio yet.  It reproduces the checked-in
 ; FastTracker module's order/row/tick timeline without calling Windows, C, or

@@ -4,7 +4,7 @@
 ; Scene: 4 sub-objects (222+81+8+256 verts, 440+158+12+384 faces) in one
 ; 567-vertex model space. Per-face texture mapping over 4 textures (sw.inc,
 ; v_txr1.inc, proc.inc, metal.inc) with three mapping modes (plane-pkt,
-; phong-n_rot, standard-pos), its OWN textured-triangle rasterizer (face),
+; phong-n_rot, standard-pos), and a dedicated textured-triangle rasterizer,
 ; Euler-angle object (ob1..9) + camera (ca1..9) rotation matrices, a 2,964-key
 ; camera path (vodka 74 -> trasa.dat; swing-clamp ruchow=2,951), a scrolling
 ; logo overlay and a picture + flash outro.
@@ -26,7 +26,7 @@
 ; show() resolves mapN_sel -> sel_base_table and keeps the texture base in fsq
 ; (per face) and the screen base in esq (once) - mirrors txtr.asm / p8.
 ;
-; ABI: 8-push prologue + sub 0x28 -> RSP%16==0 at every NASM->C++/EOS call.
+; ABI: 8-push prologue + sub 0x28 -> RSP%16==0 at every NASM->platform call.
 
 BITS 64
 DEFAULT REL

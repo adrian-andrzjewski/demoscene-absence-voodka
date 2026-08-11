@@ -3,6 +3,11 @@
 Status: **Phase 2A through Phase 2X passed; libxmp is reference-only for the shipped demo**
 Snapshot date: **2026-08-10**
 
+This document is a historical phase record. The shipped target now uses the
+dedicated assembly player described at the top; later paragraphs retain their
+original dated wording to preserve migration provenance. Final release
+evidence is in `RELEASE_COMPLETION.md`.
+
 Phase 2 is the next feasibility gate after the D3D11 presenter. The shipped
 production application now uses the dedicated assembly player and no longer
 compiles `audio.cpp` or links `xmp_static`. The C++/libxmp implementation is

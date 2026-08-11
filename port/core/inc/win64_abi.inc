@@ -1,9 +1,7 @@
-; win64_abi.inc - Phase 0 x64 ABI contract for the Windows demo target.
+; win64_abi.inc - MS x64 ABI contract for the Windows demo target.
 ;
-; This file is intentionally declarative. It centralizes the rules that all
-; future NASM platform replacements must obey, without changing the current
-; runtime implementation. The current C++ bridge remains the reference
-; implementation until the corresponding migration gate is passed.
+; This file is intentionally declarative. It centralizes the rules shared by
+; the production NASM platform and the separate C++ differential oracle.
 
 %ifndef VOODKA_WIN64_ABI_INC
 %define VOODKA_WIN64_ABI_INC
@@ -29,7 +27,7 @@
 
 ; eos_dispatch saves RBP plus RBX, RSI, RDI, and R12-R15 (8 registers = 64
 ; bytes). At entry RSP%16 is 8; after those pushes it is 8 again. Reserving
-; 0x28 bytes leaves RSP%16 == 0 at every call into the C++ bridge and supplies
+; 0x28 bytes leaves RSP%16 == 0 at every call into a Windows service and supplies
 ; the mandatory 0x20-byte home area plus 8 bytes of local alignment space.
 %define WIN64_EOS_DISPATCH_SAVED_BYTES       0x40
 %define WIN64_EOS_DISPATCH_CALL_FRAME_BYTES  0x28
@@ -40,9 +38,8 @@
 ; At the caller's RSP before CALL, the fifth argument is [rsp+0x20]. After
 ; CALL pushes the return address, the callee observes it at [rsp+0x28].
 
-; The bridge's current exported C symbols are deliberately not declared here:
-; their signatures belong in the platform ABI header while the C++ layer is
-; active. Once a subsystem is replaced, its NASM-owned entry points should be
-; added here together with fixed-width argument/return documentation.
+; Public service signatures are documented beside their NASM implementations
+; and validation ABIs. Keep fixed-width argument and return contracts there;
+; do not introduce compiler-generated platform wrappers into VOODKA.exe.
 
 %endif

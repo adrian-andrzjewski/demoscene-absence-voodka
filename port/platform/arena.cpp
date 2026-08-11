@@ -113,7 +113,9 @@ bool loadArchive() {
     c2.push_back(dir + L"data\\vodka.dat");
     c2.push_back(dir + L"vodka.dat");
     // dev-tree fallback (configure-time repo root; ASCII-safe widening)
-    std::wstring dev(VOODKA_REPO_ROOT, VOODKA_REPO_ROOT + strlen(VOODKA_REPO_ROOT));
+    const char* root = VOODKA_REPO_ROOT;
+    const size_t rootLength = strlen(root);
+    std::wstring dev(root, root + rootLength);
     c2.push_back(dev + L"/port/data/vodka.dat");
 
     for (auto& c : c2) {

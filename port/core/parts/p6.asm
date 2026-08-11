@@ -43,9 +43,6 @@ bump_y:      dd 0
 bump_x_base: dd 0
 bump_y_base: dd 0
 
-; resolve stored dword offset (in [mem]) -> real 64-bit pointer in rax
-; (unused helper kept for reference)
-
 section .text
 
 ; ---------------------------------------------------------------- part6 ----

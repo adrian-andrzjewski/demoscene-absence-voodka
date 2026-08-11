@@ -189,12 +189,18 @@ static std::string resolveMusicPath(const char* overridePath) {
         dir + L"amnezja2.mod",
     };
     // dev-tree fallback (configure-time repo root; ASCII-safe widening)
-    std::wstring dev(VOODKA_REPO_ROOT, VOODKA_REPO_ROOT + strlen(VOODKA_REPO_ROOT));
+    std::wstring dev;
+    for (const char* p = VOODKA_REPO_ROOT; *p; ++p) {
+        dev.push_back(static_cast<wchar_t>(static_cast<unsigned char>(*p)));
+    }
     cands.push_back(dev + L"/music/amnezja2.mod");
     for (auto& c : cands) {
         if (exists(c)) {
             // the module filename is ASCII, so narrowing is lossless here
-            return std::string(c.begin(), c.end());
+            std::string result;
+            result.reserve(c.size());
+            for (wchar_t ch : c) result.push_back(static_cast<char>(ch));
+            return result;
         }
     }
     return std::string();
@@ -324,7 +330,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
 #if defined(VOODKA_REFERENCE_BUILD)
         asmPresenter = explicitAsmPresenter;
 #else
-        (void)explicitAsmPresenter; // --asm-present remains a compatibility alias.
+        (void)explicitAsmPresenter; // reference-only presenter comparison selector.
 #endif
         const bool explicitAsmAudio =
             cmd.find("--asm-audio") != std::string::npos;

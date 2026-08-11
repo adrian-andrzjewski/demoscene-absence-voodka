@@ -1,7 +1,8 @@
 # Porting notes - architecture & hard-won invariants
 
 How the 1996 TASM/DOS demo became a native Windows x64 program without
-losing behavioral fidelity. Read this before touching `port/core`.
+losing behavioral fidelity. Read this before touching `port/core` or the
+NASM platform modules.
 For the asset formats themselves (container, palettes, bitmaps, V3D/V3M,
 paths, water/bump data, MOD, presentation conversion) see
 `docs/ASSET_FORMATS.md`.
@@ -10,22 +11,22 @@ paths, water/bump data, MOD, presentation conversion) see
 
 ```
 +----------------------------------------------------------+
-|  port/platform (C++17, Win32)                            |
-|   app.cpp  window/CLI/crash filter   d3d11_dispatch.cpp |
-|   audio.cpp (libxmp+WASAPI)          timer.cpp (QPC 70Hz)|
-|   arena.cpp (64MB arena + archive)   input/pause/progress|
-|   bridge.cpp  <-- the ONLY C symbols NASM may call (vk_*)|
+| VOODKA.exe: NASM x64 production image                    |
+|   core/eos_replace  entry, EOS services, Win32, audio    |
+|   core/engine       rasterizers, transforms, VR engine   |
+|   core/parts        P1..P8 and generated scene data      |
+|   platform/*.asm    D3D11, WASAPI, timing, ABI, shutdown |
 +---------------------------+------------------------------+
-                            | extern "C", MS x64 ABI
+                            | explicit MS x64 ABI
 +---------------------------v------------------------------+
-|  port/core (NASM x64, faithful port of the TASM sources) |
-|   eos_replace/  boot.asm(DemoStart32) eos_dispatch toonel|
-|   engine/       engine txtr mrotate cammat persp v2d ... |
-|   parts/        p1..p8 (+ generated/data includes)       |
+| Non-shipped validation graph                             |
+|   VOODKA_REFERENCE.exe  C++/libxmp behavioral oracle      |
+|   tools/validate        differential and lifecycle tests  |
+|   tools/*               packers, viewers, converters      |
 +----------------------------------------------------------+
 ```
 
-- The demo core is **kept in assembly on purpose**: it is a line-faithful
+- The demo and its Windows platform are **kept in assembly on purpose**: it is a line-faithful
   port, so every effect retains its original arithmetic (fixed-point,
   16/32-bit wraparound, FPU quirks). Behavior parity matters more than
   language purity.
@@ -36,7 +37,7 @@ paths, water/bump data, MOD, presentation conversion) see
 
 ## Memory model (the one arena rule)
 
-- The whole demo universe is **one 64 MB arena** (`arena.cpp`,
+- The whole demo universe is **one 64 MB arena** (`win32_arena.asm`,
   `VirtualAlloc`). The demo stores 32-bit `Code32_addr`-relative offsets in
   dwords; add the qword `Code32_addr` base before dereferencing.
 - Two VGA overlays are at fixed arena offsets (`platform_abi.h`):
@@ -53,7 +54,7 @@ paths, water/bump data, MOD, presentation conversion) see
 
 ## ABI rule (critical, #1 crash source)
 
-Every NASM -> C++ call must have **`RSP % 16 == 0` at the `call`**.
+Every NASM -> Windows ABI call must have **`RSP % 16 == 0` at the `call`**.
 Prologue accounting: at function entry `RSP % 16 == 8`; after `push rbp` it
 is 0; each extra push moves it by 8. Examples:
 
@@ -62,8 +63,8 @@ is 0; each extra push moves it by 8. Examples:
 - an *inlined* block that pushes rbp + subs must reach 0 relative to the
   enclosing body
 
-Getting this wrong crashes inside MSVCRT / the NVIDIA D3D stack with /GS
-cookie or stack faults. When in doubt, count pushes.
+Getting this wrong crashes inside Win32, COM, or the NVIDIA D3D stack with
+stack faults. When in doubt, count pushes.
 
 ## EOS kernel replacement
 
@@ -74,22 +75,23 @@ never in the repo). The port reimplements the used services:
   `EOS.INC` is absent, so these ids are our own) plus
   `AllocateMemory`/`AllocateMemoryFree`/`LoadFile`/`WaitVbl` macros.
 - `eos_replace/eos_dispatch.asm` adapts the EOS register convention to the
-  MS x64 ABI and forwards to `bridge.cpp`:
+  MS x64 ABI and forwards to NASM-owned platform services:
   memory/selector alloc, `wait_vbl`, `Get_Info` (ModPos), file load.
-- `wait_vbl` = QPC-paced ~70 Hz retrace emulation (`timer.cpp`), sleep+spin.
+- `wait_vbl` = QPC-paced ~70 Hz retrace emulation (`platform/timer.asm`),
+  sleep+spin.
 - Audio services (`Load_module`/`Play_module`/`Stop_module`...) are
   deliberate no-ops in the dispatcher: the module is loaded and auto-started
-  by the platform (`audio.cpp`) before `DemoStart32` runs. Only nad czerwonym lampa (P8)'s final
+  by the NASM audio service before `DemoStart32` runs. Only nad czerwonym lampa (P8)'s final
   `EOS_STOP_MODULE` reaches the platform.
 - Keyboard: EOS hooked int 09 and exposed a scancode `Key_Map`; the port
-  fills the same table from Win32 messages (`input.cpp` maps virtual keys ->
+  fills the same table from Win32 messages (`win32_input.asm` maps virtual keys ->
   PC scancodes, layout-independent).
 
 ## Selectors (fs/gs are off-limits in user-mode x64)
 
 The original allocates *selectors* for texture data and reads them via
 `fs:[...]`. User-mode x64 forbids arbitrary fs/gs bases, so
-`sel_base_table[512]` in `bridge.cpp` maps `Allocate_Selector` handles to
+`sel_base_table[512]` in `win32_arena.asm` maps `Allocate_Selector` handles to
 base pointers; the texture mappers read the base up front
 (`engine/txtr.asm`, nad czerwonym lampa (P8)'s dual mapper).
 
@@ -165,9 +167,9 @@ pointer advancement.**
   texture and the 768-byte palette to a 256x1 texture; a point-sampled
   fullscreen quad maps indices through the palette - pixel-identical to VGA
   DAC behavior, 4x integer upscale into a 1280x800 window. The shipped
-  `d3d11_dispatch.cpp` exposes the platform ABI and owns only recording and
-  diagnostic file I/O; the full `d3d11_present.cpp` implementation is retained
-  in `VOODKA_REFERENCE.exe` for differential validation.
+  `win32_d3d_dispatch.asm` exposes the platform ABI; recording, diagnostics,
+  and the complete presenter lifecycle are NASM-owned. The C++ presenter is
+  retained only in `VOODKA_REFERENCE.exe` for differential validation.
 - **Sampler pitfall (audit 2026-08-05):** the point sampler must be created
   with every `D3D11_SAMPLER_DESC` field set. The original code only set
   `Filter`/`AddressU/V`, leaving `AddressW=0` (not a valid address mode) in
@@ -197,14 +199,15 @@ pointer advancement.**
 
 - Original: DIAMOND.OBJ player (binary-only) driven by EOS, 44,000 Hz,
   "SB & GUZ ONLY".
-- Port: **libxmp 4.6.2** (vendored, statically linked) + event-driven WASAPI
-  render thread at 44,100 Hz / 2 ch (`audio.cpp`). The module is a
-  14-channel FastTracker file ("<>Amnezja<>", 42 orders).
+- Port: dedicated NASM parser, tracker, effect engine, mixer, PCM ring, and
+  event-driven WASAPI render worker at 44,100 Hz / 2 ch. The module is a
+  14-channel FastTracker file ("<>Amnezja<>", 42 orders). libxmp 4.6.2 is
+  retained only for `VOODKA_REFERENCE.exe` and host-side differential tests.
 - `ModPos = (order << 8) | row` is the demo's timeline currency; the parts
-  poll it via EOS `Get_Info`. `audio.cpp` tracks it with loop handling and
+  poll it via EOS `Get_Info`. The NASM audio controller tracks it with loop handling and
   supports canonical scene seeks (`--scene`) plus historical numeric
   `--part`, `--modpos`, `--ms`, and `--order`. Scene-start constants
-  (`kPartStartModPos` in `app.cpp`) are calibration-tuned - see
+  (`win32_app_modes.asm`) are calibration-tuned - see
   `docs/KNOWN_DIFFERENCES.md`.
 
 ## Lifecycle / global quit (the quit path)
@@ -215,17 +218,17 @@ pointer advancement.**
   consumers. A titlebar-X close likewise must not just destroy the window
   (`WM_DESTROY -> PostQuitMessage`); something still on the main thread has to
   notice and run the teardown.
-- `input.cpp` starts a small Win32 watchdog before archive/module/scene
+- `win32_input.asm` starts a small Win32 watchdog before archive/module/scene
   loading. It watches `VK_ESCAPE` with `GetAsyncKeyState` and sets the same
   atomic quit request as `WndProc`, so ESC is not dependent on the per-frame
   message pump. `waitVbl` checks the request during its pacing spin and
   `presentFrame` checks it before touching D3D11 state.
-- The chain: `WM_CLOSE` (explicit in `app.cpp`'s `WndProc`) -> `DestroyWindow`
+- The chain: `WM_CLOSE` (explicit in the NASM WndProc) -> `DestroyWindow`
   -> `WM_DESTROY` -> `PostQuitMessage(0)` -> **`WM_QUIT`** lands in
   `updateInput()` (called from `waitVbl` and `presentFrame` every frame).
   `updateInput` records it (`vk::requestQuit`/`quitRequested`) instead of
   dispatching - `WM_QUIT` has no window.
-- The per-frame choke points (`waitVbl` in `timer.cpp` - including its
+- The per-frame choke points (`waitVbl` in `timer.asm` - including its
   pause-park loop - and `presentFrame`) call `vk::shutdownAndExit()` when a
   quit is pending. The idempotent sequence stops/join the input and WASAPI
   workers, closes recording/readback files, releases D3D11 resources, clears

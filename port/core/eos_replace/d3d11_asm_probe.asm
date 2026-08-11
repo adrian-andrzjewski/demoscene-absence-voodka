@@ -1,8 +1,7 @@
-; d3d11_asm_probe.asm - direct Win64 D3D11/COM feasibility probe.
+; d3d11_asm_probe.asm - standalone Win64 D3D11/COM validation probe.
 ;
-; This is Phase 1 validation code. It deliberately owns the D3D11 calls in
-; NASM instead of forwarding them through C++. The existing C++ presenter is
-; still the production reference until the complete presenter gate passes.
+; This is validation-only code. It deliberately owns the D3D11 calls in NASM
+; so the host can exercise the ABI independently of the production presenter.
 ;
 ; The probe creates a hardware D3D11 device and swap chain, obtains the
 ; backbuffer through IDXGISwapChain::GetBuffer, creates an RTV, clears it,

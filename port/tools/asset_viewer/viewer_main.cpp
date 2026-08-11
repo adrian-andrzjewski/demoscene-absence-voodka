@@ -325,7 +325,9 @@ void loadWorldModels() {
     std::wstring wdir(exePath);
     auto slash = wdir.find_last_of(L"\\/");
     if (slash != std::wstring::npos) wdir = wdir.substr(0, slash + 1);
-    std::string dir(wdir.begin(), wdir.end());   // exe dir is ASCII here
+    std::string dir;
+    dir.reserve(wdir.size());
+    for (wchar_t ch : wdir) dir.push_back(static_cast<char>(ch));
 
     std::vector<std::string> cands;
     cands.push_back(dir + "data\\world");

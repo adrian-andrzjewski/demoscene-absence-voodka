@@ -1,4 +1,4 @@
-# platform/CMakeLists.txt - Windows platform sources and C++ reference/tool layer.
+# platform/CMakeLists.txt - NASM production platform and C++ reference layer.
 
 set(VOODKA_PLATFORM_COMMON_SOURCES
     audio_controller.asm
@@ -111,7 +111,7 @@ configure_voodka_platform_target(VOODKA)
 target_compile_definitions(VOODKA PRIVATE VOODKA_ASSEMBLY_PLATFORM=1)
 
 # Non-shipped behavioral oracle. This target is intentionally separate from
-# VOODKA so libxmp cannot enter the production dependency graph.
+# VOODKA so C++, the CRT, and libxmp cannot enter the production graph.
 add_executable(VOODKA_REFERENCE WIN32 ${VOODKA_REFERENCE_SOURCES})
 configure_voodka_platform_target(VOODKA_REFERENCE)
 target_compile_definitions(VOODKA_REFERENCE PRIVATE VOODKA_REFERENCE_BUILD=1)

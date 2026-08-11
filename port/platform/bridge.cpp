@@ -258,7 +258,7 @@ const char* vk_app_resolve_music_path(const char* overridePath) {
 }
 
 // entry-scene selector: 0 = run the full sequence (default), 1..8 = run only
-// that scene. Numeric --part remains a compatibility/debugging alias.
+// that scene. Numeric --part remains a historical selector.
 static int g_entry_scene = 0;
 void vk_set_entry_scene(int scenePart) { g_entry_scene = scenePart; }
 int  vk_get_entry_scene()              { return g_entry_scene; }

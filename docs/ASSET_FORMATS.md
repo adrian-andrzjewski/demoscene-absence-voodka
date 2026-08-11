@@ -533,7 +533,8 @@ EOS/DIAMOND (`DIAMOND.OBJ`, binary-only): `Load_Module` with **bx = 44,000**
 requested Hz (`DEMO.AS^:112`), `Set_Pattern 0`, `Play_Module`. Measured
 DOSBox/SB16 playback is ~5% slow (fit r = 0.950; hypothesis: SB16 DSP time
 constant quantization 44,000 → 41,667 Hz, ≈0.9 semitone flat) — the port
-plays pitch-correct at 44,100 Hz via libxmp+WASAPI (documented, not "fixed").
+plays pitch-correct at 44,100 Hz via the dedicated NASM tracker/mixer and
+WASAPI worker (documented, not "fixed"). libxmp is a reference oracle only.
 
 **ModPos = (order << 8) | row** — proven by `DEMO.AS^:240-244`
 (`mov al,bl` merges BL's row into AH's order), oko + szklo (P1)'s `and bx,0ff00h / sub bh,2`

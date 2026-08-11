@@ -1,7 +1,8 @@
 ; eos_dispatch.asm - the flat-model EOS service dispatcher.
 ;
 ; Receives the service id in eax and register args per eos.inc, adapts to the
-; C++ platform layer (Microsoft x64 ABI) and restores EOS-style results.
+; NASM Windows platform layer (Microsoft x64 ABI) and restores EOS-style
+; results.
 ;
 ; Calling convention used for platform calls (Microsoft x64):
 ;   rcx, rdx, r8, r9  = first four args (int/ptr), caller cleans the stack.

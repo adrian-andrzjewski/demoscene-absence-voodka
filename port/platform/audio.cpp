@@ -1,5 +1,5 @@
-// audio.cpp - music via vendored libxmp + Windows WASAPI (event-driven render
-// thread). Scenes sync to the module position via getModPos().
+// audio.cpp - C++ reference music path via vendored libxmp + Windows WASAPI.
+// Scenes sync to the module position via getModPos(); production uses assembly.
 //
 // NOTE: exact Sound Blaster mixing/filters are not bit-reproducible; this is
 // an unavoidable difference. Position/timing sync is preserved.
@@ -178,16 +178,16 @@ static bool splitRows(uint32_t rows, long* loopOut, long* orderOut, long* rowOut
         long acc = 0;
         for (int o = 0; o < mi.mod->len; o++) {
             int p = mi.mod->xxo[o];
-            long rows = (p >= 0 && p < mi.mod->pat && mi.mod->xxp[p])
+            long orderRows = (p >= 0 && p < mi.mod->pat && mi.mod->xxp[p])
                             ? mi.mod->xxp[p]->rows : 64;
-            if (rest < acc + rows) {
+            if (rest < acc + orderRows) {
                 *loopOut = loop;
                 *orderOut = o;
                 *rowOut = rest - acc;
                 ok = true;
                 break;
             }
-            acc += rows;
+            acc += orderRows;
         }
         if (!ok && mi.mod->len > 0) {          // target at/after end of a pass
             *loopOut = loop == 0 ? 0 : loop;   // clamp into the last order

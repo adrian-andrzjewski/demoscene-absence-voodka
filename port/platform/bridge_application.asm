@@ -571,6 +571,7 @@ vk_app_log_automation_failure:
 
 vk_app_log_automation:
         sub     rsp, 0x28
+        mov     r9d, edx
         test    ecx, ecx
         jns     .pause_enabled
         lea     rdx, [rel app_off_string]
@@ -578,7 +579,7 @@ vk_app_log_automation:
 .pause_enabled:
         lea     rdx, [rel app_enabled_string]
 .pause_ready:
-        test    r8d, r8d
+        test    r9d, r9d
         jns     .close_enabled
         lea     r8, [rel app_off_string]
         jmp     .automation_log

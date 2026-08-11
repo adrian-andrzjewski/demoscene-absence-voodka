@@ -139,8 +139,8 @@ void requestQuit();          // mark a quit request (earliest source wins)
 bool quitRequested();        // ESC or a window-close is pending
 void resetSelectors();       // release the emulated selector table
 
-// ---- audio (libxmp MOD player) ----------------------------------------------
-void audioSetAssemblyMode(bool enabled); // production default; false = libxmp oracle
+// ---- audio (assembly player; C++ reference can select libxmp) ---------------
+void audioSetAssemblyMode(bool enabled); // production default; false = oracle
 int  audioInit(const char* modFilePath, int sampleRate);
 void audioShutdown();
 int  audioPlay();

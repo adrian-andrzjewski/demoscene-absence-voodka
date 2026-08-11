@@ -1,4 +1,4 @@
-; audio_event.asm - Phase 2D native MOD event decoder.
+; audio_event.asm - production MOD event decoder.
 ;
 ; The checked-in soundtrack is a 14-channel FastTracker MOD whose packed
 ; pattern records use the classic four-byte ProTracker event format.  This

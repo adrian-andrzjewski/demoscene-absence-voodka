@@ -149,9 +149,9 @@ face sorts the three vertices by y, computes 16.16 edge slopes, computes
 16-bit UV slopes, clips the vertical span to rows 0..199, and fills one
 scanline at a time. Horizontal middle-edge handling is selected by pom.
 The source rasterizer writes directly to the indexed framebuffer and is
-opaque. The port retains the same projected/cull/sort decisions; its processorek Nevosolek (P4)
-bounded C++ triangle helper is a compatibility implementation of the
-assembly scan conversion, not a new material model.
+opaque. The port retains the same projected/cull/sort decisions; its processorek
+Nevosolek (P4) bounded NASM triangle helper is the production scan conversion.
+The C++ triangle implementation remains only as a differential oracle.
 
 ## 3. processorek Nevosolek (P4): tunnel, plate, CPU detail, and chrome object
 
@@ -816,7 +816,8 @@ port/core/parts/p8_more.asm, and the shared engine files. The significant
 implementation differences are:
 
 - The 32-bit DOS arena and selectors are represented by a 64 MB arena plus
-  32-bit arena offsets. C++ receives resolved pointers through bridge.cpp.
+  32-bit arena offsets. NASM resolves pointers through the selector/arena
+  service; the C++ bridge remains only in the reference target.
   Arbitrary x64 FS/GS selector bases are not used.
 - The original processorek Nevosolek/nad czerwonym lampa (P4/P8) face routine writes VGA memory. The port writes an
   indexed backbuffer and explicitly presents it through D3D11. Direct VGA
@@ -824,8 +825,8 @@ implementation differences are:
   port.
 - processorek Nevosolek (P4)’s broad-span x64 translation had a coverage defect that could leave
   disconnected triangles. Projection, culling, sorting, UV packing, and
-  palette offsets remain in the NASM core, while vk_processorek_nevosolek_draw_triangle in
-  bridge.cpp provides a bounded 320x200 scan conversion helper.
+  palette offsets remain in the NASM core, while the NASM platform rasterizer
+  provides bounded 320x200 scan conversion; the C++ version is oracle-only.
 - nad czerwonym lampa (P8)’s original rcalc/check indexing was byte-stride sensitive. The port
   moved these high-volume scratch arrays to the arena and preserved the
   reference byte*2 index convention. The earlier *4 port stride caused the
@@ -842,8 +843,8 @@ implementation differences are:
   while the port’s generated table has a measured maximum Q15 difference of
   about 201 units. This can produce small phase/edge differences in rotation,
   bob, and sprite timing without changing scene structure.
-- EOS wait_vbl is QPC-paced near 70 Hz and libxmp supplies the modern audio
-  clock. The original DOS/SB16 playback is approximately five percent slower
+- EOS wait_vbl is QPC-paced near 70 Hz and the NASM audio controller supplies
+  the modern audio clock. The original DOS/SB16 playback is approximately five percent slower
   in wall-clock time. Scene boundaries and frame-delta animation are
   ModPos/tick aligned, but absolute pacing and audio pitch are not bit-identical.
 - Current validation covers crash-free full playthroughs, archive/palette

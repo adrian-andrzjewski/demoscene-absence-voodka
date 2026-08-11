@@ -3,7 +3,7 @@
 ; These are the second bridge slice.  They preserve the existing C ABI used by
 ; eos_dispatch.asm while forwarding directly to the already assembly-owned
 ; QPC/timer and dedicated-player namespace ABI.  The reference target keeps
-; bridge.cpp so its C++ timer/libxmp implementation remains the oracle.
+; The C++ reference implementation remains the timer/libxmp oracle.
 
 BITS 64
 DEFAULT REL

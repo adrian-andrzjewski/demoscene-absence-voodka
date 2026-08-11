@@ -1,7 +1,8 @@
 ; win32_log.asm - production low-level file logging sink.
 ;
-; C++ retains printf-style formatting for message compatibility. NASM owns the
-; Windows file/critical-section lifecycle and byte writes used by VOODKA.exe.
+; NASM owns formatting, the Windows file/critical-section lifecycle, and byte
+; writes used by VOODKA.exe. The reference target retains its C++ logger as an
+; independent formatting oracle.
 
 BITS 64
 DEFAULT REL
