@@ -64,6 +64,8 @@ DEFAULT REL
 %define CONTEXT_COPY_RESOURCE           47
 %define CONTEXT_CLEAR_RTV               50
 %define CONTEXT_DRAW                    13
+%define CONTEXT_CLEAR_STATE             110
+%define CONTEXT_FLUSH                   111
 
 %define SWAPCHAIN_PRESENT               8
 %define SWAPCHAIN_GETBUFFER             9
@@ -146,6 +148,7 @@ DEFAULT REL
 %define MAPPED_PDATA                    0
 %define MAPPED_ROW_PITCH                8
 
+extern asm_log_write
 extern D3D11CreateDeviceAndSwapChain
 
 global asm_present_init
@@ -218,6 +221,41 @@ align 4
 pres_clear_color:
         dd 0, 0, 0, 0x3F800000
 
+; Temporary teardown trace; remove after localizing the intermittent release
+; fault. The assembly logger writes synchronously to the package log.
+pres_trace_staging: db "[d3d-shutdown] staging", 10
+pres_trace_staging_len equ $ - pres_trace_staging
+pres_trace_rtv: db "[d3d-shutdown] rtv", 10
+pres_trace_rtv_len equ $ - pres_trace_rtv
+pres_trace_rasterizer: db "[d3d-shutdown] rasterizer", 10
+pres_trace_rasterizer_len equ $ - pres_trace_rasterizer
+pres_trace_sampler: db "[d3d-shutdown] sampler", 10
+pres_trace_sampler_len equ $ - pres_trace_sampler
+pres_trace_pixel_shader: db "[d3d-shutdown] pixel-shader", 10
+pres_trace_pixel_shader_len equ $ - pres_trace_pixel_shader
+pres_trace_vertex_shader: db "[d3d-shutdown] vertex-shader", 10
+pres_trace_vertex_shader_len equ $ - pres_trace_vertex_shader
+pres_trace_input_layout: db "[d3d-shutdown] input-layout", 10
+pres_trace_input_layout_len equ $ - pres_trace_input_layout
+pres_trace_vertex_buffer: db "[d3d-shutdown] vertex-buffer", 10
+pres_trace_vertex_buffer_len equ $ - pres_trace_vertex_buffer
+pres_trace_palette_srv: db "[d3d-shutdown] palette-srv", 10
+pres_trace_palette_srv_len equ $ - pres_trace_palette_srv
+pres_trace_palette_texture: db "[d3d-shutdown] palette-texture", 10
+pres_trace_palette_texture_len equ $ - pres_trace_palette_texture
+pres_trace_index_srv: db "[d3d-shutdown] index-srv", 10
+pres_trace_index_srv_len equ $ - pres_trace_index_srv
+pres_trace_index_texture: db "[d3d-shutdown] index-texture", 10
+pres_trace_index_texture_len equ $ - pres_trace_index_texture
+pres_trace_backbuffer: db "[d3d-shutdown] backbuffer", 10
+pres_trace_backbuffer_len equ $ - pres_trace_backbuffer
+pres_trace_context: db "[d3d-shutdown] context", 10
+pres_trace_context_len equ $ - pres_trace_context
+pres_trace_device: db "[d3d-shutdown] device", 10
+pres_trace_device_len equ $ - pres_trace_device
+pres_trace_swap: db "[d3d-shutdown] swap", 10
+pres_trace_swap_len equ $ - pres_trace_swap
+
 section .text
 
 pres_vs_blob:
@@ -236,96 +274,157 @@ pres_release_all:
         ; Entry is reached by CALL from an aligned frame, so the return
         ; address makes RSP%16==8 here. Align every COM Release call.
         sub     rsp, 0x28
+        ; Drain the immediate context before releasing resources. D3D11 keeps
+        ; deferred GPU work alive through the context; ClearState + Flush is
+        ; the required teardown barrier for drivers that validate resource
+        ; lifetime asynchronously.
+        mov     rcx, [rel pres_context]
+        test    rcx, rcx
+        jz      .context_drained
+        mov     rax, [rcx]
+        call    qword [rax + CONTEXT_CLEAR_STATE * 8]
+        mov     rcx, [rel pres_context]
+        mov     rax, [rcx]
+        call    qword [rax + CONTEXT_FLUSH * 8]
+.context_drained:
+        lea     rcx, [rel pres_trace_staging]
+        mov     edx, pres_trace_staging_len
+        call    asm_log_write
         mov     rcx, [rel pres_staging]
         test    rcx, rcx
         jz      .staging_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .staging_done:
+        lea     rcx, [rel pres_trace_rtv]
+        mov     edx, pres_trace_rtv_len
+        call    asm_log_write
         mov     rcx, [rel pres_rtv]
         test    rcx, rcx
         jz      .rtv_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .rtv_done:
+        lea     rcx, [rel pres_trace_rasterizer]
+        mov     edx, pres_trace_rasterizer_len
+        call    asm_log_write
         mov     rcx, [rel pres_rasterizer]
         test    rcx, rcx
         jz      .ras_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .ras_done:
+        lea     rcx, [rel pres_trace_sampler]
+        mov     edx, pres_trace_sampler_len
+        call    asm_log_write
         mov     rcx, [rel pres_sampler]
         test    rcx, rcx
         jz      .samp_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .samp_done:
+        lea     rcx, [rel pres_trace_pixel_shader]
+        mov     edx, pres_trace_pixel_shader_len
+        call    asm_log_write
         mov     rcx, [rel pres_pixel_shader]
         test    rcx, rcx
         jz      .ps_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .ps_done:
+        lea     rcx, [rel pres_trace_vertex_shader]
+        mov     edx, pres_trace_vertex_shader_len
+        call    asm_log_write
         mov     rcx, [rel pres_vertex_shader]
         test    rcx, rcx
         jz      .vs_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .vs_done:
+        lea     rcx, [rel pres_trace_input_layout]
+        mov     edx, pres_trace_input_layout_len
+        call    asm_log_write
         mov     rcx, [rel pres_input_layout]
         test    rcx, rcx
         jz      .il_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .il_done:
+        lea     rcx, [rel pres_trace_vertex_buffer]
+        mov     edx, pres_trace_vertex_buffer_len
+        call    asm_log_write
         mov     rcx, [rel pres_vertex_buffer]
         test    rcx, rcx
         jz      .vb_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .vb_done:
+        lea     rcx, [rel pres_trace_palette_srv]
+        mov     edx, pres_trace_palette_srv_len
+        call    asm_log_write
         mov     rcx, [rel pres_palette_srv]
         test    rcx, rcx
         jz      .pal_srv_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .pal_srv_done:
+        lea     rcx, [rel pres_trace_palette_texture]
+        mov     edx, pres_trace_palette_texture_len
+        call    asm_log_write
         mov     rcx, [rel pres_palette_texture]
         test    rcx, rcx
         jz      .pal_tex_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .pal_tex_done:
+        lea     rcx, [rel pres_trace_index_srv]
+        mov     edx, pres_trace_index_srv_len
+        call    asm_log_write
         mov     rcx, [rel pres_index_srv]
         test    rcx, rcx
         jz      .idx_srv_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .idx_srv_done:
+        lea     rcx, [rel pres_trace_index_texture]
+        mov     edx, pres_trace_index_texture_len
+        call    asm_log_write
         mov     rcx, [rel pres_index_texture]
         test    rcx, rcx
         jz      .idx_tex_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .idx_tex_done:
+        lea     rcx, [rel pres_trace_backbuffer]
+        mov     edx, pres_trace_backbuffer_len
+        call    asm_log_write
         mov     rcx, [rel pres_backbuffer]
         test    rcx, rcx
         jz      .back_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .back_done:
+        lea     rcx, [rel pres_trace_context]
+        mov     edx, pres_trace_context_len
+        call    asm_log_write
         mov     rcx, [rel pres_context]
         test    rcx, rcx
         jz      .ctx_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .ctx_done:
+        lea     rcx, [rel pres_trace_device]
+        mov     edx, pres_trace_device_len
+        call    asm_log_write
         mov     rcx, [rel pres_device]
         test    rcx, rcx
         jz      .dev_done
         mov     rax, [rcx]
         call    qword [rax + IUNKNOWN_RELEASE * 8]
 .dev_done:
+        lea     rcx, [rel pres_trace_swap]
+        mov     edx, pres_trace_swap_len
+        call    asm_log_write
         mov     rcx, [rel pres_swap]
         test    rcx, rcx
         jz      .swap_done
