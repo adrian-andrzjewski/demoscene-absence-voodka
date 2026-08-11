@@ -67,6 +67,7 @@ uint64_t vk_selector_base(uint16_t handle) {
 #endif
 
 // Original EOS wait_vbl returns the ticks SINCE THE PREVIOUS CALL (~1 per
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 // frame), not the absolute retrace counter: every part stores the result into
 // ramki/frames and uses it as a per-frame delta multiplier. Returning the
 // absolute counter made camera paths and sprite animations advance
@@ -82,10 +83,12 @@ uint64_t vk_wait_vbl() {
     return delta;
 }
 uint32_t vk_get_modpos()    { vk::audioPump(); return vk::getModPos(); }
-uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
 uint64_t vk_audio_elapsed_us() {
     return static_cast<uint64_t>(vk::audioElapsedSec() * 1000000.0);
 }
+#endif
+
+uint32_t vk_load_internal_file(const char* name) { return vk::loadInternalFile(name); }
 
 // palette + present helpers: take 768-byte buffer / nothing.
 #if !defined(VOODKA_ASSEMBLY_PLATFORM)
@@ -117,6 +120,7 @@ uint32_t vk_framebuffer_offset(void) { return vk::kFramebufferOffset; }
 uint32_t vk_backbuffer_offset(void) { return vk::kBackbufferOffset; }
 #endif
 
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 int  vk_audio_play()        { return vk::audioPlay(); }
 int  vk_audio_stop()        { return vk::audioStop(); }
 void vk_audio_clear()       { }
@@ -126,6 +130,7 @@ void vk_audio_set_pattern(int pos) { (void)pos; }
 uint32_t vk_audio_seek_rows(uint32_t rows) { return vk::audioSeekRows(rows); }
 uint32_t vk_audio_seek_ms(int ms)           { return vk::audioSeekMs(ms); }
 uint32_t vk_audio_seek_order(int order)     { return vk::audioSeekOrder(order); }
+#endif
 
 // Production app-mode adapters. The NASM dispatcher owns selector precedence,
 // scene-start data, self-test looping, and result propagation; these functions

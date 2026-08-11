@@ -23,6 +23,7 @@ set(VOODKA_PLATFORM_SOURCES
     audio_dispatch.asm
     win32_platform_abi.asm
     bridge_services.asm
+    bridge_timing_audio.asm
     p4_raster.asm
     win32_d3d_dispatch.asm
 )

@@ -811,6 +811,16 @@ target_link_libraries(bridge_services_probe PRIVATE kernel32)
 add_test(NAME bridge.services COMMAND bridge_services_probe)
 set_tests_properties(bridge.services PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.3 bridge gate: exercise NASM wait-vbl delta, ModPos, elapsed
+# audio time, playback, and seek forwarding adapters.
+add_executable(bridge_timing_audio_probe
+    tools/validate/bridge_timing_audio_probe.cpp
+    platform/bridge_timing_audio.asm)
+target_compile_definitions(bridge_timing_audio_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(bridge_timing_audio_probe PRIVATE kernel32)
+add_test(NAME bridge.timing_audio COMMAND bridge_timing_audio_probe)
+set_tests_properties(bridge.timing_audio PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe
