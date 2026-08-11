@@ -583,6 +583,25 @@ Go only if:
 
 ---
 
+### Current execution checkpoint — Phase 3B.6.7C
+
+The risk-first platform migration is active. The shipped target now has native
+x64 assembly implementations for the D3D11/COM presenter, the dedicated MOD
+player and WASAPI path, the Win32 substrate, logging/timeline/arena/startup
+services, the 70 Hz QPC timer, and the first bridge ABI group (selectors,
+palette, presentation, fixed overlay pointers, and arena forwarders). The
+reference target and host tools remain C++ where they provide the differential
+oracle. The current bridge gate is 77/77 Release tests green, including live
+WASAPI, P1 playback, pause, close, and the new bridge-service probe.
+
+The next gate is the remaining bridge service surface: wait-vbl/ModPos and
+audio forwarding, internal-file and key-map adapters, then shutdown/logging
+and the P4 rasterizer boundary. This keeps the executable buildable after each
+slice and postpones removal of the C++ bridge, CRT startup, and remaining CRT
+imports until the high-risk platform behavior is proven equivalent.
+
+---
+
 ## Phase 4 — Replace the C ABI bridge and EOS platform boundary
 
 ### Scope

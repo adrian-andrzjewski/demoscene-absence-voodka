@@ -1182,6 +1182,55 @@ visual/audio/A-V/reference differential gates                passed
 This is a **GO**. The shipped 70 Hz timing state machine is now native x64
 assembly without observable rendering, soundtrack, or synchronization drift.
 
+## Phase 3B.6.7C.2 bridge selector, palette, present, and arena ABI
+
+This slice moves the first stable, high fan-out portion of `bridge.cpp` into
+`bridge_services.asm` for the shipped target. The assembly implementation now
+owns the shared 512-entry selector table, selector allocation/free/base lookup,
+the reset routine, the 64 MiB arena forwarders, interleaved-to-planar palette
+conversion, bounded palette-range updates, frame presentation forwarding, and
+the two fixed 320x200 overlay pointers. `VOODKA_REFERENCE.exe` deliberately
+retains the C++ bridge implementation as the behavioral oracle.
+
+The palette and presenter services still call the existing namespace-vk
+implementation through explicit MSVC-decorated symbols. That is an intentional
+intermediate ABI boundary: it proves the NASM-side contracts before moving the
+remaining wait-vbl, file, audio, input, logging, and shutdown adapters.
+
+### Assembly interfaces and dependencies
+
+```text
+vk_arena_get / vk_arena_alloc / vk_arena_free
+vk_selector_alloc / vk_selector_free / vk_selector_base
+vk_set_palette / vk_get_palette / vk_set_palette_range
+vk_present_frame
+vk_backbuffer_ptr / vk_framebuffer_ptr
+vk_backbuffer_offset / vk_framebuffer_offset
+vk::resetSelectors
+```
+
+The slice depends on the existing `asm_arena_*` services and the C++
+`vk::setPalette`, `vk::currentPalette`, and `vk::presentFrame` implementations.
+The bridge probe supplies deterministic stubs for those dependencies and
+checks selector reuse, invalid handles, complete palette round-trips, range
+preservation/clamping, fixed overlay addresses, and present forwarding.
+
+### Phase 3B.6.7C.2 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM bridge selector/palette/present probe                   1/1 passed
+full regression suite                                      77/77 passed; 106.94 s
+full assembly P1/pause/close playback                       passed
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. The first bridge group is native x64 assembly with no change
+to selector semantics, palette bytes, framebuffer addressing, presentation,
+audio delivery, timing, or teardown. It is not yet a C++-free bridge: the
+remaining service adapters are the next gate.
+
 ## Phase 3B.6.7C production platform audit
 
 The current production CMake source list and object-symbol audit establish the
@@ -1194,7 +1243,7 @@ remaining boundary:
 | `input.cpp` | Namespace-vk wrappers, quit flag, reference-only C++ watcher branch | Production state/worker already lives in `win32_input.asm`; bool and byte-map ABI must remain exact | Medium, after bridge consumers are mapped |
 | `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
 | `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
-| `bridge.cpp` | Broad C ABI adapter used by NASM core/startup/shutdown | Widest symbol surface: selectors, palette conversion, wait-vbl delta, app/audio/presenter adapters, shutdown, logging; currently retains C++ name-mangled calls, variadic forwarding, `/GS`, and `memset` | Next highest-risk platform gate |
+| `bridge.cpp` | Remaining C ABI adapter used by NASM core/startup/shutdown | Selector/palette/present/fixed-pointer services are now in `bridge_services.asm`; remaining wait-vbl delta, file, audio, input, shutdown, logging, and P4 adapter paths still retain C++ calls, variadic forwarding, `/GS`, and CRT helpers | Next highest-risk platform gate |
 
 `dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
 `ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
@@ -1205,13 +1254,13 @@ remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
 objects and must be removed or deliberately retained before a custom `/ENTRY`
 claim.
 
-## Next gate: Phase 3B.6.7C.2 bridge C ABI adapter
+## Next gate: Phase 3B.6.7C.3 remaining bridge service adapters
 
-The next risk-first slice must migrate the broadest remaining C++ adapter,
-`bridge.cpp`, in dependency groups: selector table and fixed arena pointers;
-palette/present and frame-buffer helpers; application/audio/presenter service
-adapters; shutdown and logging boundaries; then the wait-vbl delta state. Each
-group needs a symbol-level ABI probe and the full visual/audio/lifecycle suite.
-Do not remove the C++ bridge or attempt custom `/ENTRY` until the production
-PE import set, selector/palette behavior, full playback, and close/failure
-paths remain equivalent.
+The next risk-first slice must migrate the remaining `bridge.cpp` service
+groups in dependency order: wait-vbl delta state and ModPos/audio forwarding;
+internal-file loading and key-map copying; then shutdown, logging, and the P4
+rasterizer adapter. Each group needs a symbol-level ABI probe and the full
+visual/audio/lifecycle suite. Do not remove the C++ bridge or attempt custom
+`/ENTRY` until every production bridge symbol has an assembly implementation,
+the PE import set is understood, and full playback plus close/failure paths
+remain equivalent.

@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (76 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (77 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -118,7 +118,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-76 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+77 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -161,6 +161,9 @@ wrappers, duplicate lower-bound behavior, negative-input rejection, and
 status-0/status-2 seek metadata contracts.
 `timer.asm_probe` validates NASM QPC initialization, monotonic microseconds,
 70 Hz frame pacing, pause parking/resume, and per-frame input/progress hooks.
+`bridge.services` validates the NASM selector table, arena forwarders,
+interleaved/planar palette ABI, bounded palette-range updates, present
+forwarding, and fixed framebuffer overlay pointers.
 `audio.wasapi_asm_probe` performs the complete 44.1 kHz stereo PCM WASAPI
 activation, event, buffer, stop/reset, and COM teardown sequence in NASM; the
 C++ executable only validates its fixed-width report.
@@ -224,6 +227,8 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_sync_probe` | Phase 3B.6.7B.9.3 NASM state publish/increment/acknowledgement loop with a real Win32 helper thread (CTest `audio.sync`) |
 | `audio_seek_probe` | Phase 3B.6.7B.9.6 NASM pause/seek/producer-ack/ring-flush/prebuffer/resume transaction with real producer and consumer helpers (CTest `audio.seek`) |
 | `audio_workers_probe` | Phase 3B.6.7B.9.5 NASM worker startup, prebuffer, rollback, join, `CreateThread`/wait/close ownership, early-exit and failure paths (CTest `audio.workers`) |
+| `timer_asm_probe` | Phase 3B.6.7C.1 NASM QPC initialization, 70 Hz pacing, pause parking, and per-frame hook gate (CTest `timer.asm_probe`) |
+| `bridge_services_probe` | Phase 3B.6.7C.2 NASM selector, arena, palette, present, and fixed-overlay-pointer ABI gate (CTest `bridge.services`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3-4 production NASM module/command-line/DPI handoff and complete host coordination; only the minimal CRT `WinMain` shim remains, reference retains the C++ host |

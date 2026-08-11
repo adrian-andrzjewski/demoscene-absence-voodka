@@ -801,6 +801,16 @@ target_link_libraries(timer_asm_probe PRIVATE kernel32)
 add_test(NAME timer.asm_probe COMMAND timer_asm_probe)
 set_tests_properties(timer.asm_probe PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C.2 bridge gate: exercise NASM selector, palette, present, and
+# fixed-arena-pointer C ABI services.
+add_executable(bridge_services_probe
+    tools/validate/bridge_services_probe.cpp
+    platform/bridge_services.asm)
+target_compile_definitions(bridge_services_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(bridge_services_probe PRIVATE kernel32)
+add_test(NAME bridge.services COMMAND bridge_services_probe)
+set_tests_properties(bridge.services PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe

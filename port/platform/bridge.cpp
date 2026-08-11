@@ -36,6 +36,7 @@ extern "C" const char* asm_voodka_resolve_music_path(const char*, const char*);
 #endif
 
 extern "C" {
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 // public table NASM can index:  sel_base_table[handle*8] = base pointer.
 // size matches EOS_MAX_SELECTORS in eos_dispatch.asm.
 uint64_t sel_base_table[512];
@@ -63,6 +64,7 @@ uint64_t vk_selector_base(uint16_t handle) {
     if (handle < 512) return sel_base_table[handle];
     return 0;
 }
+#endif
 
 // Original EOS wait_vbl returns the ticks SINCE THE PREVIOUS CALL (~1 per
 // frame), not the absolute retrace counter: every part stores the result into
@@ -86,6 +88,7 @@ uint64_t vk_audio_elapsed_us() {
 }
 
 // palette + present helpers: take 768-byte buffer / nothing.
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 void vk_set_palette(const uint8_t* rgb) {
     uint8_t r[256], g[256], b[256];
     for (int i = 0; i < 256; i++) {
@@ -112,6 +115,7 @@ void* vk_backbuffer_ptr(void) { return vk::arena() + vk::kBackbufferOffset; }
 void* vk_framebuffer_ptr(void) { return vk::arena() + vk::kFramebufferOffset; }
 uint32_t vk_framebuffer_offset(void) { return vk::kFramebufferOffset; }
 uint32_t vk_backbuffer_offset(void) { return vk::kBackbufferOffset; }
+#endif
 
 int  vk_audio_play()        { return vk::audioPlay(); }
 int  vk_audio_stop()        { return vk::audioStop(); }
@@ -376,9 +380,13 @@ void vk_key_map_copy(uint8_t* dst) {
 } // extern "C"
 
 namespace vk {
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 void resetSelectors() {
     std::memset(sel_base_table, 0, sizeof sel_base_table);
 }
+#else
+void resetSelectors();
+#endif
 #if defined(VOODKA_ASSEMBLY_PLATFORM)
 void shutdownAll() { asm_shutdown_all(); }
 void shutdownAndExit() { asm_shutdown_and_exit(); }
