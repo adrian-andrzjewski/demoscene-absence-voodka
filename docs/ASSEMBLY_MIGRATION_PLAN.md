@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.8 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.9.1 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -1004,12 +1004,18 @@ return, and unconditional shutdown while the dedicated player orchestration
 remains the C++ transitional owner. The focused dispatch probe and complete
 68-test suite pass, including live WASAPI, seek/stress, and P1/pause/close
 playback gates.
+Phase 3B.6.7B.9.1 now replaces the two production `std::lower_bound` seek
+lookups in `audio_asm.cpp` with a stateless NASM `audio_lookup.asm` primitive.
+Its empty-table, duplicate, boundary, and randomized-table probe matches the
+C++ oracle, and the complete 69-test suite—including live seek/stress and
+P1/pause/close playback—passes. The C++ audio runtime record, worker handles,
+acknowledgement loops, and storage/path ownership remain intentionally intact
+for the next higher-risk gate.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.9: migrate
-the C++ audio orchestration in risk order—seek/timeline state, worker and
-synchronization ownership, then storage/path helpers—while retaining the
-reference target as the differential oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.9.2:
+migrate the C++ audio runtime record and worker/synchronization ownership while
+retaining the reference target as the differential oracle.

@@ -15,9 +15,12 @@
 
 #include <windows.h>
 
-#include <algorithm>
 #include <cstdint>
 #include <cstdio>
+
+extern "C" uint32_t asm_audio_lower_bound_u32(const uint32_t* values,
+                                                uint32_t count,
+                                                uint32_t key);
 
 namespace vk {
 
@@ -133,19 +136,13 @@ bool seekTick(Runtime* runtime, uint32_t targetTick) {
 }
 
 uint32_t tickForModPos(const Runtime* runtime, uint32_t modpos) {
-    const uint32_t* begin = runtime->storage.modposByTick;
-    const uint32_t* end = begin + runtime->storage.stateFrames;
-    const auto it = std::lower_bound(begin, end, modpos);
-    if (it == end) return runtime->storage.stateFrames - 1;
-    return static_cast<uint32_t>(it - begin);
+    return asm_audio_lower_bound_u32(runtime->storage.modposByTick,
+                                     runtime->storage.stateFrames, modpos);
 }
 
 uint32_t tickForMs(const Runtime* runtime, uint32_t ms) {
-    const uint32_t* begin = runtime->storage.tickTimesMs;
-    const uint32_t* end = begin + runtime->storage.stateFrames;
-    const auto it = std::lower_bound(begin, end, ms);
-    if (it == end) return runtime->storage.stateFrames - 1;
-    return static_cast<uint32_t>(it - begin);
+    return asm_audio_lower_bound_u32(runtime->storage.tickTimesMs,
+                                     runtime->storage.stateFrames, ms);
 }
 
 void clearRuntime() {

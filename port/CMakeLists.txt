@@ -717,6 +717,17 @@ target_link_libraries(audio_dispatch_probe PRIVATE kernel32)
 add_test(NAME audio.dispatch COMMAND audio_dispatch_probe)
 set_tests_properties(audio.dispatch PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.9.1 witness: compare the production seek lower_bound primitive
+# against std::lower_bound over empty, duplicate, boundary, and randomized
+# sorted tick tables before the live audio orchestration consumes it.
+add_executable(audio_lookup_probe
+    tools/validate/audio_lookup_probe.cpp
+    platform/audio_lookup.asm)
+target_compile_definitions(audio_lookup_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_lookup_probe PRIVATE kernel32)
+add_test(NAME audio.lookup COMMAND audio_lookup_probe)
+set_tests_properties(audio.lookup PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

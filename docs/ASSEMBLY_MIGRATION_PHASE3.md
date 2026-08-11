@@ -856,12 +856,42 @@ This is a **GO** for the next audio/runtime boundary. The dispatch shim is no
 longer a blocker; the next risk is moving the C++ audio orchestration without
 altering PCM output, WASAPI lifecycle, seek behavior, or A/V synchronization.
 
-## Next gate: Phase 3B.6.7B.9
+## Phase 3B.6.7B.9.1 audio seek lookup primitive
 
-Phase 3B.6.7B.9 should migrate the C++ audio orchestration boundary in measured
-stages: first the seek/timeline lookup and scalar state, then Win32 worker
-creation and synchronization ownership, and finally the C++ storage/path
-helpers. Import attribution, PCM/perceptual audio comparison, full-demo
-playback, A/V synchronization, and failure/lifecycle probes remain mandatory;
-custom `/ENTRY` is still deferred until no production C++ object requires CRT
-initialization.
+The first audio-orchestration slice replaces both `std::lower_bound` calls in
+`audio_asm.cpp` with `asm_audio_lower_bound_u32` from `audio_lookup.asm`. The
+primitive is stateless and preserves the former boundary contract: it returns
+the first index whose value is at least the requested key, or `count - 1` when
+the key is above the table, including the old `UINT32_MAX` result for an empty
+table. No worker, PCM, WASAPI, clock, or seek-state ownership changed in this
+slice.
+
+`audio_lookup_probe` compares the NASM result with `std::lower_bound` for empty
+tables, duplicates, exact hits, gaps, high keys, and deterministic sorted
+tables through 257 entries. The full Release suite passes 69/69, including
+live seek/stress, audio playback, and P1/pause/close demo gates.
+
+### Phase 3B.6.7B.9.1 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM seek-lookup probe                                     1/1 passed; 0.08 s
+full regression suite                                      69/69 passed; 104.86 s
+production std::lower_bound calls                          removed from audio_asm.cpp
+production seek lookup                                     NASM x64
+audio worker/state ownership                               unchanged C++ transitional owner
+```
+
+This is a **GO** for the next audio-orchestration gate. The remaining high-risk
+boundary is the C++ runtime state machine: Win32 worker handles, atomic control
+records, pause/seek acknowledgements, and deterministic teardown.
+
+## Next gate: Phase 3B.6.7B.9.2
+
+Phase 3B.6.7B.9.2 should migrate the audio runtime state and synchronization
+ownership in measured stages: first the POD runtime record and scalar state,
+then Win32 worker creation and acknowledgement loops, and finally the C++
+storage/path helpers. Import attribution, PCM/perceptual audio comparison,
+full-demo playback, A/V synchronization, and failure/lifecycle probes remain
+mandatory; custom `/ENTRY` is still deferred until no production C++ object
+requires CRT initialization.
