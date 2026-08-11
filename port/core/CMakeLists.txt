@@ -17,6 +17,8 @@ set(VOODKA_CORE_ASM
     eos_replace/win32_app_wndproc.asm
     eos_replace/win32_app_window.asm
     eos_replace/win32_app_entry.asm
+    eos_replace/win32_crash.asm
+    eos_replace/win32_input.asm
     eos_replace/boot.asm
     eos_replace/toonel.asm
     inc/globals.asm

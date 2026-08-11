@@ -9,6 +9,11 @@
 #include <windows.h>
 #include <cstring>
 
+#if !defined(VOODKA_REFERENCE_BUILD)
+extern "C" int asm_input_init(void* hwnd);
+extern "C" void asm_input_shutdown(void);
+#endif
+
 namespace vk {
 
 void requestQuit();
@@ -49,6 +54,9 @@ DWORD WINAPI inputWatchThread(LPVOID) {
 }
 
 bool inputInit(void* hwnd) {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    return asm_input_init(hwnd) != 0;
+#else
     if (g_inputThread) return true;
     g_inputWindow = (HWND)hwnd;
     g_inputStop = CreateEventW(nullptr, TRUE, FALSE, nullptr);
@@ -64,9 +72,13 @@ bool inputInit(void* hwnd) {
         return false;
     }
     return true;
+#endif
 }
 
 void inputShutdown() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_input_shutdown();
+#else
     if (g_inputStop) SetEvent(g_inputStop);
     if (g_inputThread) WaitForSingleObject(g_inputThread, INFINITE);
     if (g_inputThread) CloseHandle(g_inputThread);
@@ -74,6 +86,7 @@ void inputShutdown() {
     g_inputThread = nullptr;
     g_inputStop = nullptr;
     g_inputWindow = nullptr;
+#endif
 }
 
 void requestQuit()      { _InterlockedExchange(&g_quitRequested, 1); }

@@ -166,11 +166,42 @@ The production tests exercised raw command-line acquisition, P1 startup,
 clean close, and normal host/subsystem sequencing. The complete suite retained
 all rendering, audio, timing, asset, Win32, D3D11, and assembly-audio checks.
 
-## Next gate: Phase 3B.4
+## Phase 3B.4 early host services
 
-Phase 3B.4 must migrate the remaining early host setup: assembly-side command
-line parsing/argument storage, crash-filter registration and reporting, and
-input-watcher startup. It must preserve all seek, recording, diagnostic,
-pause, close, and failure-injection behavior. The C++ reference executable
-remains mandatory until those paths pass the same full-demo visual, audio,
-timing, and stability witnesses.
+The production early-host path now has three additional assembly-owned pieces:
+
+- `win32_app_entry.asm` stores the raw `GetCommandLineA` pointer and exposes it
+  through `asm_voodka_command_line` for the production host;
+- `win32_crash.asm` registers the native exception-filter entry and forwards
+  `EXCEPTION_POINTERS` to the existing C++ diagnostic logger; and
+- `win32_input.asm` owns the production global Escape watcher, manual-reset
+  stop event, worker thread, polling edge detector, quit request, close message,
+  join, and handle cleanup.
+
+The C++ reference target retains its original crash-filter and input-watcher
+implementations. The production C++ layer still owns formatted crash output,
+argument interpretation, the 128-byte key map, and the main-thread message
+pump; those are intentionally later boundaries.
+
+### Phase 3B.4 validation
+
+```text
+Release build                                      passed
+focused production/reference lifecycle gates      3/3 passed; 32.20 s
+full regression suite                              54/54 passed; 104.36 s
+production crash/input startup                    NASM x64
+reference crash/input startup                     C++ differential oracle
+```
+
+The focused gates covered production pause/resume, production close, and
+reference close. The full suite retained all rendering, audio, timing, asset,
+Win32, D3D11, and dedicated assembly-audio checks.
+
+## Next gate: Phase 3B.5
+
+Phase 3B.5 must migrate command-line interpretation and the remaining input
+bridge: scalar/path argument parsing, seek and recording selectors, the key-map
+state, and the main-thread message pump. It must preserve all seek, recording,
+diagnostic, pause, close, and failure-injection behavior. The C++ reference
+executable remains mandatory until those paths pass the same full-demo visual,
+audio, timing, and stability witnesses.

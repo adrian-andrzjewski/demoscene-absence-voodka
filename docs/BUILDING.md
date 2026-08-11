@@ -78,7 +78,10 @@ also implemented in `core/eos_replace/win32_app_window.asm`. Production CRT
 handoff, raw command-line acquisition, module-handle acquisition, and DPI
 setup are implemented in `core/eos_replace/win32_app_entry.asm`; true custom
 `/ENTRY` startup remains deferred until the C++ host no longer needs CRT/STL
-initialization.
+initialization. Production raw command-line storage, exception-filter entry,
+and the global Escape watcher lifecycle are also implemented in
+`core/eos_replace/win32_crash.asm` and `core/eos_replace/win32_input.asm`;
+formatted logging and message-pump state remain in C++ for the current gate.
 
 ## Running
 
@@ -189,6 +192,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3 production NASM module/command-line/DPI handoff into the C++ host; reference remains direct C++ |
+| `VOODKA` early host services | Phase 3B.4 production NASM raw-command-line storage, exception-filter entry, and Escape watcher thread/event lifecycle |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |

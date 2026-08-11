@@ -15,7 +15,9 @@
 
 // Very small crash logger: print exception address + register state then let
 // the OS terminate. Gives the exact faulting RIP without a debugger attached.
-static LONG WINAPI CrashFilter(EXCEPTION_POINTERS* ep) {
+// The production filter entry is NASM; this C ABI body remains the logger
+// oracle until the logging subsystem is migrated.
+extern "C" LONG WINAPI vk_crash_report(EXCEPTION_POINTERS* ep) {
     EXCEPTION_RECORD* er = ep->ExceptionRecord;
     CONTEXT* cx = ep->ContextRecord;
     vk::logPrint("[CRASH] code=0x%08x at %p\n", er->ExceptionCode, er->ExceptionAddress);
@@ -36,6 +38,8 @@ extern "C" HWND asm_create_voodka_window(HINSTANCE);
 extern "C" void asm_destroy_voodka_window(HWND, HINSTANCE);
 extern "C" int vk_voodka_host_main(HINSTANCE, LPSTR, int);
 extern "C" int asm_voodka_winmain(HINSTANCE, HINSTANCE, LPSTR, int);
+extern "C" const char* asm_voodka_command_line(void);
+extern "C" void asm_install_crash_filter(void);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -213,6 +217,12 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     vk::logInit();
     vk::logPrint("[app] VOODKA x64 port starting\n");
 
+    const char* commandLine = lpCmd;
+#if !defined(VOODKA_REFERENCE_BUILD)
+    if (const char* storedCommandLine = asm_voodka_command_line())
+        commandLine = storedCommandLine;
+#endif
+
     // Per-monitor DPI awareness: window geometry is expressed in physical
     // pixels, so centering stays consistent across DPI-scaled desktops.
 #if defined(VOODKA_REFERENCE_BUILD)
@@ -251,7 +261,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         return dir.empty() ? nullptr : _strdup(dir.c_str());
     };
     {
-        std::string cmd = lpCmd ? lpCmd : "";
+        std::string cmd = commandLine ? commandLine : "";
         recDir = argDirOf(cmd, "record");
         diagDir = argDirOf(cmd, "diag");
         musicOverride = argDirOf(cmd, "music");
@@ -442,7 +452,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     //   --part N    scene/part index (maps to a ModPos, see table below)
     // At most one seek selector is honored; the first present wins.
     {
-        std::string cmd = lpCmd ? lpCmd : "";
+        std::string cmd = commandLine ? commandLine : "";
         auto numAfter = [&](const char* flag) -> long {
             auto p = cmd.find(flag);
             if (p == std::string::npos) return -1;
@@ -487,7 +497,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     // ---- self-test or run the demo core (assembly) --------------------------
     uint8_t* ab = vk::arena();
     int rcode = 0;
-    std::string cmdline = lpCmd ? lpCmd : "";
+    std::string cmdline = commandLine ? commandLine : "";
     bool selftest = cmdline.find("--selftest") != std::string::npos;
     if (selftest) {
         // present the built-in pattern a few times so the readback can be
@@ -517,7 +527,11 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         rcode = vk::audioSelfCheck(secs);
     } else {
         vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
-        SetUnhandledExceptionFilter(&CrashFilter);
+#if defined(VOODKA_REFERENCE_BUILD)
+        SetUnhandledExceptionFilter(&vk_crash_report);
+#else
+        asm_install_crash_filter();
+#endif
         rcode = DemoStart32(ab, 64ull * 1024 * 1024);
     }
 
