@@ -1053,15 +1053,48 @@ soundtrack/A-V lifecycle                                   fully green
 
 This is a **GO**.  The highest-risk audio synchronization boundary now has a
 native assembly implementation with real-worker and production validation.
-The next gate is the remaining C++ audio controller wrapper: runtime metadata,
-elapsed-time bookkeeping, pump dispatch, and self-check reporting.
 
-## Next gate: Phase 3B.6.7B.9.7
+## Phase 3B.6.7B.9.7 audio controller metadata and query wrapper
 
-Phase 3B.6.7B.9.7 should migrate the remaining audio-controller metadata and
-query paths into assembly without changing the public `audioAsm*` ABI.  It
-must preserve ModPos, elapsed time across seeks, pause/resume state, failure
-reporting, and the reference-target differential path.  Import attribution,
-PCM/perceptual audio comparison, full-demo playback, A/V synchronization, and
-failure/lifecycle probes remain mandatory; custom `/ENTRY` is still deferred
-until no production C++ object requires CRT initialization.
+This slice moves the remaining steady-state controller surface from
+`audio_asm.cpp` into `audio_controller.asm` while keeping initialization,
+shutdown, playback, and the already-migrated seek transaction as explicit
+assembly/C++ ABI boundaries. NASM now owns `audioAsmModPos`,
+`audioAsmModLength`, `audioAsmElapsedSec`, `audioAsmPump`, and
+`audioAsmSelfCheck`. The controller ABI has a compile-time layout witness for
+the 600-byte runtime view, and the focused probe verifies uninitialized
+defaults, ModPos/order queries, elapsed time across a seek base, pause/resume
+state publication, helper-thread acknowledgements, self-check logging, and
+failure reporting.
+
+The migration also removed the obsolete C++ `issueState` wrapper and corrected
+the Win64 boolean boundary to test MSVC's `AL` return value. Elapsed-frame
+conversion uses a zero-extended 64-bit integer before SSE2 conversion, so the
+query remains correct across the full unsigned 32-bit frame range. The
+reference executable and host probes remain the behavioral oracle.
+
+### Phase 3B.6.7B.9.7 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM controller/query/self-check probe                      1/1 passed
+full regression suite                                      73/73 passed; 109.09 s
+live WASAPI control/seek/stress/long-run                    passed
+full assembly P1/pause/close playback                      passed
+visual/audio/A-V differential gates                         passed
+```
+
+This is a **GO**. The controller query and reporting boundary is now native
+x64 assembly without regressions in rendering, soundtrack output, A/V timing,
+or lifecycle stability.
+
+## Next gate: Phase 3B.6.7B.9.8
+
+The next risk-first slice is the remaining C++ audio initialization,
+shutdown, play/stop, and metadata commit orchestration. It must preserve
+native module-storage ownership, worker startup/rollback, seek metadata
+updates, failure injection, idempotent teardown, and the reference-target
+differential path. Do not remove the C++ behavioral oracle or attempt a custom
+`/ENTRY` until this boundary has a focused ABI witness, production device and
+failure tests, full-demo playback, A/V timing checks, and a clean complete
+regression run.

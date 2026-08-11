@@ -8,6 +8,7 @@
 // The old audio.cpp/libxmp path remains available as the behavioral oracle.
 
 #include "platform_abi.h"
+#include "../tools/validate/audio_controller_abi.h"
 #include "../tools/validate/audio_mix_abi.h"
 #include "../tools/validate/audio_ring_abi.h"
 #include "../tools/validate/audio_seek_abi.h"
@@ -68,19 +69,20 @@ struct Runtime {
 
 static_assert(sizeof(Runtime) <= 0x2000,
               "assembly-owned audio runtime block is too small");
+static_assert(sizeof(Runtime) == sizeof(AudioControllerRuntimeView));
+static_assert(offsetof(Runtime, producerArgs) == 112);
+static_assert(offsetof(Runtime, ring) == 224);
+static_assert(offsetof(Runtime, control) == 288);
+static_assert(offsetof(Runtime, workerReport) == 376);
+static_assert(offsetof(Runtime, initialized) == 564);
+static_assert(offsetof(Runtime, playing) == 572);
+static_assert(offsetof(Runtime, seekTimeBase) == 592);
 
 // The state layout remains described by this POD for now, but its storage is
 // no longer a C++ global object.  The shipped and reference targets both use
 // the same loader-zeroed NASM block, which removes one C++ data owner without
 // changing any field offsets or orchestration behavior.
 #define g_runtime (*reinterpret_cast<Runtime*>(asm_audio_runtime_state))
-
-bool issueState(Runtime* runtime, uint32_t state, uint32_t* sequenceOut) {
-    return asm_audio_issue_state(&runtime->control, state,
-                                 &runtime->lastControlState,
-                                 &runtime->lastControlSequence,
-                                 sequenceOut) != 0;
-}
 
 bool seekTick(Runtime* runtime, uint32_t targetTick) {
     uint32_t baseConsumed = 0;
@@ -249,35 +251,6 @@ int audioAsmStop() {
     return 1;
 }
 
-void audioAsmPump() {
-    if (!g_runtime.initialized || g_runtime.shuttingDown) return;
-    const uint32_t desired =
-        (InterlockedCompareExchange(&g_runtime.playing, 0, 0) == 0 ||
-         isPaused()) ? 1u : 0u;
-    if (desired != g_runtime.lastControlState)
-        issueState(&g_runtime, desired, nullptr);
-}
-
-uint32_t audioAsmModPos() {
-    if (!g_runtime.initialized) return 0;
-    MemoryBarrier();
-    return g_runtime.workerReport.publishedModPos;
-}
-
-uint32_t audioAsmModLength() {
-    return g_runtime.initialized ? g_runtime.storage.orderCount : 0;
-}
-
-double audioAsmElapsedSec() {
-    if (!g_runtime.initialized) return 0.0;
-    MemoryBarrier();
-    const uint32_t frame = g_runtime.workerReport.publishedPcmFrame;
-    const uint32_t delta = frame >= g_runtime.seekBaseFrame
-        ? frame - g_runtime.seekBaseFrame : 0;
-    return g_runtime.seekTimeBase +
-        static_cast<double>(delta) / kSampleRate;
-}
-
 uint32_t audioAsmSeekRows(uint32_t modpos) {
     if (!g_runtime.initialized) return 0;
     const uint32_t tick = tickForModPos(&g_runtime, modpos);
@@ -295,27 +268,6 @@ uint32_t audioAsmSeekMs(int ms) {
 uint32_t audioAsmSeekOrder(int order) {
     if (!g_runtime.initialized || order < 0) return 0;
     return audioAsmSeekRows(static_cast<uint32_t>(order) << 8);
-}
-
-int audioAsmSelfCheck(int seconds) {
-    if (!g_runtime.initialized) return 1;
-    if (seconds <= 0) seconds = 20;
-    const uint64_t start = getQpcUs();
-    while (getQpcUs() - start < static_cast<uint64_t>(seconds) * 1000000ull) {
-        updateInput();
-        if (quitRequested()) shutdownAndExit();
-        audioAsmPump();
-        Sleep(10);
-    }
-    MemoryBarrier();
-    const auto& report = g_runtime.workerReport;
-    logPrint("[audio-asm] self-check: %.2fs device_frames=%u underruns=%u "
-             "markers=%u worker_exit=%u\n",
-             audioAsmElapsedSec(), report.common.frames,
-             report.underrunEvents, report.snapshotUpdates,
-             report.common.workerExit);
-    return report.underrunEvents == 0 && report.common.workerExit == 0
-        ? 0 : 1;
 }
 
 } // namespace vk

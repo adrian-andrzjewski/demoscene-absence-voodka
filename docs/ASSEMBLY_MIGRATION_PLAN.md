@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.9.6 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.9.7 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -1036,14 +1036,23 @@ Phase 3B.6.7B.9.6 now moves the controller-side seek transaction into
 `audio_seek.asm`: pause acknowledgement, consumed-frame capture, producer
 seek acknowledgement, PCM/marker cursor flush, commit, prebuffer, and resume
 acknowledgement. Its real two-worker probe and complete 72-test suite—including
-live seek/stress, long-run audio, and P1/pause/close playback—pass. The
-reference target remains the C++ behavioral oracle; remaining work is the
-audio controller's metadata, elapsed-time, pump, and self-check wrapper.
+live seek/stress, long-run audio, and P1/pause/close playback—pass. Phase
+3B.6.7B.9.7 now moves the production ModPos/order-length/elapsed-time queries,
+pause/resume pump, and self-check/report wrapper into `audio_controller.asm`.
+The fixed 600-byte runtime view is guarded by compile-time offsets, while the
+controller probe covers default values, seek-relative elapsed time, a real
+acknowledgement helper thread, boolean return handling, logging, and failure
+status. The obsolete C++ state-pump wrapper is removed. The focused probe and
+complete 73-test suite—including live WASAPI control/seek/stress/long-run and
+P1/pause/close playback—pass. The reference target remains the C++ behavioral
+oracle; the next gate is the remaining initialization/shutdown/play/stop
+orchestration.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.9.7:
-migrate the remaining audio-controller metadata and query wrapper while
-retaining the reference target as the differential oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.9.8:
+migrate the remaining audio initialization/shutdown/play/stop and metadata
+commit orchestration while retaining the reference target as the differential
+oracle.
