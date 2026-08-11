@@ -15,31 +15,19 @@
 #include "../tools/validate/audio_service_abi.h"
 #include "../tools/validate/audio_thread_abi.h"
 #include "../tools/validate/audio_tick_abi.h"
-#include "../tools/validate/audio_workers_abi.h"
-
-#include <windows.h>
 
 #include <cstdint>
-#include <cstdio>
 
 extern "C" uint32_t asm_audio_lower_bound_u32(const uint32_t* values,
                                                 uint32_t count,
                                                 uint32_t key);
 extern "C" unsigned char asm_audio_runtime_state[0x2000];
-extern "C" uint32_t asm_audio_issue_state(AudioLiveControl* control,
-                                             uint32_t state,
-                                             uint32_t* lastState,
-                                             uint32_t* lastSequence,
-                                             uint32_t* sequenceOut);
 
 namespace vk {
 
 namespace {
 
 constexpr uint32_t kSampleRate = 44100;
-constexpr uint32_t kRingCapacity = 16384;
-constexpr uint32_t kMarkerCapacity = 16384;
-
 struct Runtime {
     AudioAssemblyStorage storage{};
     AudioAssemblyProducerArgs producerArgs{};
@@ -49,17 +37,17 @@ struct Runtime {
     AudioAssemblyWorkerArgs workerServiceArgs{};
     AudioRingThreadReport workerReport{};
 
-    HANDLE producerHandle = nullptr;
-    HANDLE workerControllerHandle = nullptr;
-    volatile LONG producerStop = 0;
-    volatile LONG producerFailed = 0;
-    volatile LONG workerControllerResult = 1;
-    volatile LONG producerDone = 0;
-    volatile LONG producerError = 0;
+    void* producerHandle = nullptr;
+    void* workerControllerHandle = nullptr;
+    volatile int32_t producerStop = 0;
+    volatile int32_t producerFailed = 0;
+    volatile int32_t workerControllerResult = 1;
+    volatile int32_t producerDone = 0;
+    volatile int32_t producerError = 0;
 
-    volatile LONG initialized = 0;
-    volatile LONG shuttingDown = 0;
-    volatile LONG playing = 1;
+    volatile int32_t initialized = 0;
+    volatile int32_t shuttingDown = 0;
+    volatile int32_t playing = 1;
     uint32_t lastControlState = 0;
     uint32_t lastControlSequence = 0;
     uint32_t seekBaseFrame = 0;
@@ -120,136 +108,7 @@ uint32_t tickForMs(const Runtime* runtime, uint32_t ms) {
                                      runtime->storage.stateFrames, ms);
 }
 
-void clearRuntime() {
-    if (g_runtime.ring.samples) asm_audio_ring_close(&g_runtime.ring);
-    g_runtime = Runtime{};
-}
-
 } // namespace
-
-void audioAsmShutdown();
-
-int audioAsmInit(const char* modPath, int) {
-    if (g_runtime.initialized) return 1;
-    char forcedFailure[4] = {};
-    if (GetEnvironmentVariableA("VOODKA_ASM_AUDIO_FAIL_DEVICE",
-                                forcedFailure, sizeof(forcedFailure)) != 0) {
-        logPrint("[audio-asm] forced device failure injection\n");
-        return 0;
-    }
-    const uint32_t storageStatus = modPath
-        ? asm_audio_service_storage_init(modPath, &g_runtime.storage) : 1;
-    if (storageStatus != 0) {
-        logPrint("[audio-asm] native module/storage preparation failed "
-                 "status=%u\n", storageStatus);
-        clearRuntime();
-        return 0;
-    }
-
-    if (asm_audio_ring_init(&g_runtime.ring,
-                            g_runtime.storage.ringSamples,
-                            kRingCapacity,
-                            g_runtime.storage.ringMarkers,
-                            kMarkerCapacity) != 0) {
-        logPrint("[audio-asm] ring initialization failed\n");
-        clearRuntime();
-        return 0;
-    }
-
-    g_runtime.producerArgs = {
-        g_runtime.storage.module,
-        g_runtime.storage.moduleSize,
-        g_runtime.storage.stateFrames,
-        g_runtime.storage.maxTickFrames,
-        g_runtime.storage.scratchFrames,
-        g_runtime.storage.tickStarts,
-        g_runtime.storage.modposByTick,
-        &g_runtime.ring,
-        &g_runtime.control,
-        g_runtime.storage.producerStates,
-        g_runtime.storage.producerPcm,
-        g_runtime.storage.producerHistory,
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerDone),
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerError),
-    };
-    g_runtime.workerArgs = {&g_runtime.ring, 0, &g_runtime.control};
-    g_runtime.workerServiceArgs = {
-        &g_runtime.workerArgs,
-        &g_runtime.workerReport,
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.workerControllerResult),
-    };
-    const AudioWorkerLifecycleArgs workerLifecycle{
-        reinterpret_cast<void**>(&g_runtime.producerHandle),
-        reinterpret_cast<uint64_t>(asm_audio_producer_thread),
-        &g_runtime.producerArgs,
-        &g_runtime.ring,
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
-        reinterpret_cast<void**>(&g_runtime.workerControllerHandle),
-        reinterpret_cast<uint64_t>(asm_audio_ring_thread_entry),
-        &g_runtime.workerServiceArgs,
-        &g_runtime.control,
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
-    };
-    const uint32_t workerStatus = asm_audio_start_workers(&workerLifecycle);
-    if (workerStatus != 0) {
-        if (workerStatus == 1) {
-            logPrint("[audio-asm] producer prebuffer failed failed=%ld done=%ld "
-                     "error=%ld write=%u read=%u\n",
-                     g_runtime.producerFailed, g_runtime.producerDone,
-                     g_runtime.producerError,
-                     g_runtime.ring.writeFrame, g_runtime.ring.readFrame);
-        } else if (workerStatus == 2) {
-            logPrint("[audio-asm] worker controller creation failed\n");
-        } else {
-            logPrint("[audio-asm] assembly WASAPI worker exited during startup\n");
-        }
-        audioAsmShutdown();
-        return 0;
-    }
-
-    InterlockedExchange(&g_runtime.playing, 1);
-    InterlockedExchange(&g_runtime.initialized, 1);
-    logPrint("[audio-asm] dedicated player active, orders=%u, 44100Hz stereo\n",
-             g_runtime.storage.orderCount);
-    return 1;
-}
-
-void audioAsmShutdown() {
-    if (g_runtime.shuttingDown) return;
-    InterlockedExchange(&g_runtime.shuttingDown, 1);
-    InterlockedExchange(&g_runtime.playing, 0);
-    const AudioWorkerLifecycleArgs workerLifecycle{
-        reinterpret_cast<void**>(&g_runtime.producerHandle),
-        0,
-        nullptr,
-        nullptr,
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerFailed),
-        reinterpret_cast<void**>(&g_runtime.workerControllerHandle),
-        0,
-        nullptr,
-        &g_runtime.control,
-        reinterpret_cast<volatile uint32_t*>(&g_runtime.producerStop),
-    };
-    asm_audio_stop_workers(&workerLifecycle);
-    if (g_runtime.ring.samples) asm_audio_ring_close(&g_runtime.ring);
-    logPrint("[audio-asm] stopped: device_frames=%u underruns=%u markers=%u\n",
-             g_runtime.workerReport.common.frames,
-             g_runtime.workerReport.underrunEvents,
-             g_runtime.workerReport.snapshotUpdates);
-    clearRuntime();
-}
-
-int audioAsmPlay() {
-    InterlockedExchange(&g_runtime.playing, 1);
-    return 1;
-}
-
-int audioAsmStop() {
-    InterlockedExchange(&g_runtime.playing, 0);
-    return 1;
-}
 
 uint32_t audioAsmSeekRows(uint32_t modpos) {
     if (!g_runtime.initialized) return 0;

@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.9.7 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.9.8.1 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -1044,15 +1044,19 @@ controller probe covers default values, seek-relative elapsed time, a real
 acknowledgement helper thread, boolean return handling, logging, and failure
 status. The obsolete C++ state-pump wrapper is removed. The focused probe and
 complete 73-test suite—including live WASAPI control/seek/stress/long-run and
-P1/pause/close playback—pass. The reference target remains the C++ behavioral
-oracle; the next gate is the remaining initialization/shutdown/play/stop
-orchestration.
+P1/pause/close playback—pass. Phase 3B.6.7B.9.8.1 now moves dedicated-player
+initialization, fixed record construction, startup rollback, shutdown, and
+play/stop publication into `audio_lifecycle.asm`. Its lifecycle witness checks
+the exact producer/worker pointer contract, null/forced-failure paths, and
+runtime clearing; the complete 74-test suite—including live WASAPI lifecycle,
+seek/stress/long-run, P1/pause/close playback, and reference close—passes. The
+reference target remains the C++ behavioral oracle; only seek-index and
+seek-metadata commit glue remains in `audio_asm.cpp` for the next gate.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.9.8:
-migrate the remaining audio initialization/shutdown/play/stop and metadata
-commit orchestration while retaining the reference target as the differential
-oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.9.8.2:
+migrate the remaining seek-index and seek-metadata commit wrapper while
+retaining the reference target as the differential oracle.

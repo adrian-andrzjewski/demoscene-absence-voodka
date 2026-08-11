@@ -768,6 +768,17 @@ target_link_libraries(audio_controller_probe PRIVATE kernel32)
 add_test(NAME audio.controller COMMAND audio_controller_probe)
 set_tests_properties(audio.controller PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.9.8 lifecycle gate: exercise NASM audio initialization,
+# record construction, rollback, play/stop publication, and teardown.
+add_executable(audio_lifecycle_probe
+    tools/validate/audio_lifecycle_probe.cpp
+    platform/audio_lifecycle.asm
+    platform/audio_runtime_state.asm)
+target_compile_definitions(audio_lifecycle_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_lifecycle_probe PRIVATE kernel32)
+add_test(NAME audio.lifecycle COMMAND audio_lifecycle_probe)
+set_tests_properties(audio.lifecycle PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe

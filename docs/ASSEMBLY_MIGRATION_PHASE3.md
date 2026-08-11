@@ -1088,13 +1088,47 @@ This is a **GO**. The controller query and reporting boundary is now native
 x64 assembly without regressions in rendering, soundtrack output, A/V timing,
 or lifecycle stability.
 
-## Next gate: Phase 3B.6.7B.9.8
+## Phase 3B.6.7B.9.8.1 audio lifecycle orchestration
 
-The next risk-first slice is the remaining C++ audio initialization,
-shutdown, play/stop, and metadata commit orchestration. It must preserve
-native module-storage ownership, worker startup/rollback, seek metadata
-updates, failure injection, idempotent teardown, and the reference-target
-differential path. Do not remove the C++ behavioral oracle or attempt a custom
-`/ENTRY` until this boundary has a focused ABI witness, production device and
-failure tests, full-demo playback, A/V timing checks, and a clean complete
-regression run.
+This slice moves the dedicated player's remaining initialization, startup
+record construction, failure rollback, shutdown, and play/stop state
+publication from `audio_asm.cpp` into `audio_lifecycle.asm`. NASM now builds the
+fixed producer/worker/lifecycle records, invokes the existing assembly storage,
+ring, and worker services, preserves the former failure-status logging and
+worker-before-producer teardown order, closes the ring, clears the runtime, and
+publishes the play state atomically. The C++ audio runtime file no longer
+includes Windows headers or owns lifecycle code; it retains only seek-index
+selection and seek metadata commit for the next gate.
+
+The focused lifecycle witness uses controlled storage/ring/worker stubs to
+verify exact pointer offsets and Win64 argument records, null-path and forced
+device-failure rejection before storage, successful startup, play/stop, and
+shutdown cleanup. The production suite then exercises the real native module,
+producer, WASAPI worker, failure injection, full soundtrack, and reference
+oracle paths.
+
+### Phase 3B.6.7B.9.8.1 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM lifecycle record/startup/teardown probe                 1/1 passed
+full regression suite                                      74/74 passed; 111.92 s
+live WASAPI control/seek/stress/long-run                    passed
+full assembly P1/pause/close playback                      passed
+failure-injection/reference/lifecycle gates                 passed
+```
+
+This is a **GO**. The dedicated audio lifecycle is now native x64 assembly
+without regressions in PCM delivery, soundtrack timing, A/V synchronization,
+rendering, or teardown stability.
+
+## Next gate: Phase 3B.6.7B.9.8.2
+
+The remaining production C++ in `audio_asm.cpp` is the seek-index and metadata
+commit wrapper: selecting a tick for ModPos/milliseconds/order, invoking the
+assembly seek transaction, and publishing the seek-relative frame/time base.
+The next gate must move that final wrapper into assembly while preserving
+duplicate/boundary lookup behavior, negative-input handling, seek failure
+statuses, elapsed-time continuity, live seek/stress results, and the
+reference-target differential path. Custom `/ENTRY` remains deferred until
+this and the remaining platform C++ ownership boundaries are proven.
