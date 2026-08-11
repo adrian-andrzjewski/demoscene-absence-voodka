@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (63 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (64 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -116,7 +116,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-63 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+64 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -202,9 +202,10 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_music_path_probe` | Phase 3B.6.7B.1 production NASM soundtrack-path override, executable-directory, and fallback witness (CTest `win32.music_path`) |
 | `win32_app_modes_probe` | Phase 3B.6.7B.2 production NASM seek precedence, part-start, self-test, audio-check, and result ABI witness (CTest `win32.app_modes`) |
 | `win32_app_startup_probe` | Phase 3B.6.7B.3 production NASM subsystem order, Win64 POD arguments, quit checkpoints, and rollback witness (CTest `win32.app_startup`) |
+| `win32_app_host_probe` | Phase 3B.6.7B.4 production NASM host configuration, window/startup failure, seek/run, arena-size, and final-shutdown witness (CTest `win32.app_host`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
-| `VOODKA` host handoff | Phase 3B.3 production NASM module/command-line/DPI handoff into the C++ host; reference remains direct C++ |
+| `VOODKA` host handoff | Phase 3B.3-4 production NASM module/command-line/DPI handoff and complete host coordination; only the minimal CRT `WinMain` shim remains, reference retains the C++ host |
 | `VOODKA` early host services | Phase 3B.4 production NASM raw-command-line storage, exception-filter entry, and Escape watcher thread/event lifecycle |
 | `VOODKA` command-line/input bridge | Phase 3B.5 production NASM flag/value parsing, selector storage, 128-byte key map, and main-thread message pump; reference retains C++ behavior |
 | `VOODKA` lifecycle automation | Phase 3B.6 production NASM pause/close automation worker, event/thread state, message injection, join, and handle cleanup; reference retains C++ behavior |

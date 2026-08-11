@@ -1,7 +1,6 @@
 # platform/CMakeLists.txt - the C++ Windows integration layer.
 
 set(VOODKA_PLATFORM_COMMON_SOURCES
-    app.cpp
     arena.cpp
     log.cpp
     input.cpp
@@ -14,12 +13,14 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 )
 
 set(VOODKA_PLATFORM_SOURCES
+    production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_dispatch.cpp
     audio_dispatch.cpp
 )
 
 set(VOODKA_REFERENCE_SOURCES
+    app.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_present.cpp
     audio.cpp

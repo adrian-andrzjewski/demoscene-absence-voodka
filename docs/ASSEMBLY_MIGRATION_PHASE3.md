@@ -542,7 +542,7 @@ owners:
 
 | Component | Current production ownership | Migration risk |
 |---|---|---|
-| `app.cpp` | Host configuration/logging, production window-failure handoff, final return boundary; production path, startup coordination, and mode dispatch are now assembly ABIs | High: CRT exception/startup state, window bootstrap failure, and final host boundary remain coupled here; reference-only STL code remains the oracle |
+| `app.cpp` / `production_entry.cpp` | `app.cpp` is now reference-only; production retains only the minimal CRT `WinMain` shim, while `win32_app_host.asm` owns host configuration, logging, window failure, startup, seek, run, and final return | Medium-high: the remaining shim still requires CRT entry initialization; C++ platform services and the bridge remain live owners |
 | `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
 | `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
 | `d3d11_dispatch.cpp` | Production presenter adapter, palette state, frame recording and GPU/source diagnostics | Medium-high: normal COM calls are assembly, but optional capture uses `std::string`, `std::vector`, `fopen_s`, `fwrite`, and `fflush` |
@@ -664,11 +664,49 @@ line/configuration display, the window-bootstrap failure boundary, the final
 host return boundary, and C++ wrapper code used by diagnostics and platform
 services. Those must be reduced and measured before a custom `/ENTRY` attempt.
 
-## Next gate: Phase 3B.6.7B.4
+## Phase 3B.6.7B.4 production host removal
 
-Phase 3B.6.7B.4 should reduce the remaining production host and bridge C++
-boundary: configuration/log display, window-bootstrap failure handling, final
-shutdown return, and the small diagnostic/platform adapters that still pull in
-CRT/STL support. Import measurements and full-demo playback remain mandatory
-after each slice; no custom `/ENTRY` attempt is justified until the host no
-longer constructs C++ runtime objects during startup.
+The shipped target no longer compiles `app.cpp`. `win32_app_host.asm` now owns
+the production host body and preserves the former order:
+
+- initialize the assembly logger and emit the startup/configuration messages;
+- consume the assembly-parsed recording, diagnostics, timeline, music, audio,
+  and automation selectors;
+- build the fixed `AppStartupConfig`, create the window, and hand off to the
+  Phase B3 startup coordinator;
+- apply entry seeking, obtain the 64 MiB arena, run the selected mode, and
+  propagate the demo result; and
+- perform the final idempotent assembly shutdown, including window failure and
+  startup failure behavior.
+
+`production_entry.cpp` is only a CRT-owned `WinMain` transfer stub. The full
+C++ `app.cpp` remains in `VOODKA_REFERENCE.exe`, including its C++ lifecycle,
+window, and differential behavior. `bridge.cpp` supplies the narrow resolver
+and production shutdown symbols needed by the remaining C++ platform services.
+The focused host probe validates success, no-option defaults, window failure,
+startup failure, configuration fields, and all run/shutdown arguments without
+a window, GPU, audio device, or filesystem dependency.
+
+### Phase 3B.6.7B.4 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM host-coordinator probe                                1/1 passed; 0.10 s
+full regression suite                                      64/64 passed; 106.08 s
+production host body                                       NASM x64
+reference host body                                        C++ differential path
+```
+
+This is a **GO** for the next boundary. The shipped production host is now
+assembly except for the minimal CRT `WinMain` transfer. Remaining all-assembly
+blockers are the C++ platform services: bridge/P4 rasterization, dedicated
+audio orchestration, D3D11 capture/diagnostics, timing, input/pause, progress,
+timeline/log adapters, and their CRT/STL imports.
+
+## Next gate: Phase 3B.6.7B.5
+
+Phase 3B.6.7B.5 should remove the production C++ logger/timeline adapters and
+then re-audit the bridge and platform service ownership. Import measurements,
+full-demo playback, A/V synchronization, and failure/lifecycle probes remain
+mandatory; custom `/ENTRY` is still deferred until no production C++ object
+requires CRT initialization.

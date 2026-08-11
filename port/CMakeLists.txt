@@ -655,6 +655,18 @@ target_link_libraries(win32_app_startup_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.app_startup COMMAND win32_app_startup_probe)
 set_tests_properties(win32.app_startup PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.4 witness: exercise the shipped NASM host's logging,
+# configuration-record construction, window failure, startup failure, seek,
+# run, arena-size, and final-shutdown order with ABI stubs.
+add_executable(win32_app_host_probe
+    tools/validate/win32_app_host_probe.cpp)
+target_compile_definitions(win32_app_host_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_app_host_probe PRIVATE platform)
+target_link_libraries(win32_app_host_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.app_host COMMAND win32_app_host_probe)
+set_tests_properties(win32.app_host PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

@@ -1,9 +1,9 @@
 ; win32_app_entry.asm - production x64 assembly host handoff.
 ;
-; The CRT still owns the external WinMain entry while the host uses C++ CRT
-; facilities. The C++ WinMain shim immediately transfers control here. This
-; keeps the migration ABI-safe and makes the eventual no-CRT process entry a
-; later gate instead of calling an uninitialized C++ runtime.
+; The CRT still owns the external WinMain entry while the minimal C++ shim
+; immediately transfers control here. The complete production host is NASM;
+; custom /ENTRY remains a later gate until the remaining platform C++ objects
+; no longer require CRT initialization.
 
 BITS 64
 DEFAULT REL
@@ -16,7 +16,7 @@ extern GetModuleHandleA
 extern GetCommandLineA
 extern SetProcessDpiAwarenessContext
 extern asm_parse_command_line
-extern vk_voodka_host_main
+extern asm_voodka_host_main
 
 global asm_voodka_winmain
 
@@ -59,7 +59,7 @@ asm_voodka_winmain:
         mov     rcx, r13                     ; HINSTANCE
         mov     rdx, r14                     ; raw command line
         xor     r8d, r8d                     ; nCmdShow is not used by host
-        call    vk_voodka_host_main
+        call    asm_voodka_host_main
 
         add     rsp, 0x28
         pop     r14

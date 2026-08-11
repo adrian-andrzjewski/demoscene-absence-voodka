@@ -26,6 +26,9 @@ using std::uint64_t;
 #if defined(VOODKA_ASSEMBLY_PLATFORM)
 extern "C" int asm_log_vformat(char*, unsigned, const char*, const char*);
 extern "C" void asm_log_write(const char*, unsigned);
+extern "C" void asm_shutdown_all(void);
+extern "C" void asm_shutdown_and_exit(void);
+extern "C" const char* asm_voodka_resolve_music_path(const char*, const char*);
 #endif
 
 extern "C" {
@@ -216,6 +219,14 @@ void vk_app_log_automation(int32_t pauseMs, int32_t closeMs) {
                  pauseMs >= 0 ? "enabled" : "off",
                  closeMs >= 0 ? "enabled" : "off");
 }
+const char* vk_app_resolve_music_path(const char* overridePath) {
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+    return asm_voodka_resolve_music_path(overridePath, VOODKA_REPO_ROOT);
+#else
+    (void)overridePath;
+    return nullptr;
+#endif
+}
 
 // entry-part selector: 0 = run the full part1..part8 sequence (default),
 // 1..8 = run only that part. Set by app.cpp before DemoStart32.
@@ -341,4 +352,8 @@ namespace vk {
 void resetSelectors() {
     std::memset(sel_base_table, 0, sizeof sel_base_table);
 }
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+void shutdownAll() { asm_shutdown_all(); }
+void shutdownAndExit() { asm_shutdown_and_exit(); }
+#endif
 } // namespace vk
