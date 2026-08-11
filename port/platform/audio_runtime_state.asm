@@ -1,8 +1,8 @@
 ; audio_runtime_state.asm - fixed storage for the dedicated-player Runtime.
 ;
-; audio_asm.cpp continues to provide the transitional POD layout and state
-; machine, but the backing bytes are owned by the assembly image.  The loader
-; zeroes this block before either target enters its platform code.
+; The public C++ ABI view is described by audio_controller_abi.h; assembly
+; lifecycle/controller/seek services own the block in the shipped target. The
+; loader zeroes this block before either target enters its platform code.
 
 BITS 64
 DEFAULT REL

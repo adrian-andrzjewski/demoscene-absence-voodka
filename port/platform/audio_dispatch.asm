@@ -1,9 +1,8 @@
 ; audio_dispatch.asm - production namespace-vk audio ABI.
 ;
-; The dedicated player orchestration remains in audio_asm.cpp for now.  This
-; file removes the C++ forwarding shim from the shipped target while keeping
-; its exact MSVC-decorated namespace ABI and disabled-mode behavior.  The
-; reference executable has its own audio.cpp ABI and never links this file.
+; The dedicated player orchestration is native assembly. This file keeps the
+; exact MSVC-decorated namespace ABI and disabled-mode behavior. The reference
+; executable has its own audio.cpp ABI and never links this file.
 
 BITS 64
 DEFAULT REL

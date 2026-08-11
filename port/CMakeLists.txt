@@ -779,6 +779,18 @@ target_link_libraries(audio_lifecycle_probe PRIVATE kernel32)
 add_test(NAME audio.lifecycle COMMAND audio_lifecycle_probe)
 set_tests_properties(audio.lifecycle PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.9.8.2 seek-controller gate: exercise the public NASM
+# ModPos/millisecond/order wrappers and metadata commit status contract.
+add_executable(audio_seek_controller_probe
+    tools/validate/audio_seek_controller_probe.cpp
+    platform/audio_seek_controller.asm
+    platform/audio_lookup.asm
+    platform/audio_runtime_state.asm)
+target_compile_definitions(audio_seek_controller_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_seek_controller_probe PRIVATE kernel32)
+add_test(NAME audio.seek_controller COMMAND audio_seek_controller_probe)
+set_tests_properties(audio.seek_controller PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe

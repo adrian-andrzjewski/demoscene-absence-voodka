@@ -1122,13 +1122,45 @@ This is a **GO**. The dedicated audio lifecycle is now native x64 assembly
 without regressions in PCM delivery, soundtrack timing, A/V synchronization,
 rendering, or teardown stability.
 
-## Next gate: Phase 3B.6.7B.9.8.2
+## Phase 3B.6.7B.9.8.2 final audio seek wrapper
 
-The remaining production C++ in `audio_asm.cpp` is the seek-index and metadata
-commit wrapper: selecting a tick for ModPos/milliseconds/order, invoking the
-assembly seek transaction, and publishing the seek-relative frame/time base.
-The next gate must move that final wrapper into assembly while preserving
-duplicate/boundary lookup behavior, negative-input handling, seek failure
-statuses, elapsed-time continuity, live seek/stress results, and the
-reference-target differential path. Custom `/ENTRY` remains deferred until
-this and the remaining platform C++ ownership boundaries are proven.
+This slice moves the last production C++ audio surface out of `audio_asm.cpp`.
+`audio_seek_controller.asm` now owns the public ModPos, millisecond, and order
+seek wrappers, calls the native lower-bound and cross-thread transaction
+primitives, and commits the seek-relative frame/source/time metadata. It
+preserves the former status contract: status 0 leaves metadata unchanged,
+status 1 returns the selected ModPos, and status 2 commits metadata but returns
+failure to the caller. Negative millisecond/order inputs remain rejected and
+duplicate lower-bound behavior is unchanged.
+
+The obsolete `audio_asm.cpp` translation unit is removed from both production
+and reference target source lists. The dedicated player is now entirely NASM
+at the implementation layer; C++ remains only in the separate reference
+`audio.cpp` and in host/tool probes used for differential validation.
+
+### Phase 3B.6.7B.9.8.2 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM public seek-controller probe                            1/1 passed
+full regression suite                                      75/75 passed; 106.63 s
+live WASAPI seek/stress/long-run                             passed
+full assembly P1/pause/close playback                       passed
+audio C++ orchestration source in VOODKA build              removed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. The shipped dedicated audio player is now fully native x64
+assembly, including tracker/mixer, storage, WASAPI worker, synchronization,
+controller, lifecycle, and public seek ABI.
+
+## Next gate: Phase 3B.6.7C production platform C++ inventory
+
+With audio complete, the next risk-first gate is an import/symbol/source audit
+of the remaining shipped platform objects: `input.cpp`, `timer.cpp`,
+`progress.cpp`, `pause.cpp`, `bridge.cpp`, and the CRT `production_entry.cpp`
+handoff. Classify each remaining boundary by actual production references,
+Win32 API/COM dependency, and no-CRT impact before converting code. The
+reference target and all existing visual/audio/lifecycle gates remain
+mandatory; custom `/ENTRY` is still deferred until the remaining C++ startup
+and host contracts are understood.

@@ -4,10 +4,10 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
     arena.cpp
     input.cpp
     timer.cpp
-    audio_asm.cpp
     audio_controller.asm
     audio_lifecycle.asm
     audio_lookup.asm
+    audio_seek_controller.asm
     audio_seek.asm
     audio_runtime_state.asm
     audio_sync.asm

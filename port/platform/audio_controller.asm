@@ -1,7 +1,7 @@
 ;
 ; Public controller/query ABI for the dedicated assembly player. The runtime
-; block is initialized by audio_asm.cpp, but these steady-state query and
-; control paths no longer require a C++ implementation body.
+; block is initialized and cleared by audio_lifecycle.asm; these steady-state
+; query and control paths require no C++ implementation body.
 
 BITS 64
 DEFAULT REL

@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.9.8.1 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.9.8.2 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -1049,14 +1049,19 @@ initialization, fixed record construction, startup rollback, shutdown, and
 play/stop publication into `audio_lifecycle.asm`. Its lifecycle witness checks
 the exact producer/worker pointer contract, null/forced-failure paths, and
 runtime clearing; the complete 74-test suite—including live WASAPI lifecycle,
-seek/stress/long-run, P1/pause/close playback, and reference close—passes. The
-reference target remains the C++ behavioral oracle; only seek-index and
-seek-metadata commit glue remains in `audio_asm.cpp` for the next gate.
+seek/stress/long-run, P1/pause/close playback, and reference close—passes. Phase
+3B.6.7B.9.8.2 now moves the final public seek wrappers and seek-relative
+metadata commit into `audio_seek_controller.asm`, then removes `audio_asm.cpp`
+from both target source lists. Its duplicate/boundary/status probe and complete
+75-test suite—including live WASAPI seek/stress/long-run and P1/pause/close
+playback—pass. The dedicated shipped audio implementation is now entirely
+NASM; the reference target remains the C++ behavioral oracle.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.9.8.2:
-migrate the remaining seek-index and seek-metadata commit wrapper while
-retaining the reference target as the differential oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7C:
+inventory the remaining shipped platform C++ objects and their actual Win32,
+CRT, and host-handoff contracts before converting the next highest-risk
+boundary.

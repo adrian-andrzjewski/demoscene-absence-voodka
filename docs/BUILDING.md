@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (74 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (75 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -118,7 +118,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-74 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+75 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -156,6 +156,9 @@ self-check/report success and failure paths.
 `audio.lifecycle` validates NASM dedicated-player initialization, fixed record
 construction, null/forced-failure rollback, play/stop state publication,
 worker teardown ordering, ring closure, and runtime clearing.
+`audio.seek_controller` validates the public NASM ModPos/millisecond/order
+wrappers, duplicate lower-bound behavior, negative-input rejection, and
+status-0/status-2 seek metadata contracts.
 `audio.wasapi_asm_probe` performs the complete 44.1 kHz stereo PCM WASAPI
 activation, event, buffer, stop/reset, and COM teardown sequence in NASM; the
 C++ executable only validates its fixed-width report.
