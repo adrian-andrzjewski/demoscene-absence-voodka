@@ -40,6 +40,20 @@ extern "C" int vk_voodka_host_main(HINSTANCE, LPSTR, int);
 extern "C" int asm_voodka_winmain(HINSTANCE, HINSTANCE, LPSTR, int);
 extern "C" const char* asm_voodka_command_line(void);
 extern "C" void asm_install_crash_filter(void);
+extern "C" uint32_t asm_voodka_arg_libxmp(void);
+extern "C" const char* asm_voodka_arg_record(void);
+extern "C" const char* asm_voodka_arg_diag(void);
+extern "C" const char* asm_voodka_arg_music(void);
+extern "C" const char* asm_voodka_arg_timeline(void);
+extern "C" int32_t asm_voodka_arg_auto_pause(void);
+extern "C" int32_t asm_voodka_arg_auto_close(void);
+extern "C" int32_t asm_voodka_arg_modpos(void);
+extern "C" int32_t asm_voodka_arg_ms(void);
+extern "C" int32_t asm_voodka_arg_order(void);
+extern "C" int32_t asm_voodka_arg_part(void);
+extern "C" int32_t asm_voodka_arg_selftest(void);
+extern "C" int32_t asm_voodka_arg_audiocheck(void);
+extern "C" int32_t asm_voodka_arg_audiocheck_seconds(void);
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -261,6 +275,17 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         return dir.empty() ? nullptr : _strdup(dir.c_str());
     };
     {
+#if !defined(VOODKA_REFERENCE_BUILD)
+        const uint32_t assemblyArgFlags = asm_voodka_arg_libxmp();
+        recDir = asm_voodka_arg_record();
+        diagDir = asm_voodka_arg_diag();
+        musicOverride = asm_voodka_arg_music();
+        timelinePath = asm_voodka_arg_timeline();
+        referenceAudio = (assemblyArgFlags & 0x00000001u) != 0;
+        asmAudio = !referenceAudio;
+        autoPauseMs = asm_voodka_arg_auto_pause();
+        autoCloseMs = asm_voodka_arg_auto_close();
+#else
         std::string cmd = commandLine ? commandLine : "";
         recDir = argDirOf(cmd, "record");
         diagDir = argDirOf(cmd, "diag");
@@ -292,6 +317,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         };
         autoPauseMs = parseMs("--auto-pause-ms");
         autoCloseMs = parseMs("--auto-close-ms");
+#endif
         if (recDir) vk::logPrint("[app] recording to '%s'\n", recDir);
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
@@ -452,6 +478,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     //   --part N    scene/part index (maps to a ModPos, see table below)
     // At most one seek selector is honored; the first present wins.
     {
+#if defined(VOODKA_REFERENCE_BUILD)
         std::string cmd = commandLine ? commandLine : "";
         auto numAfter = [&](const char* flag) -> long {
             auto p = cmd.find(flag);
@@ -492,13 +519,41 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         } else {
             vk::logPrint("[app] no entry seek (module starts at beginning)\n");
         }
+#else
+        static const uint32_t kPartStartModPos[9] = {
+            0x0000, 0x0400, 0x0B40, 0x0D40, 0x1400,
+            0x1B40, 0x1C40, 0x2040, 0x2640,
+        };
+        long v;
+        if ((v = asm_voodka_arg_modpos()) >= 0) {
+            uint32_t reached = vk::audioSeekRows((uint32_t)v);
+            vk::logPrint("[app] seek --modpos %ld -> reached ModPos %u\n", v, reached);
+        } else if ((v = asm_voodka_arg_ms()) >= 0) {
+            uint32_t reached = vk::audioSeekMs((int)v);
+            vk::logPrint("[app] seek --ms %ld -> reached ModPos %u\n", v, reached);
+        } else if ((v = asm_voodka_arg_order()) >= 0) {
+            uint32_t reached = vk::audioSeekOrder((int)v);
+            vk::logPrint("[app] seek --order %ld -> reached ModPos %u\n", v, reached);
+        } else if ((v = asm_voodka_arg_part()) >= 1 && v <= 8) {
+            uint32_t reached = vk::audioSeekRows(kPartStartModPos[v - 1]);
+            vk::logPrint("[app] seek --part %ld -> ModPos 0x%x reached %u\n", v,
+                         kPartStartModPos[v - 1], reached);
+            vk_set_entry_part((int)v);
+        } else {
+            vk::logPrint("[app] no entry seek (module starts at beginning)\n");
+        }
+#endif
     }
 
     // ---- self-test or run the demo core (assembly) --------------------------
     uint8_t* ab = vk::arena();
     int rcode = 0;
     std::string cmdline = commandLine ? commandLine : "";
+#if defined(VOODKA_REFERENCE_BUILD)
     bool selftest = cmdline.find("--selftest") != std::string::npos;
+#else
+    bool selftest = asm_voodka_arg_selftest() != 0;
+#endif
     if (selftest) {
         // present the built-in pattern a few times so the readback can be
         // compared 1:1; bypasses the demo entirely
@@ -509,6 +564,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
             Sleep(16);
         }
         rcode = 0;
+#if defined(VOODKA_REFERENCE_BUILD)
     } else if (cmdline.find("--audiocheck") != std::string::npos) {
         // run the audio subsystem self-check; no demo rendering.
         int secs = 20;
@@ -525,6 +581,13 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         }
         vk::logPrint("[app] AUDIO CHECK: running %d s\n", secs);
         rcode = vk::audioSelfCheck(secs);
+#else
+    } else if (asm_voodka_arg_audiocheck() != 0) {
+        int secs = asm_voodka_arg_audiocheck_seconds();
+        if (secs <= 0) secs = 20;
+        vk::logPrint("[app] AUDIO CHECK: running %d s\n", secs);
+        rcode = vk::audioSelfCheck(secs);
+#endif
     } else {
         vk::logPrint("[app] arena=%p starting demo core\n", (void*)ab);
 #if defined(VOODKA_REFERENCE_BUILD)

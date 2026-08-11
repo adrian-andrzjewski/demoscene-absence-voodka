@@ -15,6 +15,7 @@ DEFAULT REL
 extern GetModuleHandleA
 extern GetCommandLineA
 extern SetProcessDpiAwarenessContext
+extern asm_parse_command_line
 extern vk_voodka_host_main
 
 global asm_voodka_winmain
@@ -52,6 +53,8 @@ asm_voodka_winmain:
         mov     r14, rax
         mov     [rel asm_instance_storage], r13
         mov     [rel asm_command_line_storage], r14
+        mov     rcx, r14
+        call    asm_parse_command_line
 
         mov     rcx, DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2
         call    SetProcessDpiAwarenessContext

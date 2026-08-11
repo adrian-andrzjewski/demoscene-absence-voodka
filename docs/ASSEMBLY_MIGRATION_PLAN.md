@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.4 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.5 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -935,18 +935,23 @@ handoff that obtains the module handle and raw command line, applies DPI policy,
 and calls the existing C++ host ABI. The reference target keeps direct C++
 entry. This is intentionally not a custom `/ENTRY` yet because the host still
 depends on CRT/STL initialization.
-Phase 3B.4 now stores the raw command-line pointer in assembly, registers the
+Phase 3B.4 stores the raw command-line pointer in assembly, registers the
 production assembly exception-filter entry, and moves the production Escape
-watcher event/thread lifecycle into NASM. Formatted crash reporting, argument
-interpretation, key-map state, and the main-thread message pump remain C++.
-Release validation includes the 54-test suite plus direct timeline runs.
+watcher event/thread lifecycle into NASM. Phase 3B.5 extends that ownership to
+command-line interpretation and the remaining input bridge: NASM now stores and
+parses the production flags, scalar/path selectors, seek controls, and
+recording/diagnostic switches, and owns the 128-byte key map plus the main
+thread message pump. The parser preserves the former C++ token behavior so
+this is an implementation migration rather than a command-line redesign.
+Formatted crash reporting, host orchestration, and final demo startup remain
+C++ for now. Release validation includes the 54-test suite, focused lifecycle
+gates, and direct `--selftest`/`--audiocheck 1` witnesses.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.5: assembly-side
-command-line interpretation and the remaining input bridge, including scalar
-and path selectors, key-map state, and the main-thread message pump. The
-transition into `DemoStart32` and final subsystem orchestration remain C++ until
-those gates have equivalent evidence.
+libxmp for differential validation. The next gate is Phase 3B.6: move the
+remaining production host bridge and application lifecycle orchestration behind
+assembly-owned interfaces, while retaining the reference target until those
+boundaries have equivalent evidence.

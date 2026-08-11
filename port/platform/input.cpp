@@ -12,6 +12,14 @@
 #if !defined(VOODKA_REFERENCE_BUILD)
 extern "C" int asm_input_init(void* hwnd);
 extern "C" void asm_input_shutdown(void);
+extern "C" uint8_t* asm_input_key_map(void);
+extern "C" void asm_input_key_down(uint32_t scancode);
+extern "C" void asm_input_key_up(uint32_t scancode);
+extern "C" void asm_input_key_reset(void);
+extern "C" int asm_input_key_is_down(int scancode);
+extern "C" void asm_input_clear_escape(void);
+extern "C" int asm_input_escape_queued(void);
+extern "C" void asm_input_update(void);
 #endif
 
 namespace vk {
@@ -93,6 +101,9 @@ void requestQuit()      { _InterlockedExchange(&g_quitRequested, 1); }
 bool quitRequested()    { return _InterlockedCompareExchange(&g_quitRequested, 0, 0) != 0; }
 
 void keyDown(uint8_t sc) {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_input_key_down(sc);
+#else
     if (sc < 128) {
         g_keyPressed[sc] = 1;
         if (sc == 1) {
@@ -100,19 +111,57 @@ void keyDown(uint8_t sc) {
             requestQuit();
         }
     }
+#endif
 }
-void keyUp(uint8_t sc)   { if (sc < 128) g_keyPressed[sc] = 0; }
-void keyReset()          { std::memset(g_keyPressed, 0, sizeof g_keyPressed); }
-uint8_t* rawKeyMap()     { return g_keyPressed; }
-void clearEscapeQueue()  { g_escapeQueued = false; }
-bool escapeQueued()      { return g_escapeQueued; }
+void keyUp(uint8_t sc) {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_input_key_up(sc);
+#else
+    if (sc < 128) g_keyPressed[sc] = 0;
+#endif
+}
+void keyReset() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_input_key_reset();
+#else
+    std::memset(g_keyPressed, 0, sizeof g_keyPressed);
+#endif
+}
+uint8_t* rawKeyMap() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    return asm_input_key_map();
+#else
+    return g_keyPressed;
+#endif
+}
+void clearEscapeQueue() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_input_clear_escape();
+#else
+    g_escapeQueued = false;
+#endif
+}
+bool escapeQueued() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    return asm_input_escape_queued() != 0;
+#else
+    return g_escapeQueued;
+#endif
+}
 
 int isKeyDown(int scancode) {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    return asm_input_key_is_down(scancode);
+#else
     if (scancode < 0 || scancode >= 128) return 0;
     return g_keyPressed[scancode] != 0;
+#endif
 }
 
 void updateInput() {
+#if !defined(VOODKA_REFERENCE_BUILD)
+    asm_input_update();
+#else
     // process any queued Windows messages (drives keyDown/keyUp)
     MSG msg;
     while (PeekMessageW(&msg, nullptr, 0, 0, PM_REMOVE)) {
@@ -128,6 +177,7 @@ void updateInput() {
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
     }
+#endif
 }
 
 }  // namespace vk

@@ -197,11 +197,51 @@ The focused gates covered production pause/resume, production close, and
 reference close. The full suite retained all rendering, audio, timing, asset,
 Win32, D3D11, and dedicated assembly-audio checks.
 
-## Next gate: Phase 3B.5
+## Phase 3B.5 command-line and input bridge
 
-Phase 3B.5 must migrate command-line interpretation and the remaining input
-bridge: scalar/path argument parsing, seek and recording selectors, the key-map
-state, and the main-thread message pump. It must preserve all seek, recording,
-diagnostic, pause, close, and failure-injection behavior. The C++ reference
-executable remains mandatory until those paths pass the same full-demo visual,
-audio, timing, and stability witnesses.
+Phase 3B.5 moves the production command-line and main-thread input boundary into
+NASM while keeping the C++ target as a differential oracle.
+
+- `win32_args.asm` owns raw command-line interpretation, the flag/value state,
+  fixed-size path storage, and getters for recording, diagnostics, music,
+  timeline, pause/close automation, ModPos, millisecond/order seeks, and part
+  selection. Its token and substring behavior intentionally matches the former
+  C++ parser, including its existing path-with-spaces limitation.
+- `win32_input.asm` owns the production 128-byte key map, key transitions,
+  Escape queue state, and the `PeekMessageW`/translate/dispatch loop. The
+  assembly Escape watcher and its event/thread lifecycle remain the Phase 3B.4
+  implementation.
+- `app.cpp` now consumes assembly getters for the shipped target. The
+  reference target retains the original C++ parser and input implementation so
+  every migration can still be compared against the established behavior.
+- The C++ ABI remains deliberately narrow: the assembly message handler uses
+  the existing key/pause/quit wrappers, while host orchestration, logging, and
+  subsystem startup remain C++ until their own gates are proven.
+
+### Phase 3B.5 validation
+
+```text
+Release build                                      passed
+focused parser/input/lifecycle gates               5/5 passed; 58.57 s
+direct --selftest                                  ExitCode=0
+direct --audiocheck 1                              ExitCode=0
+full regression suite                              54/54 passed; 107.86 s
+production command-line/input path                NASM x64
+reference command-line/input path                 C++ differential oracle
+```
+
+The focused gates cover assembly-audio startup, pause/resume, production close,
+reference close, and rejection of the removed production libxmp path. The full
+suite retains rendering, audio, timing, asset, Win32, D3D11, and dedicated
+assembly-audio coverage. This is a **GO** for the next platform boundary, but
+not yet a claim that the shipped process is assembly-only: C++ still owns the
+host handoff after the assembly entry point, formatted logging, and final demo
+orchestration.
+
+## Next gate: Phase 3B.6
+
+Phase 3B.6 should move the remaining production host bridge and application
+lifecycle orchestration behind assembly-owned interfaces, beginning with the
+smallest stable service boundaries. The C++ reference executable and all
+existing full-demo visual, audio, timing, and stability witnesses remain
+mandatory before removing each C++ implementation.

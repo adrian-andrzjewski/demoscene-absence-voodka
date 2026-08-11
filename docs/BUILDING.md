@@ -193,6 +193,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
 | `VOODKA` host handoff | Phase 3B.3 production NASM module/command-line/DPI handoff into the C++ host; reference remains direct C++ |
 | `VOODKA` early host services | Phase 3B.4 production NASM raw-command-line storage, exception-filter entry, and Escape watcher thread/event lifecycle |
+| `VOODKA` command-line/input bridge | Phase 3B.5 production NASM flag/value parsing, selector storage, 128-byte key map, and main-thread message pump; reference retains C++ behavior |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |
