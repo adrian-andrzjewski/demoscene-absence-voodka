@@ -10,6 +10,7 @@
 #include "platform_abi.h"
 #include "../tools/validate/audio_mix_abi.h"
 #include "../tools/validate/audio_ring_abi.h"
+#include "../tools/validate/audio_seek_abi.h"
 #include "../tools/validate/audio_service_abi.h"
 #include "../tools/validate/audio_thread_abi.h"
 #include "../tools/validate/audio_tick_abi.h"
@@ -34,7 +35,6 @@ namespace vk {
 
 namespace {
 
-constexpr uint32_t kPrebufferFrames = 8192;
 constexpr uint32_t kSampleRate = 44100;
 constexpr uint32_t kRingCapacity = 16384;
 constexpr uint32_t kMarkerCapacity = 16384;
@@ -82,59 +82,30 @@ bool issueState(Runtime* runtime, uint32_t state, uint32_t* sequenceOut) {
                                  sequenceOut) != 0;
 }
 
-bool issueSeek(Runtime* runtime, uint32_t targetTick,
-               uint32_t* sequenceOut) {
-    InterlockedExchange(
-        reinterpret_cast<volatile LONG*>(&runtime->control.requestedSeekTick),
-        static_cast<LONG>(targetTick));
-    const LONG sequence = InterlockedIncrement(
-        reinterpret_cast<volatile LONG*>(&runtime->control.seekSequence));
-    for (uint32_t i = 0; i < 5000; ++i) {
-        if (runtime->control.producerSeekAckSequence ==
-            static_cast<uint32_t>(sequence)) {
-            if (sequenceOut) *sequenceOut = static_cast<uint32_t>(sequence);
-            return true;
-        }
-        Sleep(1);
-    }
-    return false;
-}
-
-bool prebuffered(Runtime* runtime) {
-    for (uint32_t i = 0; i < 5000; ++i) {
-        if (runtime->ring.writeFrame - runtime->ring.readFrame >=
-            kPrebufferFrames) return true;
-        if (runtime->producerFailed) return false;
-        Sleep(1);
-    }
-    return false;
-}
-
 bool seekTick(Runtime* runtime, uint32_t targetTick) {
-    if (!issueState(runtime, 1, nullptr)) return false;
-    MemoryBarrier();
-    const uint32_t baseConsumed = runtime->control.workerConsumedFrames;
-    InterlockedExchange(
-        reinterpret_cast<volatile LONG*>(&runtime->control.seekRingBaseFrame),
-        static_cast<LONG>(baseConsumed));
+    uint32_t baseConsumed = 0;
     uint32_t seekSequence = 0;
-    if (!issueSeek(runtime, targetTick, &seekSequence)) return false;
-
-    MemoryBarrier();
-    runtime->ring.readFrame = runtime->ring.writeFrame;
-    runtime->ring.markerRead = runtime->ring.markerWrite;
-    MemoryBarrier();
-    InterlockedExchange(
-        reinterpret_cast<volatile LONG*>(&runtime->control.seekCommitSequence),
-        static_cast<LONG>(seekSequence));
-    if (!prebuffered(runtime)) return false;
+    const AudioSeekTransactionArgs transaction{
+        &runtime->control,
+        &runtime->ring,
+        reinterpret_cast<volatile uint32_t*>(&runtime->producerFailed),
+        targetTick,
+        0,
+        &runtime->lastControlState,
+        &runtime->lastControlSequence,
+        &baseConsumed,
+        &seekSequence,
+    };
+    const uint32_t transactionStatus =
+        asm_audio_seek_transaction(&transaction);
+    if (transactionStatus == 0) return false;
 
     runtime->seekBaseFrame = baseConsumed;
     runtime->seekSourceTick = targetTick;
     runtime->seekTimeBase =
         static_cast<double>(runtime->storage.tickStarts[targetTick]) /
         kSampleRate;
-    return issueState(runtime, 0, nullptr);
+    return transactionStatus == 1;
 }
 
 uint32_t tickForModPos(const Runtime* runtime, uint32_t modpos) {

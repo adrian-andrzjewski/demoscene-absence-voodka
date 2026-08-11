@@ -739,6 +739,17 @@ target_link_libraries(audio_sync_probe PRIVATE kernel32)
 add_test(NAME audio.sync COMMAND audio_sync_probe)
 set_tests_properties(audio.sync PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.9.6 seek gate: exercise assembly pause/ack, producer seek
+# acknowledgement, ring flush, prebuffer, and resume across real Win32 workers.
+add_executable(audio_seek_probe
+    tools/validate/audio_seek_probe.cpp
+    platform/audio_seek.asm
+    platform/audio_sync.asm)
+target_compile_definitions(audio_seek_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(audio_seek_probe PRIVATE kernel32)
+add_test(NAME audio.seek COMMAND audio_seek_probe)
+set_tests_properties(audio.seek PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe

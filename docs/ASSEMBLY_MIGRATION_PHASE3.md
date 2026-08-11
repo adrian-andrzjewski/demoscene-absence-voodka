@@ -1020,12 +1020,47 @@ next risk is seek-time quiescence and ring flushing, where producer and WASAPI
 threads must observe a precise pause boundary before the controller rewrites
 ring ownership state.
 
-## Next gate: Phase 3B.6.7B.9.6
+## Phase 3B.6.7B.9.6 seek quiescence and ring transaction
 
-Phase 3B.6.7B.9.6 should migrate seek-time quiescence, ring flushing, and
-resume publication into assembly.  It must prove that no producer write or
-WASAPI read crosses the captured logical boundary, including repeated seeks
-and shutdown during an in-flight seek.  Import attribution, PCM/perceptual
-audio comparison, full-demo playback, A/V synchronization, and
+This slice moves the remaining controller-side seek choreography from
+`audio_asm.cpp` into `audio_seek.asm`.  The fixed `AudioSeekTransactionArgs`
+ABI now makes assembly responsible for pause acknowledgement, consumed-frame
+capture, target/sequence publication, producer acknowledgement polling, PCM
+and marker cursor flushing, commit publication, 8192-frame prebuffer polling,
+and resume acknowledgement.  The existing producer-side tracker rebuild and
+the WASAPI worker's audio-boundary acknowledgement remain assembly-owned and
+are joined through the same `AudioLiveControl` record.
+
+The transaction returns status 0 for failure before resume, 1 for complete
+success, and 2 when commit/prebuffer completed but resume acknowledgement
+failed.  That preserves the former C++ metadata behavior for the latter case
+while keeping all cross-thread ownership operations in assembly.  The real
+`audio_seek_probe` uses separate Win32 producer and consumer helper threads to
+verify the complete pause/seek/flush/refill/resume sequence, while the live
+WASAPI seek/stress tests validate the production path.
+
+### Phase 3B.6.7B.9.6 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM seek transaction probe                                 1/1 passed
+seek/stress/P1/pause/close focused gates                    6/6 passed
+full regression suite                                      72/72 passed; 106.54 s
+PCM/marker flush and resume ownership                      NASM x64
+soundtrack/A-V lifecycle                                   fully green
+```
+
+This is a **GO**.  The highest-risk audio synchronization boundary now has a
+native assembly implementation with real-worker and production validation.
+The next gate is the remaining C++ audio controller wrapper: runtime metadata,
+elapsed-time bookkeeping, pump dispatch, and self-check reporting.
+
+## Next gate: Phase 3B.6.7B.9.7
+
+Phase 3B.6.7B.9.7 should migrate the remaining audio-controller metadata and
+query paths into assembly without changing the public `audioAsm*` ABI.  It
+must preserve ModPos, elapsed time across seeks, pause/resume state, failure
+reporting, and the reference-target differential path.  Import attribution,
+PCM/perceptual audio comparison, full-demo playback, A/V synchronization, and
 failure/lifecycle probes remain mandatory; custom `/ENTRY` is still deferred
 until no production C++ object requires CRT initialization.

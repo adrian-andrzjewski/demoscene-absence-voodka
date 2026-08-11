@@ -6,6 +6,7 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
     timer.cpp
     audio_asm.cpp
     audio_lookup.asm
+    audio_seek.asm
     audio_runtime_state.asm
     audio_sync.asm
     audio_workers.asm

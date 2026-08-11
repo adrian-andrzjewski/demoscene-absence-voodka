@@ -17,7 +17,7 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (71 tests)
+.\build.ps1 -Config Release -Test    # build + run the CTest suite (72 tests)
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -116,7 +116,7 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure
 ```
 
-71 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+72 tests: 20 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 P2 data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
 release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
@@ -209,6 +209,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `audio_dispatch_probe` | Phase 3B.6.7B.8 production NASM namespace-vk audio forwarding, disabled-mode defaults, log ABI, and shutdown witness (CTest `audio.dispatch`) |
 | `audio_lookup_probe` | Phase 3B.6.7B.9.1 NASM lower-bound seek-index primitive vs `std::lower_bound` over duplicate and boundary tables (CTest `audio.lookup`) |
 | `audio_sync_probe` | Phase 3B.6.7B.9.3 NASM state publish/increment/acknowledgement loop with a real Win32 helper thread (CTest `audio.sync`) |
+| `audio_seek_probe` | Phase 3B.6.7B.9.6 NASM pause/seek/producer-ack/ring-flush/prebuffer/resume transaction with real producer and consumer helpers (CTest `audio.seek`) |
 | `audio_workers_probe` | Phase 3B.6.7B.9.5 NASM worker startup, prebuffer, rollback, join, `CreateThread`/wait/close ownership, early-exit and failure paths (CTest `audio.workers`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
