@@ -12,10 +12,11 @@ The target is:
 - Windows, D3D11, WASAPI, and GPU-driver code remain external system dependencies.
 
 The current production boundary is defined by `port/platform/CMakeLists.txt`.
-The shipped target has already removed `xmp_static` and the C++/libxmp player;
-its D3D11/COM calls are now owned by the NASM presenter behind a narrow C++
-dispatch. The migration must preserve the existing NASM core and replace the
-remaining platform boundary incrementally.
+The shipped target has removed `xmp_static` and the C++/libxmp player; its
+D3D11/COM calls, dedicated player, Win32 host, and bridge services are owned
+by NASM. The C++ implementation remains only in the reference executable and
+host tools as a behavioral oracle. The migration must preserve the existing
+NASM core and its differential validation contracts.
 
 The shortest credible answer to whether this is viable is not to port the easy
 code first. The first feasibility gates are:
@@ -641,6 +642,12 @@ The dedicated production-entry close smoke passed five consecutive repeats,
 and the complete 88-test Release matrix passed in 112.45 seconds, including
 all visual, audio, synchronization, failure, P4 scene, and teardown gates.
 
+> The Phase 4-8 sections below are the original forward plan retained for
+> provenance. The current execution checkpoint above supersedes their open
+> migration claims: the shipped target has already crossed those production
+> boundaries. The remaining release gate is cross-machine Windows 10/11
+> validation and archival A/V review.
+
 ---
 
 ## Phase 4 — Replace the C ABI bridge and EOS platform boundary
@@ -971,7 +978,11 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7C.1 (after Phase 1C and 2X)
+## Historical implementation checkpoint: Phase 3B.6.7C.1 (superseded)
+
+The following checkpoint is retained as a chronological migration record. It
+describes the intermediate state before the later production ownership gates
+recorded above and is not the current completion status.
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and

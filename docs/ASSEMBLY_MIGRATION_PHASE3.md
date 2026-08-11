@@ -1,8 +1,12 @@
 # Phase 3 progress: pure Win32/thread runtime and callback integration
 
-Status: **Phase 3A and Phase 3B.1-3B.6.7B.2 passed; remaining host migration is in progress.**
+Status: **Production Phase 3 migration complete; local final gate passed; Windows 10/11 cross-machine and archival A/V release gates remain.**
 
 Snapshot date: **2026-08-11**
+
+The detailed sections below are chronological records of the migration gates.
+The current production result and remaining release gate are summarized at the
+end of this document.
 
 Phase 3 begins the highest-risk remaining platform work. It tests whether a
 native x64 assembly process can perform the Windows startup, window, message,
