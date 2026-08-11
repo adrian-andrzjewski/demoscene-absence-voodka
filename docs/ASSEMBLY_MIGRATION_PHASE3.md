@@ -430,11 +430,43 @@ formatter dependency is now specifically floating-point and any future
 unsupported format grammar; host/startup orchestration and the broader C++
 platform layer remain unchanged.
 
-## Next gate: Phase 3B.6.5
+## Phase 3B.6.5 production fixed-point float formatter
 
-Phase 3B.6.5 should inventory the live floating-point diagnostics and either
-implement a byte-compatible NASM conversion path or isolate the remaining
-formatting service behind a formally bounded assembly ABI. It must preserve
-rounding, signs, precision, scientific/general formats if present, truncation,
-concurrent writes, and crash-path output before `vsnprintf` can be removed from
-the shipped target.
+The remaining live floating-point formats are now native x64 assembly in
+`win32_log_format.asm`.
+
+- The formatter supports fixed `%f` with precision zero through six, including
+  signs, explicit plus, rounded scaled-integer conversion, trailing zeroes,
+  width/padding, and multiple floating arguments in one MSVC x64 `va_list`.
+- The production `log.cpp` path no longer contains a `vsnprintf` fallback.
+  `bridge.cpp` crash/shutdown trace formatting and `progress.cpp` elapsed/title
+  formatting also route through the same bounded NASM formatter. The reference
+  target keeps its C++ paths as the behavioral oracle.
+- `win32_log_format_probe` compares the live `%.2f`, `%+.0f`, and `%.3f`
+  cases, the exact pause format with a following `%ld`, truncation, flags, and
+  mixed integer/string/pointer records against MSVC. A shipped-binary symbol
+  audit reports no `vsnprintf`, `snprintf`, or `__stdio_common` reference.
+
+### Phase 3B.6.5 validation
+
+```text
+fixed-point formatter / logger / sink gates              3/3 passed; 0.09 s
+exact pause-format + lifecycle gate                    2/2 passed; 27.45 s
+full regression suite                                  58/58 passed; 104.38 s
+production log/progress/bridge formatting               NASM x64
+reference/VIRTUAL formatting paths                      C++ differential paths
+remaining formatted file output                        C++ timeline service
+```
+
+This is a **GO** for the next boundary. The shipped logger, crash trace,
+progress title, and live floating diagnostics no longer depend on CRT printf
+formatting. The remaining formatted production output is the timeline/file
+service, while host/startup orchestration and the broader C++ platform layer
+remain unchanged.
+
+## Next gate: Phase 3B.6.6
+
+Phase 3B.6.6 should migrate the timeline record formatter and its file-output
+boundary, preserving byte-for-byte timestamps, ModPos, audio-clock values,
+flush/close behavior, and failure-path handling. It should then reassess the
+remaining CRT/STL startup dependency before any custom `/ENTRY` work.

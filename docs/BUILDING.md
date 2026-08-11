@@ -82,9 +82,9 @@ initialization. Production raw command-line storage, exception-filter entry,
 and the global Escape watcher lifecycle are also implemented in
 `core/eos_replace/win32_crash.asm`, `core/eos_replace/win32_input.asm`, and
 `core/eos_replace/win32_log.asm`; crash formatting, the key map, message pump,
-and low-level logging sink are now assembly-owned; C++ retains only the
-production floating-point/unsupported printf-style formatting fallback for the
-current gate.
+and low-level logging sink are now assembly-owned; production log, progress,
+crash-trace, and fixed-point float formatting are NASM-owned; the formatted
+timeline/file service and broader host remain C++ for the current gate.
 
 ## Running
 
@@ -194,7 +194,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_runtime_probe` | Phase 3A no-CRT NASM process, HWND/WndProc, message pump, worker/event, exception-filter registration, and teardown gate (CTest `win32.runtime_probe`) |
 | `win32_crash_probe` | Phase 3B.6.2 synthetic `EXCEPTION_POINTERS`/Win64 varargs witness for the production NASM crash formatter (CTest `win32.crash_report`) |
 | `win32_log_probe` | Phase 3B.6.3 production NASM file sink, critical section, flush/close, and on-disk marker witness (CTest `win32.log_sink`) |
-| `win32_log_format_probe` | Phase 3B.6.4 byte-level MSVC-oracle comparison for the NASM integer/string/pointer formatter (CTest `win32.log_format`) |
+| `win32_log_format_probe` | Phase 3B.6.4-5 byte-level MSVC-oracle comparison for NASM integer/string/pointer/fixed-float formatting (CTest `win32.log_format`) |
 | `win32_log_api_probe` | Phase 3B.6.4 real production `vk::logPrint` va_list/formatter/sink integration witness (CTest `win32.log_api`) |
 | `VOODKA` lifecycle gates | Phase 3B.1 production NASM WndProc with pause/close validation; the reference executable retains the C++ callback |
 | `VOODKA` window bootstrap | Phase 3B.2 production NASM class registration, monitor geometry, creation/focus, and teardown; reference remains C++ |
@@ -204,7 +204,7 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` lifecycle automation | Phase 3B.6 production NASM pause/close automation worker, event/thread state, message injection, join, and handle cleanup; reference retains C++ behavior |
 | `VOODKA` shutdown coordinator | Phase 3B.6.1 production NASM atomic shutdown claim, teardown ordering, window destruction, log close, and quit-to-ExitProcess handoff; reference retains C++ behavior |
 | `VOODKA` crash formatter | Phase 3B.6.2 production NASM exception-record/context formatting and log-flush handoff; reference retains the C++ formatter |
-| `VOODKA` log sink | Phase 3B.6.3 production NASM path/file/critical-section/write/flush/close sink; Phase 3B.6.4 NASM integer/string/pointer formatting; C++ retains only floating/unsupported fallback and reference/VIRTUAL retain C++ logging |
+| `VOODKA` log sink | Phase 3B.6.3 production NASM path/file/critical-section/write/flush/close sink; Phase 3B.6.4-5 NASM integer/string/pointer/fixed-float formatting; timeline/file output and reference/VIRTUAL retain C++ paths |
 | `VOODKA --part 8 --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
 | `d3d11_dispatch.cpp` | Phase 1C shipped-target ABI dispatch; no C++ D3D11 objects |
 | `VOODKA_REFERENCE --asm-present` | Phase 1C reference-target comparison path using the NASM presenter |

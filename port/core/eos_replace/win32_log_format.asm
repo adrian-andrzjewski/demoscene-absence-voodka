@@ -51,11 +51,37 @@ asm_log_format_supported:
 .width:
         mov     dl, [rax]
         cmp     dl, '1'
-        jb      .length
+        jb      .precision
         cmp     dl, '9'
-        ja      .length
+        ja      .precision
         inc     rax
         jmp     .width
+
+.precision:
+        mov     dl, [rax]
+        cmp     dl, '.'
+        jne     .length
+        inc     rax
+        xor     r8d, r8d
+        mov     dl, [rax]
+        cmp     dl, '0'
+        jb      .no
+        cmp     dl, '9'
+        ja      .no
+.precision_digits:
+        movzx   edx, byte [rax]
+        sub     edx, '0'
+        imul    r8d, r8d, 10
+        add     r8d, edx
+        cmp     r8d, 6
+        ja      .no                         ; live path needs at most 6
+        inc     rax
+        mov     dl, [rax]
+        cmp     dl, '0'
+        jb      .length
+        cmp     dl, '9'
+        jbe     .precision_digits
+        jmp     .length
 
 .length:
         mov     dl, [rax]
@@ -93,6 +119,8 @@ asm_log_format_supported:
         je      .conversion_done
         cmp     dl, 'c'
         je      .conversion_done
+        cmp     dl, 'f'
+        je      .conversion_done
         jmp     .no
 .conversion_done:
         inc     rax
@@ -127,6 +155,7 @@ asm_log_vformat:
         push    r14
         push    r15
         sub     rsp, 0xA8                    ; keep RSP%16==0 for the scan call
+        mov     dword [rbp - 0x9C], 0        ; integer-format path by default
 
         mov     r12, rcx                    ; output buffer
         mov     r13d, edx                   ; capacity
@@ -194,9 +223,9 @@ asm_log_vformat:
 .parse_width:
         mov     al, [rsi]
         cmp     al, '1'
-        jb      .parse_length
+        jb      .parse_precision
         cmp     al, '9'
-        ja      .parse_length
+        ja      .parse_precision
         imul    r8d, r8d, 10
         movzx   eax, al
         sub     eax, '0'
@@ -204,7 +233,35 @@ asm_log_vformat:
         inc     rsi
         jmp     .parse_width
 
+.parse_precision:
+        mov     dword [rbp - 0x88], 6         ; printf default for %f
+        cmp     byte [rsi], '.'
+        jne     .parse_length
+        inc     rsi
+        xor     r10d, r10d
+        mov     al, [rsi]
+        cmp     al, '0'
+        jb      .unsupported
+        cmp     al, '9'
+        ja      .unsupported
+.parse_precision_digits:
+        movzx   eax, byte [rsi]
+        sub     eax, '0'
+        imul    r10d, r10d, 10
+        add     r10d, eax
+        cmp     r10d, 6
+        ja      .unsupported
+        inc     rsi
+        mov     al, [rsi]
+        cmp     al, '0'
+        jb      .parse_precision_done
+        cmp     al, '9'
+        jbe     .parse_precision_digits
+.parse_precision_done:
+        mov     [rbp - 0x88], r10d
+
 .parse_length:
+        mov     [rbp - 0x84], r8d             ; field width
         xor     r10d, r10d                 ; qword argument flag
         mov     al, [rsi]
         cmp     al, 'z'
@@ -240,6 +297,8 @@ asm_log_vformat:
         je      .number_unsigned
         cmp     al, 'x'
         je      .number_hex_lower
+        cmp     al, 'f'
+        je      .number_float
         ; The scan above guarantees this is the supported uppercase hex case.
         mov     r11d, 2                    ; uppercase digit flag
         jmp     .number_unsigned_fetch
@@ -260,6 +319,46 @@ asm_log_vformat:
 .number_hex_lower:
         xor     r11d, r11d
         jmp     .number_fetch
+.number_float:
+        mov     rax, [rdi]
+        add     rdi, 8
+        mov     [rbp - 0xA8], rsi          ; preserve format cursor while appending
+        mov     r10d, [rbp - 0x88]
+        xor     r11d, r11d                 ; sign: 1 negative, 2 explicit plus
+        test    rax, rax
+        jns     .float_positive
+        mov     r11d, 1
+.float_positive_abs:
+        mov     rcx, 0x7FFFFFFFFFFFFFFF
+        and     rax, rcx
+        jmp     .float_scale
+.float_positive:
+        test    r9d, 4
+        jz      .float_scale
+        mov     r11d, 2
+.float_scale:
+        movq    xmm0, rax
+        movsd   xmm1, [rel float_ten]
+.float_scale_loop:
+        test    r10d, r10d
+        jz      .float_round
+        mulsd   xmm0, xmm1
+        dec     r10d
+        jmp     .float_scale_loop
+.float_round:
+        addsd   xmm0, [rel float_half]
+        cvttsd2si rax, xmm0
+        mov     r10d, [rbp - 0x88]
+        lea     r8, [rel float_pow10]
+        mov     r8, [r8 + r10 * 8]
+        xor     edx, edx
+        div     r8
+        mov     [rbp - 0x90], rdx          ; fractional remainder
+        mov     r10d, r11d                 ; sign flag used by digits_sign
+        xor     r11d, r11d                 ; base-10, lower-case digit path
+        mov     r8d, 10
+        mov     dword [rbp - 0x9C], 1
+        jmp     .digits_begin
 .number_unsigned_fetch:
 .number_fetch:
         mov     rax, [rdi]
@@ -267,6 +366,7 @@ asm_log_vformat:
 
         ; Preserve the parsed width while the conversion uses R8 as its base.
         mov     [rbp - 0x84], r8d
+        mov     dword [rbp - 0x9C], 0
         mov     r14d, r10d                 ; qword flag before R10 is reused
         xor     r10d, r10d                 ; negative-sign flag
         test    r11d, 1
@@ -308,7 +408,7 @@ asm_log_vformat:
         mov     r8d, 16
 
 .digits_begin:
-        lea     r15, [rbp - 0x40 + 64]
+        lea     r15, [rbp - 0x40]
         xor     ecx, ecx
         test    rax, rax
         jnz     .digits_loop
@@ -349,10 +449,13 @@ asm_log_vformat:
         mov     byte [r15], '+'
 
 .digits_ready:
+        cmp     dword [rbp - 0x9C], 0
+        jne     .float_digits_ready
         mov     r14, r15                   ; rendered start pointer
-        lea     rax, [rbp - 0x40 + 64]
+        lea     rax, [rbp - 0x40]
         sub     rax, r14
         mov     r15d, eax                 ; rendered length
+.digits_width_ready:
         mov     r8d, [rbp - 0x84]
         cmp     r8d, r15d
         jbe     .number_body_no_left_padding
@@ -412,6 +515,42 @@ asm_log_vformat:
         dec     r10d
         jnz     .number_left_padding_loop
         jmp     .format_loop
+
+.float_digits_ready:
+        mov     r14, r15                   ; rendered start pointer
+        lea     rsi, [rbp - 0x40]          ; append after whole-number digits
+        mov     ecx, [rbp - 0x88]
+        test    ecx, ecx
+        jz      .float_fraction_done
+        mov     byte [rsi], '.'
+        inc     rsi
+        mov     rax, [rbp - 0x90]
+        mov     r10d, ecx
+        dec     ecx
+        lea     r8, [rel float_pow10]
+        mov     r8, [r8 + rcx * 8]
+.float_fraction_loop:
+        xor     edx, edx
+        div     r8
+        add     eax, '0'
+        mov     [rsi], al
+        inc     rsi
+        mov     [rbp - 0x90], rdx
+        dec     r10d
+        jz      .float_fraction_done
+        mov     rax, r8
+        xor     edx, edx
+        mov     ecx, 10
+        div     rcx
+        mov     r8, rax
+        mov     rax, [rbp - 0x90]
+        jmp     .float_fraction_loop
+.float_fraction_done:
+        mov     rax, rsi
+        sub     rax, r14
+        mov     r15d, eax
+        mov     rsi, [rbp - 0xA8]
+        jmp     .digits_width_ready
 
 .string_narrow:
         mov     rdx, [rdi]
@@ -479,6 +618,10 @@ asm_log_vformat:
         ret
 
 section .rdata
+align 8
+float_ten:   dq 0x4024000000000000
+float_half:  dq 0x3FE0000000000000
+float_pow10: dq 1, 10, 100, 1000, 10000, 100000, 1000000
 null_string: db '(null)', 0
 
 section .note.GNU-stack noalloc noexec nowrite progbits

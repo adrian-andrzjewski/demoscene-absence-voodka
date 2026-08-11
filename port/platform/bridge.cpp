@@ -23,6 +23,11 @@ using std::uint16_t;
 using std::uint32_t;
 using std::uint64_t;
 
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+extern "C" int asm_log_vformat(char*, unsigned, const char*, const char*);
+extern "C" void asm_log_write(const char*, unsigned);
+#endif
+
 extern "C" {
 // public table NASM can index:  sel_base_table[handle*8] = base pointer.
 // size matches EOS_MAX_SELECTORS in eos_dispatch.asm.
@@ -146,11 +151,19 @@ void vk_shutdown_log_shutdown() { vk::logShutdown(); }
 
 // trace hook from NASM (simple %s/%x/%d formatting via platform logger)
 void vk_log_printf(const char* fmt, ...) {
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+    char buf[512];
+    va_list ap; va_start(ap, fmt);
+    const int length = asm_log_vformat(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    if (length >= 0) asm_log_write(buf, static_cast<unsigned>(length));
+#else
     char buf[512];
     va_list ap; va_start(ap, fmt);
     std::vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
     vk::logPrint("%s", buf);
+#endif
 }
 
 struct P4DrawArgs {

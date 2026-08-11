@@ -20,8 +20,7 @@ int main() {
     if (!asm_log_format_supported("%d %u %ld %lu %x %08x %p %zu %llu %s\n")) {
         return 1;
     }
-    if (asm_log_format_supported("%.2f") ||
-        asm_log_format_supported("%n") ||
+    if (asm_log_format_supported("%n") ||
         asm_log_format_supported("%*d") ||
         asm_log_format_supported("% d") ||
         asm_log_format_supported("%#x")) {
@@ -72,6 +71,39 @@ int main() {
     if (f < 0 || std::strcmp(expected, actual) != 0 ||
         f != static_cast<int>(std::strlen(actual))) {
         return 6;
+    }
+
+    if (!asm_log_format_supported("%.2f %+.0f %.3f") ||
+        asm_log_format_supported("%.7f") ||
+        asm_log_format_supported("%e") ||
+        asm_log_format_supported("%g")) {
+        return 7;
+    }
+    const int oneFloat = formatAssembly(actual, sizeof actual, "%.2f", 1.234);
+    if (oneFloat < 0) return 70;
+    std::snprintf(expected, sizeof expected, "[float] %.2f %+.0f %.3f\n",
+                  1.234, -2.6, 0.9995);
+    const int q = formatAssembly(actual, sizeof actual,
+                                 "[float] %.2f %+.0f %.3f\n",
+                                 1.234, -2.6, 0.9995);
+    if (q < 0 || std::strcmp(expected, actual) != 0 ||
+        q != static_cast<int>(std::strlen(actual))) {
+        std::fprintf(stderr, "expected=[%s] actual=[%s] length=%d\n",
+                     expected, actual, q);
+        return 8;
+    }
+
+    std::snprintf(expected, sizeof expected,
+                  "[pause] PAUSED  ModPos=0x%x elapsed=%.2fs toggle=%ld\n",
+                  0x4u, 1.0, 1L);
+    const int pause = formatAssembly(actual, sizeof actual,
+                                     "[pause] PAUSED  ModPos=0x%x elapsed=%.2fs toggle=%ld\n",
+                                     0x4u, 1.0, 1L);
+    if (pause < 0 || std::strcmp(expected, actual) != 0 ||
+        pause != static_cast<int>(std::strlen(actual))) {
+        std::fprintf(stderr, "expected=[%s] actual=[%s] length=%d\n",
+                     expected, actual, pause);
+        return 9;
     }
 
     char tiny[8] = {};

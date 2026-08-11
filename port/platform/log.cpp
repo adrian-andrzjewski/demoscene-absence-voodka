@@ -50,28 +50,22 @@ void logPrint(const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
 #if defined(VOODKA_ASSEMBLY_PLATFORM)
-    if (asm_log_format_supported(fmt)) {
-        const int length = asm_log_vformat(buf, sizeof buf, fmt, ap);
-        va_end(ap);
-        if (length >= 0) {
-            asm_log_write(buf, static_cast<unsigned>(length));
-            return;
-        }
-        va_start(ap, fmt);
+    const int length = asm_log_vformat(buf, sizeof buf, fmt, ap);
+    va_end(ap);
+    if (length >= 0) {
+        asm_log_write(buf, static_cast<unsigned>(length));
     }
-#endif
+#else
     std::vsnprintf(buf, sizeof buf, fmt, ap);
     va_end(ap);
-#if !defined(VOODKA_ASSEMBLY_PLATFORM)
     if (g_log != INVALID_HANDLE_VALUE) {
         EnterCriticalSection(&g_logCs);
         DWORD wr = 0;
         WriteFile(g_log, buf, (DWORD)std::strlen(buf), &wr, nullptr);
         LeaveCriticalSection(&g_logCs);
     }
-#else
-    asm_log_write(buf, static_cast<unsigned>(std::strlen(buf)));
 #endif
+    return;
 }
 
 void logFlush() {

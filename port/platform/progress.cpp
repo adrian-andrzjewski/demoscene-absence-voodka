@@ -11,6 +11,11 @@
 #include "platform_abi.h"
 #include <windows.h>
 #include <cstdio>
+#include <cstdarg>
+
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+extern "C" int asm_log_vformat(char*, unsigned, const char*, const char*);
+#endif
 
 namespace vk {
 
@@ -44,11 +49,24 @@ HWND g_hwnd = nullptr;
 int  g_lastScene = -1;      // index of the last scene emitted (-1 = none yet)
 long g_transitionCount = 0; // running scene index (monotonic transition id)
 
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+void formatAssembly(char* out, unsigned capacity, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    (void)asm_log_vformat(out, capacity, fmt, ap);
+    va_end(ap);
+}
+#endif
+
 void formatElapsed(char* out, size_t n, double sec) {
     int mm = (int)(sec / 60.0);
     int ss = (int)sec % 60;
     int tt = (int)(sec * 10.0) % 10;
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+    formatAssembly(out, static_cast<unsigned>(n), "%02d:%02d.%d", mm, ss, tt);
+#else
     snprintf(out, n, "%02d:%02d.%d", mm, ss, tt);
+#endif
 }
 
 } // namespace
@@ -79,9 +97,15 @@ void progressUpdate() {
     formatElapsed(tbuf, sizeof tbuf, audioElapsedSec());
 
     char title[256];
+#if defined(VOODKA_ASSEMBLY_PLATFORM)
+    formatAssembly(title, sizeof title,
+                   "VOODKA (Absence) - Part %d/8  %s  [%s]  t=%s  scene#%ld",
+                   s.part, s.scene, s.effect, tbuf, g_transitionCount);
+#else
     snprintf(title, sizeof title,
              "VOODKA (Absence) - Part %d/8  %s  [%s]  t=%s  scene#%ld",
              s.part, s.scene, s.effect, tbuf, g_transitionCount);
+#endif
     if (g_hwnd) SetWindowTextA(g_hwnd, title);
 
     logPrint("[scene] part=%d/8 scene=\"%s\" effect=\"%s\" elapsed=%s "
