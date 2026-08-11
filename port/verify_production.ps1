@@ -70,6 +70,59 @@ function Invoke-ProductionRun(
     Write-Host "${Name}: exit 0"
 }
 
+function Assert-ProductionTimeline([string]$TimelinePath) {
+    if (-not (Test-Path -LiteralPath $TimelinePath)) {
+        Fail "full playback did not produce the requested timeline $TimelinePath"
+    }
+
+    $lines = @(Get-Content -LiteralPath $TimelinePath)
+    $header = "# frame qpc_us modpos audio_elapsed_us"
+    if ($lines.Count -lt 17001) {
+        Fail "production timeline contains only $($lines.Count - 1) frames; expected at least 17000"
+    }
+    if ($lines[0] -ne $header) {
+        Fail "production timeline header does not match the A/V contract"
+    }
+
+    [UInt64]$previousFrame = 0
+    [UInt32]$previousModPos = 0
+    [UInt64]$previousAudioUs = 0
+    for ($lineIndex = 1; $lineIndex -lt $lines.Count; ++$lineIndex) {
+        $fields = $lines[$lineIndex] -split '\s+'
+        if ($fields.Count -ne 4) {
+            Fail "malformed production timeline row $lineIndex"
+        }
+        try {
+            [UInt64]$frame = [UInt64]::Parse($fields[0], [Globalization.CultureInfo]::InvariantCulture)
+            [UInt32]$modpos = [UInt32]::Parse($fields[2], [Globalization.CultureInfo]::InvariantCulture)
+            [UInt64]$audioUs = [UInt64]::Parse($fields[3], [Globalization.CultureInfo]::InvariantCulture)
+        } catch {
+            Fail "malformed numeric value in production timeline row $lineIndex"
+        }
+        if ($frame -ne [UInt64]$lineIndex) {
+            Fail "production timeline frame sequence breaks at row $lineIndex"
+        }
+        if ($lineIndex -gt 1 -and $modpos -lt $previousModPos) {
+            Fail "production ModPos regressed at frame $frame"
+        }
+        if ($lineIndex -gt 1 -and $audioUs -lt $previousAudioUs) {
+            Fail "production audio clock regressed at frame $frame"
+        }
+        $previousFrame = $frame
+        $previousModPos = $modpos
+        $previousAudioUs = $audioUs
+    }
+
+    if ($previousModPos -ne 0x2803) {
+        Fail ("production playback ended at ModPos 0x{0:X}; expected 0x2803" -f $previousModPos)
+    }
+    if ($previousAudioUs -lt 200000000) {
+        Fail "production audio timeline ended before 200 seconds"
+    }
+    Write-Host ("Timeline: {0} frames, terminal ModPos 0x{1:X}, audio {2} ms ({3})" -f
+        $previousFrame, $previousModPos, [Math]::Round($previousAudioUs / 1000.0), $TimelinePath)
+}
+
 if (-not (Test-Path -LiteralPath $exePath)) {
     Fail "missing $exePath; run port/build.ps1 first"
 }
@@ -182,7 +235,7 @@ try {
         Invoke-ProductionRun "full production playback" @(
             "--timeline", $timeline
         ) $FullRunTimeoutSec $runExePath $runWorkingDirectory
-        Write-Host "Timeline: $timeline"
+        Assert-ProductionTimeline $timeline
     } else {
         Write-Host "Full production playback not requested; use -FullRun for certification."
     }
