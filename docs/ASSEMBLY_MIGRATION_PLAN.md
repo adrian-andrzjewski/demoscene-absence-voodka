@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.2 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.3 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -947,8 +947,8 @@ The shipped logger/progress/bridge formatting paths, including live fixed-point
 floating diagnostics, are now NASM-owned. Phase 3B.6.6 also moved production
 timeline record formatting and its Win32 file sink into NASM. Phase 3B.6.7A
 now moves the production 64 MiB arena, archive discovery/read, bump allocator,
-and `Load_internal_file` copy boundary into NASM. Host orchestration and startup
-orchestration remain C++ for now. Phase 3B.6 moved the production pause/close
+and `Load_internal_file` copy boundary into NASM. Phase 3B.6 moved the
+production pause/close
 automation worker,
 its event/thread state, and deterministic join/handle cleanup into NASM.
 Phase 3B.6.1 now moves the production global shutdown coordinator, atomic
@@ -973,14 +973,18 @@ pointer directly into the dedicated audio initializer. Its focused path/arena
 gates and complete 61-test suite pass. Phase 3B.6.7B.2 now moves the
 production seek precedence, part-start table, self-test loop, audio-check
 dispatch, crash-filter handoff, and DemoStart32 result branch into NASM. Its
-mode probe and complete 62-test suite pass. The next sub-gate is Phase
-3B.6.7B.3: remove the remaining host CRT/STL ownership in measured slices
-before any custom `/ENTRY` work.
+mode probe and complete 62-test suite pass. Phase 3B.6.7B.3 now moves the
+production subsystem initialization order, quit checkpoints, service argument
+contract, lifecycle automation handoff, and ordinary failure rollback into
+`win32_app_startup.asm`, with a fixed-layout `AppStartupConfig` and a focused
+service-stub witness. Its startup probe and complete 63-test suite pass. The
+next sub-gate is Phase 3B.6.7B.4: reduce the remaining production host and
+bridge C++ boundary before any custom `/ENTRY` work.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.3: remove
-the remaining CRT/STL startup and host-orchestration ownership while retaining
-the reference target as the differential oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.4: remove
+the remaining CRT/STL startup and host-boundary ownership while retaining the
+reference target as the differential oracle.

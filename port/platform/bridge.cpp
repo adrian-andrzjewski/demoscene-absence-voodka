@@ -165,6 +165,58 @@ void vk_app_log_demo_start(uint64_t arenaBase) {
                  reinterpret_cast<void*>(arenaBase));
 }
 
+// Production startup coordinator adapters.  The service order, checkpoints,
+// and ordinary failure branches live in win32_app_startup.asm; each wrapper
+// keeps one existing platform operation behind an explicit C ABI boundary.
+void vk_app_progress_init(void* hwnd) { vk::progressInit(hwnd); }
+int vk_app_input_init(void* hwnd) { return vk::inputInit(hwnd) ? 1 : 0; }
+int vk_app_platform_init() { return vk::platformInit() ? 1 : 0; }
+int vk_app_quit_requested() { return vk::quitRequested() ? 1 : 0; }
+void vk_app_shutdown_all() { vk::shutdownAll(); }
+void vk_app_shutdown_and_exit() { vk::shutdownAndExit(); }
+void vk_app_timer_init() { vk::timerInit(); }
+void vk_app_timeline_init(const char* path) { vk::timelineInit(path); }
+void vk_app_rec_init(const char* dir) { vk::recInit(dir); }
+void vk_app_log_music(const char* path) {
+    vk::logPrint("[app] music module: '%s'\n",
+                 path && path[0] ? path : "(none)");
+}
+void vk_app_audio_set_mode(int enabled) {
+    vk::audioSetAssemblyMode(enabled != 0);
+}
+int vk_app_audio_init(const char* path, int sampleRate) {
+    return vk::audioInit(path ? path : "", sampleRate);
+}
+void vk_app_log_input_failure() {
+    vk::logPrint("[app] input watcher init failed\n");
+}
+void vk_app_log_arena_failure() {
+    vk::logPrint("[app] arena init failed\n");
+}
+void vk_app_log_audio_failure(int referenceAudio) {
+    vk::logPrint(referenceAudio
+                     ? "[app] reference audio initialization failed\n"
+                     : "[app] assembly audio initialization failed\n");
+}
+void vk_app_set_assembly_presenter(int enabled) {
+    vk::setAssemblyPresenter(enabled != 0);
+}
+int vk_app_present_init(void* hwnd, int width, int height) {
+    return vk::initPresent(hwnd, width, height) ? 1 : 0;
+}
+void vk_app_diag_init(const char* dir) { vk::diagReadbackInit(dir); }
+void vk_app_log_present_failure() {
+    vk::logPrint("[app] D3D11 init failed\n");
+}
+void vk_app_log_automation_failure() {
+    vk::logPrint("[app] lifecycle automation initialization failed\n");
+}
+void vk_app_log_automation(int32_t pauseMs, int32_t closeMs) {
+    vk::logPrint("[app] lifecycle automation: pause=%s close=%s\n",
+                 pauseMs >= 0 ? "enabled" : "off",
+                 closeMs >= 0 ? "enabled" : "off");
+}
+
 // entry-part selector: 0 = run the full part1..part8 sequence (default),
 // 1..8 = run only that part. Set by app.cpp before DemoStart32.
 static int g_entry_part = 0;

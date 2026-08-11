@@ -643,6 +643,18 @@ target_link_libraries(win32_app_modes_probe PRIVATE voodka_core kernel32)
 add_test(NAME win32.app_modes COMMAND win32_app_modes_probe)
 set_tests_properties(win32.app_modes PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.3 witness: verify the production NASM subsystem-startup
+# coordinator's service order, argument ABI, quit checkpoints, and rollback
+# branches with platform/audio/GPU-free C ABI stubs.
+add_executable(win32_app_startup_probe
+    tools/validate/win32_app_startup_probe.cpp)
+target_compile_definitions(win32_app_startup_probe PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(win32_app_startup_probe PRIVATE platform)
+target_link_libraries(win32_app_startup_probe PRIVATE voodka_core kernel32)
+add_test(NAME win32.app_startup COMMAND win32_app_startup_probe)
+set_tests_properties(win32.app_startup PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

@@ -26,9 +26,37 @@
 // adapts the EOS register calling convention to these prototypes.
 
 #pragma once
+#include <cstddef>
 #include <cstdint>
 
 namespace vk {
+
+// Stable POD contract for the production NASM startup coordinator. The
+// reference executable intentionally keeps the C++ sequence as its oracle;
+// VOODKA passes this record once so assembly owns ordering and rollback.
+struct AppStartupConfig {
+    void* hwnd;
+    const char* recDir;
+    const char* diagDir;
+    const char* timelinePath;
+    const char* musicPath;
+    int32_t asmAudio;
+    int32_t referenceAudio;
+    int32_t asmPresenter;
+    int32_t autoPauseMs;
+    int32_t autoCloseMs;
+};
+static_assert(offsetof(AppStartupConfig, hwnd) == 0);
+static_assert(offsetof(AppStartupConfig, recDir) == 8);
+static_assert(offsetof(AppStartupConfig, diagDir) == 16);
+static_assert(offsetof(AppStartupConfig, timelinePath) == 24);
+static_assert(offsetof(AppStartupConfig, musicPath) == 32);
+static_assert(offsetof(AppStartupConfig, asmAudio) == 40);
+static_assert(offsetof(AppStartupConfig, referenceAudio) == 44);
+static_assert(offsetof(AppStartupConfig, asmPresenter) == 48);
+static_assert(offsetof(AppStartupConfig, autoPauseMs) == 52);
+static_assert(offsetof(AppStartupConfig, autoCloseMs) == 56);
+static_assert(sizeof(AppStartupConfig) == 64);
 
 // ---- arena memory ----------------------------------------------------------
 uint8_t* arena();                     // base of the demo arena

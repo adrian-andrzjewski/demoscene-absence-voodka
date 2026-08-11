@@ -542,7 +542,7 @@ owners:
 
 | Component | Current production ownership | Migration risk |
 |---|---|---|
-| `app.cpp` | Host orchestration, subsystem ordering, CRT `WinMain` handoff target; production path and mode dispatch are now assembly ABIs | Very high: subsystem ordering, CRT exception/startup state, and many failure paths remain coupled here; reference-only STL code remains the oracle |
+| `app.cpp` | Host configuration/logging, production window-failure handoff, final return boundary; production path, startup coordination, and mode dispatch are now assembly ABIs | High: CRT exception/startup state, window bootstrap failure, and final host boundary remain coupled here; reference-only STL code remains the oracle |
 | `bridge.cpp` | EOS C ABI wrappers, selector table, palette conversion, P4 software triangle rasterizer | High: wrappers are simple, but P4 uses `ceil`/`floor`, double precision, clipping, and byte-exact raster behavior |
 | `audio_asm.cpp` | Dedicated assembly player orchestration, Win32 handles/events, seek/pause protocol, `lower_bound` calibration | High: the mixer/player is assembly, but worker ownership and A/V clock behavior still cross a C++ state machine |
 | `d3d11_dispatch.cpp` | Production presenter adapter, palette state, frame recording and GPU/source diagnostics | Medium-high: normal COM calls are assembly, but optional capture uses `std::string`, `std::vector`, `fopen_s`, `fwrite`, and `fflush` |
@@ -624,11 +624,51 @@ demo result branch. The remaining high-risk C++ owners are subsystem ordering,
 audio worker orchestration, D3D11 diagnostics/capture, timing, and input/state
 adapters. The CRT/STL import audit still blocks custom `/ENTRY` startup.
 
-## Next gate: Phase 3B.6.7B.3
+## Phase 3B.6.7B.3 production subsystem-startup coordinator
 
-Phase 3B.6.7B.3 should reduce the remaining production `app.cpp` subsystem
-ordering and failure-path ownership, beginning with a POD startup/result
-contract around initialization and teardown while preserving the reference
-oracle. Import measurements and full-demo playback remain mandatory after each
-slice; no custom `/ENTRY` attempt is justified until the host no longer
-constructs C++ runtime objects during startup.
+The production initialization contract is now native x64 assembly in
+`win32_app_startup.asm`. `AppStartupConfig` is a fixed-layout POD record with
+explicit `offsetof`/size assertions; it carries only handles, stable path
+pointers, mode flags, and signed millisecond values. The coordinator preserves
+the existing order and checkpoints:
+
+- progress and input initialization precede arena/archive work;
+- arena failure, audio failure, presenter failure, and automation failure each
+  log the existing message, call the complete shutdown coordinator, and return
+  failure;
+- quit checks remain immediately after arena, audio, and diagnostics setup and
+  use the no-return shutdown-and-exit path;
+- timer, timeline, recording, dedicated audio, assembly presenter, diagnostics,
+  and lifecycle automation receive the same arguments and constants as C++; and
+- the reference executable retains the complete C++ initialization sequence.
+
+`bridge.cpp` now contains only narrow `vk_app_*` operation adapters. The
+focused probe stubs those services and checks the full success sequence,
+Win64 argument preservation, sample rate/window dimensions, reference-audio
+diagnostic selection, and every ordinary rollback branch without a window,
+GPU, or audio device.
+
+### Phase 3B.6.7B.3 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM startup-coordinator probe                             1/1 passed; 0.10 s
+full regression suite                                      63/63 passed; 105.31 s
+production startup ordering/rollback                        NASM x64
+reference startup ordering                                  C++ differential path
+```
+
+This is a **GO** for the next host slice. The production host no longer owns
+subsystem ordering or ordinary initialization rollback. It still owns command
+line/configuration display, the window-bootstrap failure boundary, the final
+host return boundary, and C++ wrapper code used by diagnostics and platform
+services. Those must be reduced and measured before a custom `/ENTRY` attempt.
+
+## Next gate: Phase 3B.6.7B.4
+
+Phase 3B.6.7B.4 should reduce the remaining production host and bridge C++
+boundary: configuration/log display, window-bootstrap failure handling, final
+shutdown return, and the small diagnostic/platform adapters that still pull in
+CRT/STL support. Import measurements and full-demo playback remain mandatory
+after each slice; no custom `/ENTRY` attempt is justified until the host no
+longer constructs C++ runtime objects during startup.

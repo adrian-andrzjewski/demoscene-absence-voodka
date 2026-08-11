@@ -52,6 +52,7 @@ extern "C" int32_t asm_voodka_arg_auto_pause(void);
 extern "C" int32_t asm_voodka_arg_auto_close(void);
 #if !defined(VOODKA_REFERENCE_BUILD)
 extern "C" int asm_voodka_apply_entry_seek(void);
+extern "C" int asm_voodka_initialize_subsystems(const vk::AppStartupConfig*);
 extern "C" int asm_voodka_run_mode(uint8_t*, uint64_t);
 extern "C" int asm_lifecycle_start(void* hwnd, int32_t pauseMs, int32_t closeMs);
 extern "C" void asm_shutdown_set_window(HWND, HINSTANCE);
@@ -451,6 +452,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
 #else
     asm_shutdown_set_window(hwnd, hInst);
 #endif
+#if defined(VOODKA_REFERENCE_BUILD)
     vk::progressInit(hwnd);
 
     // Start before any archive/module/scene loading. The assembly core can
@@ -504,6 +506,24 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         vk::shutdownAll();
         return 1;
     }
+#else
+    const char* musicPathValue =
+        asm_voodka_resolve_music_path(musicOverride, VOODKA_REPO_ROOT);
+    const vk::AppStartupConfig startup = {
+        hwnd,
+        recDir,
+        diagDir,
+        timelinePath,
+        musicPathValue,
+        asmAudio ? 1 : 0,
+        referenceAudio ? 1 : 0,
+        asmPresenter ? 1 : 0,
+        static_cast<int32_t>(autoPauseMs),
+        static_cast<int32_t>(autoCloseMs),
+    };
+    if (!asm_voodka_initialize_subsystems(&startup))
+        return 1; // the assembly coordinator already logged and shut down
+#endif
 
     // ---- entry-point seeking -----------------------------------------------
     // The demo may begin from a scene in the middle of the timeline; the music
