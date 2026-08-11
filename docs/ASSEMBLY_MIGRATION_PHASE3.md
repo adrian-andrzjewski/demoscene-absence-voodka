@@ -1154,13 +1154,64 @@ This is a **GO**. The shipped dedicated audio player is now fully native x64
 assembly, including tracker/mixer, storage, WASAPI worker, synchronization,
 controller, lifecycle, and public seek ABI.
 
-## Next gate: Phase 3B.6.7C production platform C++ inventory
+## Phase 3B.6.7C.1 timer/QPC state machine
 
-With audio complete, the next risk-first gate is an import/symbol/source audit
-of the remaining shipped platform objects: `input.cpp`, `timer.cpp`,
-`progress.cpp`, `pause.cpp`, `bridge.cpp`, and the CRT `production_entry.cpp`
-handoff. Classify each remaining boundary by actual production references,
-Win32 API/COM dependency, and no-CRT impact before converting code. The
-reference target and all existing visual/audio/lifecycle gates remain
-mandatory; custom `/ENTRY` is still deferred until the remaining C++ startup
-and host contracts are understood.
+The first remaining platform gate moves `timer.cpp` to `timer.asm` in the
+shipped target while keeping the C++ timer in `VOODKA_REFERENCE.exe`. NASM now
+owns QPC frequency/start/next-tick state, the 70 Hz period and sleep threshold,
+microsecond conversion, frame counting, pause parking, cancellation choke
+points, sleep-versus-spin pacing, and the per-frame progress hook. The Win64
+bool results from `isPaused` and `quitRequested` are consumed through `AL`.
+
+The focused timer witness checks monotonic QPC time, two published retrace
+frames, input/progress hooks, and a pause/resume boundary. The production suite
+is the fidelity gate because timer drift can appear only as soundtrack/scene
+desynchronization over a full run.
+
+### Phase 3B.6.7C.1 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM timer/QPC/pause witness                                 1/1 passed
+full regression suite                                      76/76 passed; 106.38 s
+full assembly P1/pause/close playback                       passed
+live WASAPI seek/stress/long-run                             passed
+visual/audio/A-V/reference differential gates                passed
+```
+
+This is a **GO**. The shipped 70 Hz timing state machine is now native x64
+assembly without observable rendering, soundtrack, or synchronization drift.
+
+## Phase 3B.6.7C production platform audit
+
+The current production CMake source list and object-symbol audit establish the
+remaining boundary:
+
+| Component | Shipped role | Current dependency/risk | Conversion order |
+|---|---|---|---|
+| `production_entry.cpp` | CRT `WinMain` transfer to `asm_voodka_winmain` | Small code footprint, but it retains CRT initialization and the last CRT imports | Final host gate after C++ global/runtime dependencies are gone |
+| `arena.cpp` | Namespace-vk wrappers over `win32_arena.asm` | Low behavior risk; only logging and fixed ABI forwarding remain | Later cleanup slice |
+| `input.cpp` | Namespace-vk wrappers, quit flag, reference-only C++ watcher branch | Production state/worker already lives in `win32_input.asm`; bool and byte-map ABI must remain exact | Medium, after bridge consumers are mapped |
+| `pause.cpp` | Process pause state, logging, audio pump | Small but cross-couples timer, audio, WndProc, and A/V synchronization | High-fidelity gate after bridge/timer contracts |
+| `progress.cpp` | Scene table, title formatting, timeline emission | Formatting, floating elapsed time, `SetWindowTextA`, and scene-name data; visible output and timeline are user-facing | High, after bridge/log ABI is stabilized |
+| `bridge.cpp` | Broad C ABI adapter used by NASM core/startup/shutdown | Widest symbol surface: selectors, palette conversion, wait-vbl delta, app/audio/presenter adapters, shutdown, logging; currently retains C++ name-mangled calls, variadic forwarding, `/GS`, and `memset` | Next highest-risk platform gate |
+
+`dumpbin /DEPENDENTS` on the current shipped executable reports `d3d11.dll`,
+`ole32.dll`, `KERNEL32.dll`, `USER32.dll`, `GDI32.dll`, `VCRUNTIME140.dll`,
+and the API-set CRT runtime/math/stdio/locale/heap DLLs. The production image
+has no libxmp dependency. The CRT imports are therefore not evidence that the
+demo core or audio player still uses C++; they are attributable to the
+remaining `production_entry.cpp`, `bridge.cpp`, `progress.cpp`, and `pause.cpp`
+objects and must be removed or deliberately retained before a custom `/ENTRY`
+claim.
+
+## Next gate: Phase 3B.6.7C.2 bridge C ABI adapter
+
+The next risk-first slice must migrate the broadest remaining C++ adapter,
+`bridge.cpp`, in dependency groups: selector table and fixed arena pointers;
+palette/present and frame-buffer helpers; application/audio/presenter service
+adapters; shutdown and logging boundaries; then the wait-vbl delta state. Each
+group needs a symbol-level ABI probe and the full visual/audio/lifecycle suite.
+Do not remove the C++ bridge or attempt custom `/ENTRY` until the production
+PE import set, selector/palette behavior, full playback, and close/failure
+paths remain equivalent.

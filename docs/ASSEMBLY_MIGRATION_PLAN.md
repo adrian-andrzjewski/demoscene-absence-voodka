@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.9.8.2 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7C.1 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -1061,7 +1061,13 @@ the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7C:
-inventory the remaining shipped platform C++ objects and their actual Win32,
-CRT, and host-handoff contracts before converting the next highest-risk
-boundary.
+libxmp for differential validation. Phase 3B.6.7C.1 now moves the shipped
+QPC/70 Hz timer state machine from `timer.cpp` into `timer.asm`, retaining the
+C++ timer only in the reference target. Its pause/QPC/progress witness and
+complete 76-test suite—including full assembly playback and live audio timing—
+pass. A production PE/object audit now attributes the remaining CRT imports to
+the production entry shim and the `bridge.cpp`, `progress.cpp`, and `pause.cpp`
+objects; arena/input are primarily wrappers over existing assembly services.
+The next gate is Phase 3B.6.7C.2: migrate the broad C ABI adapter in
+`bridge.cpp` by dependency group while retaining all visual/audio/lifecycle
+gates.

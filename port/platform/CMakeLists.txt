@@ -3,7 +3,6 @@
 set(VOODKA_PLATFORM_COMMON_SOURCES
     arena.cpp
     input.cpp
-    timer.cpp
     audio_controller.asm
     audio_lifecycle.asm
     audio_lookup.asm
@@ -20,6 +19,7 @@ set(VOODKA_PLATFORM_COMMON_SOURCES
 set(VOODKA_PLATFORM_SOURCES
     production_entry.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
+    timer.asm
     audio_dispatch.asm
     win32_platform_abi.asm
     p4_raster.asm
@@ -30,6 +30,7 @@ set(VOODKA_REFERENCE_SOURCES
     app.cpp
     log.cpp
     timeline.cpp
+    timer.cpp
     ${VOODKA_PLATFORM_COMMON_SOURCES}
     d3d11_present.cpp
     audio.cpp

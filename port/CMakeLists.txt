@@ -791,6 +791,16 @@ target_link_libraries(audio_seek_controller_probe PRIVATE kernel32)
 add_test(NAME audio.seek_controller COMMAND audio_seek_controller_probe)
 set_tests_properties(audio.seek_controller PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7C timer gate: exercise NASM QPC initialization, frame pacing,
+# pause parking, bool ABI, and per-frame platform hooks.
+add_executable(timer_asm_probe
+    tools/validate/timer_asm_probe.cpp
+    platform/timer.asm)
+target_compile_definitions(timer_asm_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_link_libraries(timer_asm_probe PRIVATE kernel32)
+add_test(NAME timer.asm_probe COMMAND timer_asm_probe)
+set_tests_properties(timer.asm_probe PROPERTIES TIMEOUT 10)
+
 # Phase 3B.6.7B.9.5 lifecycle gate: exercise NASM startup, rollback, join,
 # and Win32 CreateThread/WaitForSingleObject/CloseHandle ownership.
 add_executable(audio_workers_probe
