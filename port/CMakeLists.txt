@@ -680,6 +680,17 @@ target_link_libraries(win32_platform_abi_probe PRIVATE kernel32)
 add_test(NAME win32.platform_abi COMMAND win32_platform_abi_probe)
 set_tests_properties(win32.platform_abi PROPERTIES TIMEOUT 10)
 
+# Phase 3B.6.7B.6 witness: compare the production NASM P4 scan converter
+# against the C++ reference algorithm on deterministic triangle cases.
+add_executable(p4_raster_probe
+    tools/validate/p4_raster_probe.cpp
+    platform/p4_raster.asm)
+target_compile_definitions(p4_raster_probe PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(p4_raster_probe PRIVATE
+    platform "${CMAKE_SOURCE_DIR}/core/inc" "${CMAKE_SOURCE_DIR}/core/eos_replace")
+add_test(NAME p4.raster COMMAND p4_raster_probe)
+set_tests_properties(p4.raster PROPERTIES TIMEOUT 10)
+
 # Phase 1 feasibility gate: the host creates only a hidden HWND and COM
 # apartment; the D3D11 device, COM vtable calls, GPU readback, Present, and
 # Release sequence are implemented directly in NASM.

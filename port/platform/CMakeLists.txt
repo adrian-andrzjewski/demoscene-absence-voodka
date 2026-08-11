@@ -16,6 +16,7 @@ set(VOODKA_PLATFORM_SOURCES
     d3d11_dispatch.cpp
     audio_dispatch.cpp
     win32_platform_abi.asm
+    p4_raster.asm
 )
 
 set(VOODKA_REFERENCE_SOURCES

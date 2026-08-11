@@ -11,13 +11,16 @@
 
 #include "platform_abi.h"
 #include "pal_range.h"
-#include <algorithm>
 #include <cstdint>
 #include <cstdio>
 #include <cstdarg>
 #include <cstring>
-#include <cmath>
 #include <cstddef>
+
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
+#include <algorithm>
+#include <cmath>
+#endif
 
 using std::uint16_t;
 using std::uint32_t;
@@ -284,6 +287,7 @@ void vk_log_printf(const char* fmt, ...) {
 #endif
 }
 
+#if !defined(VOODKA_ASSEMBLY_PLATFORM)
 struct P4DrawArgs {
     int32_t xy[6];
     uint32_t uv[3];
@@ -342,6 +346,7 @@ void vk_p4_draw_triangle(const P4DrawArgs* a) {
         }
     }
 }
+#endif
 
 // copy the platform key map (128 PC scancodes, 1=pressed) into dst
 void vk_key_map_copy(uint8_t* dst) {

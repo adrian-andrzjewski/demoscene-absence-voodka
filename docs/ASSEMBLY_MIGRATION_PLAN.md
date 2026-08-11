@@ -911,7 +911,7 @@ There is little value in converting allocators, logging, or input if the
 production executable cannot reliably present frames, play the soundtrack, and
 operate as a native assembly Windows process.
 
-## Current implementation checkpoint: Phase 3B.6.7B.5 (after Phase 1C and 2X)
+## Current implementation checkpoint: Phase 3B.6.7B.6 (after Phase 1C and 2X)
 
 The live assembly tracker, mixer, SPSC PCM/timeline ring, assembly-owned
 WASAPI worker entry, native assembly producer, fixed assembly-owned storage and
@@ -987,12 +987,17 @@ implementation objects. NASM exports their exact MSVC-decorated namespace
 symbols, owns the logger/timeline forwarding and formatting boundary, and
 retains only the narrow `vk_log_printf` bridge for remaining C++ services.
 The ABI probe and complete 65-test suite pass; the reference target retains
-the C++ implementations as the behavioral oracle.
+the C++ implementations as the behavioral oracle. Phase 3B.6.7B.6 now moves
+the production P4 textured-triangle bridge from `bridge.cpp` into a standalone
+NASM SSE2/double-precision scan converter. Its complete-frame raster probe and
+the complete 66-test suite pass; the reference target retains the C++
+rasterizer as the oracle.
 The default `VOODKA.exe` path now uses the persistent assembly service through
 the production `audioInit`, `audioPump`, seek, pause, and shutdown ABI. The
 dedicated path no longer uses C++ vectors or C++ file I/O. `VOODKA.exe` now
 contains neither `audio.cpp` nor `xmp_static`; `VOODKA_REFERENCE.exe` retains
 both as a non-shipped behavioral oracle, and the host probes continue to use
-libxmp for differential validation. The next gate is Phase 3B.6.7B.6: reduce
-the remaining production bridge and render-service C++ surface while
-retaining the reference target as the differential oracle.
+libxmp for differential validation. The next gate is Phase 3B.6.7B.7: remove
+the remaining production D3D11 recording/readback diagnostic file
+orchestration while retaining the reference target as the differential
+oracle.

@@ -738,10 +738,45 @@ implementation objects are now assembly-owned. The remaining substantial
 production C++ boundary is bridge/render-service orchestration, followed by
 the smaller timing/input/progress/resource wrappers and the CRT/STL imports.
 
-## Next gate: Phase 3B.6.7B.6
+## Phase 3B.6.7B.6 P4 rasterizer bridge
 
-Phase 3B.6.7B.6 should measure and reduce the remaining production bridge and
-render-service C++ surface, beginning with P4/rasterization and D3D11 capture
-helpers. Import attribution, full-demo playback, A/V synchronization, and
-failure/lifecycle probes remain mandatory; custom `/ENTRY` is still deferred
-until no production C++ object requires CRT initialization.
+The shipped target no longer compiles the C++ `P4DrawArgs` scan converter in
+`bridge.cpp`. `p4_raster.asm` now exports the production
+`vk_p4_draw_triangle` ABI used by `parts/p4.asm` and a probe alias for direct
+comparison. It preserves the C++ oracle's vertex-Y ordering, double-precision
+edge interpolation, integer ceil/floor clipping, zero-area behavior, packed
+8-bit UV extraction, 16-bit texture wrapping, and palette-color addition.
+The reference target retains the C++ implementation unchanged. The assembly
+path has no CRT or C++ calls; its only state is the caller-provided fixed
+layout record and the texture/framebuffer pointers.
+
+The focused probe compares complete 320x200 framebuffer results for normal,
+reversed, clipped, horizontal, degenerate, fully off-screen, and UV-wrapping
+triangles. This is the rasterizer equivalence gate; a generic direct `--part
+4` host smoke is not counted as visual proof until the existing entry-seek
+trace produces a reliable P4 scene boundary.
+
+### Phase 3B.6.7B.6 validation
+
+```text
+Release production/reference/tools rebuild                 passed
+NASM-vs-C++ P4 raster probe                                1/1 passed; 0.10 s
+production P1 playback gate                                passed; 26.29 s
+full regression suite                                      66/66 passed; 104.65 s
+production P4 bridge implementation                        NASM x64
+reference P4 bridge implementation                          C++ oracle
+```
+
+This is a **GO** for the next boundary. The highest-risk algorithmic render
+bridge is now assembly-owned and independently equivalent. Remaining render
+surface is the C++ recording/readback diagnostics around the assembly D3D11
+presenter, followed by the lower-risk timing/input/progress/resource wrappers.
+
+## Next gate: Phase 3B.6.7B.7
+
+Phase 3B.6.7B.7 should migrate the production D3D11 recording and diagnostic
+file orchestration out of `d3d11_dispatch.cpp`, retaining the assembly COM
+presenter and the C++ reference presenter as separate oracles. Import
+attribution, full-demo playback, A/V synchronization, and failure/lifecycle
+probes remain mandatory; custom `/ENTRY` is still deferred until no production
+C++ object requires CRT initialization.
