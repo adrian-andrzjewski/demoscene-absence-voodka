@@ -54,6 +54,10 @@ extern "C" int32_t asm_voodka_arg_part(void);
 extern "C" int32_t asm_voodka_arg_selftest(void);
 extern "C" int32_t asm_voodka_arg_audiocheck(void);
 extern "C" int32_t asm_voodka_arg_audiocheck_seconds(void);
+#if !defined(VOODKA_REFERENCE_BUILD)
+extern "C" int asm_lifecycle_start(void* hwnd, int32_t pauseMs, int32_t closeMs);
+extern "C" void asm_lifecycle_stop(void);
+#endif
 
 namespace {
 constexpr const wchar_t* kWinClass = L"VOODKA";
@@ -68,6 +72,7 @@ volatile LONG g_shutdownStarted = 0;
 // Opt-in lifecycle automation used by the runtime gates.  It injects the
 // same window messages a user would generate, so pause/resume and close are
 // exercised through the real Win32 path instead of a private test shortcut.
+#if defined(VOODKA_REFERENCE_BUILD)
 struct AutomationState {
     HWND hwnd = nullptr;
     HANDLE stop = nullptr;
@@ -143,6 +148,21 @@ void stopAutomation() {
     CloseHandle(g_automation.stop);
     g_automation = {};
 }
+#else
+bool startAutomation(HWND hwnd, long pauseAtMs, long closeAtMs) {
+    if (!asm_lifecycle_start(hwnd, static_cast<int32_t>(pauseAtMs),
+                             static_cast<int32_t>(closeAtMs)))
+        return false;
+    vk::logPrint("[app] lifecycle automation: pause=%s close=%s\n",
+                 pauseAtMs >= 0 ? "enabled" : "off",
+                 closeAtMs >= 0 ? "enabled" : "off");
+    return true;
+}
+
+void stopAutomation() {
+    asm_lifecycle_stop();
+}
+#endif
 }
 
 // ---- music module path resolution ------------------------------------------

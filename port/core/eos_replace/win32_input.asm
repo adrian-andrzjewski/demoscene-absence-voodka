@@ -1,8 +1,8 @@
 ; win32_input.asm - production assembly global Escape watcher.
 ;
-; The main-thread key map and message pump stay in input.cpp for this gate.
-; This file owns the asynchronous watcher, its event/thread handles, and the
-; deterministic start/stop protocol used during loading and teardown.
+; This file owns the asynchronous watcher, main-thread key map/message pump,
+; event/thread handles, and deterministic start/stop protocol used during
+; loading and teardown.
 
 BITS 64
 DEFAULT REL

@@ -238,10 +238,54 @@ not yet a claim that the shipped process is assembly-only: C++ still owns the
 host handoff after the assembly entry point, formatted logging, and final demo
 orchestration.
 
-## Next gate: Phase 3B.6
+## Phase 3B.6 scope
 
-Phase 3B.6 should move the remaining production host bridge and application
+Phase 3B.6 moves the remaining production host bridge and application
 lifecycle orchestration behind assembly-owned interfaces, beginning with the
 smallest stable service boundaries. The C++ reference executable and all
 existing full-demo visual, audio, timing, and stability witnesses remain
 mandatory before removing each C++ implementation.
+
+## Phase 3B.6 lifecycle automation worker
+
+The first Phase 3B.6 boundary moves the optional lifecycle automation worker
+into `win32_lifecycle.asm` for the production target. This is a deliberately
+small threading gate before attempting the larger shutdown coordinator.
+
+- `asm_lifecycle_start` owns the production automation event, thread, HWND,
+  pause/close thresholds, and CreateThread stack-argument setup.
+- `asm_lifecycle_worker` preserves the reference behavior: it waits in 5 ms
+  increments, posts one real Space key-down/up pair at the pause threshold,
+  posts the matching pair one second later, and posts a real `WM_CLOSE` at the
+  close threshold.
+- `asm_lifecycle_stop` signals the event, joins the worker, closes both handles,
+  and clears all state. It is safe when automation was not requested or startup
+  failed.
+- The production C++ host retains only the narrow ABI wrapper and status log;
+  the C++ reference target retains the original state structure and worker as
+  the behavioral oracle.
+
+### Phase 3B.6 validation
+
+```text
+Release production/reference build                     passed
+focused lifecycle/audio gates                          5/5 passed; 58.46 s
+full regression suite                                  54/54 passed; 104.31 s
+production lifecycle automation worker                 NASM x64
+reference lifecycle automation worker                  C++ differential oracle
+```
+
+The focused gates cover normal assembly-audio startup, production pause/resume,
+production close, reference close, and rejection of the removed production
+libxmp path. The full suite still covers all renderer, asset, timing, audio,
+Win32, D3D11, and dedicated-player checks. This is a **GO** for the next
+shutdown boundary, but not a claim that application lifecycle ownership is yet
+assembly-only: C++ still coordinates subsystem initialization, logging, and
+the global teardown sequence.
+
+## Next gate: Phase 3B.6.1
+
+Phase 3B.6.1 should migrate the idempotent shutdown coordinator and its quit
+handoff behind an assembly-owned lifecycle interface. It must preserve worker
+join order, resource-release order, window destruction, process termination,
+and the reference target's clean normal/ESC/close behavior.
