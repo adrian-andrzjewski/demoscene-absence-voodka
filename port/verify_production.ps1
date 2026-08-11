@@ -7,6 +7,7 @@ param(
     [string]$Config = "Release",
     [switch]$RunTests,
     [switch]$FullRun,
+    [switch]$PackageRun,
     [int]$P4SmokeMs = 3000,
     [int]$FullRunTimeoutSec = 330
 )
@@ -18,6 +19,10 @@ $binDir = Join-Path $portRoot "bin\$Config"
 $buildDir = Join-Path $portRoot "build\$Config"
 $exePath = Join-Path $binDir "VOODKA.exe"
 $projectPath = Join-Path $buildDir "platform\VOODKA.vcxproj"
+$runExePath = $exePath
+$runWorkingDirectory = $repoRoot
+$timelineRoot = $buildDir
+$packageRoot = $null
 
 function Fail([string]$Message) {
     throw "Production verification failed: $Message"
@@ -47,10 +52,12 @@ function Find-Dumpbin {
 function Invoke-ProductionRun(
     [string]$Name,
     [string[]]$Arguments,
-    [int]$TimeoutSeconds
+    [int]$TimeoutSeconds,
+    [string]$ExecutablePath,
+    [string]$WorkingDirectory
 ) {
     Write-Host "Running $Name..."
-    $process = Start-Process -FilePath $exePath -ArgumentList $Arguments -WorkingDirectory $repoRoot -WindowStyle Hidden -PassThru
+    $process = Start-Process -FilePath $ExecutablePath -ArgumentList $Arguments -WorkingDirectory $WorkingDirectory -WindowStyle Hidden -PassThru
     Wait-Process -InputObject $process -Timeout $TimeoutSeconds -ErrorAction SilentlyContinue | Out-Null
     $process.Refresh()
     if (-not $process.HasExited) {
@@ -139,18 +146,50 @@ if ($RunTests) {
     if ($LASTEXITCODE -ne 0) { Fail "CTest returned $LASTEXITCODE" }
 }
 
-Invoke-ProductionRun "P4 scene smoke" @(
-    "--part", "4", "--auto-close-ms", $P4SmokeMs.ToString()
-) 30
+try {
+    if ($PackageRun) {
+        $archivePath = Join-Path $binDir "data\vodka.dat"
+        $musicPath = Join-Path $binDir "music\amnezja2.mod"
+        foreach ($requiredPackageFile in @($archivePath, $musicPath)) {
+            if (-not (Test-Path -LiteralPath $requiredPackageFile)) {
+                Fail "missing staged package file $requiredPackageFile"
+            }
+        }
 
-if ($FullRun) {
-    $timeline = Join-Path -Path $buildDir -ChildPath ("production_verify_{0:yyyyMMdd_HHmmss}.log" -f (Get-Date))
-    Invoke-ProductionRun "full production playback" @(
-        "--timeline", $timeline
-    ) $FullRunTimeoutSec
-    Write-Host "Timeline: $timeline"
-} else {
-    Write-Host "Full production playback not requested; use -FullRun for certification."
+        $packageRoot = Join-Path $buildDir ("production_package_{0:yyyyMMdd_HHmmssfff}" -f (Get-Date))
+        $resolvedBuildDir = [IO.Path]::GetFullPath($buildDir).TrimEnd('\')
+        $resolvedPackageRoot = [IO.Path]::GetFullPath($packageRoot)
+        if (-not $resolvedPackageRoot.StartsWith($resolvedBuildDir + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            Fail "refusing to create package outside the release build directory"
+        }
+        New-Item -ItemType Directory -Path (Join-Path $packageRoot "data") | Out-Null
+        New-Item -ItemType Directory -Path (Join-Path $packageRoot "music") | Out-Null
+        Copy-Item -LiteralPath $exePath -Destination (Join-Path $packageRoot "VOODKA.exe")
+        Copy-Item -LiteralPath $archivePath -Destination (Join-Path $packageRoot "data\vodka.dat")
+        Copy-Item -LiteralPath $musicPath -Destination (Join-Path $packageRoot "music\amnezja2.mod")
+        $runExePath = Join-Path $packageRoot "VOODKA.exe"
+        $runWorkingDirectory = $packageRoot
+        $timelineRoot = $packageRoot
+        Write-Host "Package: isolated VOODKA.exe + data\vodka.dat + music\amnezja2.mod"
+    }
+
+    Invoke-ProductionRun "P4 scene smoke" @(
+        "--part", "4", "--auto-close-ms", $P4SmokeMs.ToString()
+    ) 30 $runExePath $runWorkingDirectory
+
+    if ($FullRun) {
+        $timeline = Join-Path -Path $timelineRoot -ChildPath ("production_verify_{0:yyyyMMdd_HHmmss}.log" -f (Get-Date))
+        Invoke-ProductionRun "full production playback" @(
+            "--timeline", $timeline
+        ) $FullRunTimeoutSec $runExePath $runWorkingDirectory
+        Write-Host "Timeline: $timeline"
+    } else {
+        Write-Host "Full production playback not requested; use -FullRun for certification."
+    }
+} finally {
+    if ($packageRoot -and (Test-Path -LiteralPath $packageRoot)) {
+        Remove-Item -LiteralPath $packageRoot -Recurse -Force
+    }
 }
 
 Write-Host "Production verification passed."

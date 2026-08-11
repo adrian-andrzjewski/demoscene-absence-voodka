@@ -74,11 +74,13 @@ run the PE/source/import checks and the live P4 smoke with:
 
 ```powershell
 .\port\verify_production.ps1 -Config Release
-.\port\verify_production.ps1 -Config Release -RunTests -FullRun
+.\port\verify_production.ps1 -Config Release -RunTests -PackageRun -FullRun
 ```
 
 The second command runs the CTest matrix, the live P4 gate, and the complete
-production playback while recording an A/V timeline under `port/build/`.
+production playback from an isolated package containing only `VOODKA.exe`,
+`data\vodka.dat`, and `music\amnezja2.mod`; it records an A/V timeline under
+`port/build/` before cleaning up the temporary package.
 
 The shipped `VOODKA.exe` registers the NASM x64 callback in
 `core/eos_replace/win32_app_wndproc.asm`. `VOODKA_REFERENCE.exe` intentionally
