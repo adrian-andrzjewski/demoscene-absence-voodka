@@ -1,9 +1,9 @@
-; win32_arena.asm - production EOS arena and embedded archive service.
+; win32_arena.asm - production EOS arena and compressed archive service.
 ;
-; The generated embedded_runtime.asm owns the byte-exact vodka.dat payload.
-; This service exposes it as the archive source and keeps the existing EOS
-; arena-offset/cache contract used by the demo core.  No runtime filesystem
-; lookup is part of the shipped image.
+; The generated embedded_runtime.asm owns the single compressed VPK1 payload.
+; This service decodes vodka.dat into its final arena allocation and keeps the
+; existing EOS arena-offset/cache contract used by the demo core.  No runtime
+; filesystem lookup is part of the shipped image.
 
 BITS 64
 DEFAULT REL
@@ -22,8 +22,12 @@ extern VirtualAlloc
 extern VirtualFree
 extern MessageBoxA
 extern ExitProcess
-extern voodka_embedded_archive
+extern voodka_embedded_payload
+extern voodka_embedded_payload_size
 extern voodka_embedded_archive_size
+extern voodka_embedded_module_size
+extern voodka_embedded_module_decoded
+extern voodka_decode_embedded_asset
 
 global asm_arena_platform_init
 global asm_arena_platform_shutdown
@@ -44,46 +48,11 @@ asm_arena_archive_bytes:  resd 1
 asm_arena_cached_file:    resd 1
 
 section .rdata
-arena_name_voodka: db "voodka.dat", 0
-arena_name_vodka:  db "vodka.dat", 0
 arena_embedded_path: db "embedded:vodka.dat", 0
 arena_no_memory:   db "VOODKA arena exhausted; refusing to grow.", 0
 arena_title:       db "arena", 0
 
 section .text
-
-; int arena_equal_ci(const char* left, const char* right)
-arena_equal_ci:
-        push    rbp
-        mov     rbp, rsp
-        xor     eax, eax
-.loop:
-        mov     r8b, [rcx]
-        mov     r9b, [rdx]
-        movzx   r10d, r8b
-        sub     r10d, 'A'
-        cmp     r10d, 'Z' - 'A'
-        ja      .left_ready
-        add     r8b, 'a' - 'A'
-.left_ready:
-        movzx   r10d, r9b
-        sub     r10d, 'A'
-        cmp     r10d, 'Z' - 'A'
-        ja      .right_ready
-        add     r9b, 'a' - 'A'
-.right_ready:
-        cmp     r8b, r9b
-        jne     .done
-        test    r8b, r8b
-        je      .equal
-        inc     rcx
-        inc     rdx
-        jmp     .loop
-.equal:
-        mov     eax, 1
-.done:
-        pop     rbp
-        ret
 
 ; int asm_arena_platform_init(const char* repositoryRoot)
 ; repositoryRoot is retained in the ABI for the reference bridge, but the
@@ -91,7 +60,7 @@ arena_equal_ci:
 asm_arena_platform_init:
         push    rbp
         mov     rbp, rsp
-        sub     rsp, 0x20                    ; aligned before VirtualAlloc
+        sub     rsp, 0x30                    ; aligned, with stack arg for decoder
         cmp     qword [rel asm_arena_base_ptr], 0
         jne     .already_ready
 
@@ -105,10 +74,39 @@ asm_arena_platform_init:
         mov     [rel asm_arena_base_ptr], rax
         mov     dword [rel asm_arena_cursor], kArenaCursorStart
         mov     dword [rel asm_arena_cached_file], 0
-        lea     rax, [rel voodka_embedded_archive]
-        mov     [rel asm_arena_archive_ptr], rax
+
+        ; Allocate and decode the archive directly into the arena.  The
+        ; decompressed bytes are now the one runtime copy used by the demo.
+        mov     ecx, dword [rel voodka_embedded_archive_size]
+        call    asm_arena_alloc
+        mov     dword [rel asm_arena_cached_file], eax
+        mov     r10, [rel asm_arena_base_ptr]
+        mov     edx, dword [rel asm_arena_cached_file]
+        add     r10, rdx
+        mov     [rel asm_arena_archive_ptr], r10
         mov     eax, dword [rel voodka_embedded_archive_size]
         mov     [rel asm_arena_archive_bytes], eax
+        mov     ecx, 1                       ; VPK1 asset id: vodka.dat
+        lea     rdx, [rel voodka_embedded_payload]
+        mov     r8d, dword [rel voodka_embedded_payload_size]
+        mov     r9, r10
+        mov     eax, dword [rel asm_arena_archive_bytes]
+        mov     dword [rsp + 0x20], eax
+        call    voodka_decode_embedded_asset
+        test    eax, eax
+        jz      .decode_failed
+
+        ; Decode the module once into its persistent BSS destination.  The
+        ; audio service retains this pointer for the complete soundtrack.
+        mov     ecx, 2                       ; VPK1 asset id: amnezja2.mod
+        lea     rdx, [rel voodka_embedded_payload]
+        mov     r8d, dword [rel voodka_embedded_payload_size]
+        lea     r9, [rel voodka_embedded_module_decoded]
+        mov     eax, dword [rel voodka_embedded_module_size]
+        mov     dword [rsp + 0x20], eax
+        call    voodka_decode_embedded_asset
+        test    eax, eax
+        jz      .decode_failed
         mov     eax, 1
         jmp     .return
 
@@ -117,8 +115,21 @@ asm_arena_platform_init:
         jmp     .return
 .failed:
         xor     eax, eax
+.decode_failed:
+        mov     rcx, [rel asm_arena_base_ptr]
+        test    rcx, rcx
+        jz      .clear_failed
+        xor     edx, edx
+        mov     r8d, MEM_RELEASE
+        call    VirtualFree
+.clear_failed:
+        mov     qword [rel asm_arena_base_ptr], 0
+        mov     qword [rel asm_arena_archive_ptr], 0
+        mov     dword [rel asm_arena_cursor], 0
+        mov     dword [rel asm_arena_archive_bytes], 0
+        mov     dword [rel asm_arena_cached_file], 0
 .return:
-        add     rsp, 0x20
+        add     rsp, 0x30
         pop     rbp
         ret
 
@@ -208,36 +219,91 @@ asm_arena_load_internal_file:
         push    rsi
         sub     rsp, 0x38
         mov     r12, rcx
-        mov     rdx, r12
-        lea     rcx, [rel arena_name_voodka]
-        call    arena_equal_ci
-        test    eax, eax
-        jnz     .known
-        mov     rdx, r12
-        lea     rcx, [rel arena_name_vodka]
-        call    arena_equal_ci
-        test    eax, eax
+        test    r12, r12
         jz      .unknown
+
+        ; Accept both historical spellings, case-insensitively, without a
+        ; helper call or a runtime string copy.
+        movzx   eax, byte [r12 + 0]
+        or      al, 0x20
+        cmp     al, 'v'
+        jne     .unknown
+        movzx   eax, byte [r12 + 1]
+        or      al, 0x20
+        cmp     al, 'o'
+        jne     .unknown
+        movzx   eax, byte [r12 + 2]
+        or      al, 0x20
+        cmp     al, 'o'
+        je      .long_name
+        cmp     al, 'd'
+        jne     .unknown
+
+        ; vodka.dat
+        movzx   eax, byte [r12 + 3]
+        or      al, 0x20
+        cmp     al, 'k'
+        jne     .unknown
+        movzx   eax, byte [r12 + 4]
+        or      al, 0x20
+        cmp     al, 'a'
+        jne     .unknown
+        cmp     byte [r12 + 5], '.'
+        jne     .unknown
+        movzx   eax, byte [r12 + 6]
+        or      al, 0x20
+        cmp     al, 'd'
+        jne     .unknown
+        movzx   eax, byte [r12 + 7]
+        or      al, 0x20
+        cmp     al, 'a'
+        jne     .unknown
+        movzx   eax, byte [r12 + 8]
+        or      al, 0x20
+        cmp     al, 't'
+        jne     .unknown
+        cmp     byte [r12 + 9], 0
+        je      .known
+        jmp     .unknown
+
+.long_name:
+        ; voodka.dat
+        movzx   eax, byte [r12 + 3]
+        or      al, 0x20
+        cmp     al, 'd'
+        jne     .unknown
+        movzx   eax, byte [r12 + 4]
+        or      al, 0x20
+        cmp     al, 'k'
+        jne     .unknown
+        movzx   eax, byte [r12 + 5]
+        or      al, 0x20
+        cmp     al, 'a'
+        jne     .unknown
+        cmp     byte [r12 + 6], '.'
+        jne     .unknown
+        movzx   eax, byte [r12 + 7]
+        or      al, 0x20
+        cmp     al, 'd'
+        jne     .unknown
+        movzx   eax, byte [r12 + 8]
+        or      al, 0x20
+        cmp     al, 'a'
+        jne     .unknown
+        movzx   eax, byte [r12 + 9]
+        or      al, 0x20
+        cmp     al, 't'
+        jne     .unknown
+        cmp     byte [r12 + 10], 0
+        jne     .unknown
 .known:
         mov     eax, [rel asm_arena_cached_file]
         test    eax, eax
         jnz     .return
-        mov     ecx, [rel asm_arena_archive_bytes]
-        mov     [rsp + 0x20], ecx
-        call    asm_arena_alloc
+        mov     rax, [rel asm_arena_archive_ptr]
+        sub     rax, [rel asm_arena_base_ptr]
         mov     [rel asm_arena_cached_file], eax
-        mov     r10d, [rsp + 0x20]
-        mov     r11d, eax
-        mov     r8, [rel asm_arena_base_ptr]
-        lea     rdi, [r8 + rax]
-        mov     rsi, [rel asm_arena_archive_ptr]
-        test    r10d, r10d
-        jz      .copy_done
-        mov     ecx, r10d
-        cld
-        rep     movsb
-.copy_done:
-        mov     eax, r11d
+        mov     eax, dword [rel asm_arena_cached_file]
         jmp     .return
 .unknown:
         xor     eax, eax

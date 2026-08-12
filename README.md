@@ -27,9 +27,9 @@ contains the packed data and soundtrack, so it runs from an otherwise empty
 directory. The window is 1280×800: an exact 4×, point-sampled presentation of
 the original 320×200 logical framebuffer. The demo runs at approximately 70
 frames per second and plays all eight scenes from beginning to end.
-`VOODKA.exe` is built entirely from NASM x64 modules: no C or
-C++ object, CRT, STL, exception runtime, or libxmp code is part of the shipped
-demo.
+`VOODKA.exe` is built from NASM x64 modules plus one small freestanding C
+XZ/LZMA2 decoder: no C++ object, CRT, STL, exception runtime, or libxmp code
+is part of the shipped demo.
 
 ## Why this port exists
 
@@ -143,8 +143,9 @@ piece of old machine code.
 The Windows production migration is complete. `VOODKA.exe` contains the
 ported demo, EOS replacement, Win32 startup/window/input services, D3D11
 presentation, dedicated tracker/audio worker, asset loading, logging, timing,
-controls, and shutdown as NASM x64 modules. It enters through a native
-assembly process entry and disables the default C/C++ libraries.
+controls, and shutdown as NASM x64 modules, plus one small freestanding
+XZ/LZMA2 decoder for its compressed runtime payload. It enters through a
+native assembly process entry and disables the default C/C++ libraries.
 
 The C++ sources intentionally retained under `port/platform/` and
 `port/tools/` are not production remnants: they form the separate
@@ -227,10 +228,11 @@ silently rewritten as modern port credits.
 - CMake 3.24 or newer on `PATH`
 - PowerShell 7 or newer
 
-NASM 2.16.03 is vendored under `modules/`. libxmp 4.6.2 is also vendored, but
-is used only by the non-shipped C++ reference/oracle tools. No package manager,
-DOS compiler, TASM installation, or external runtime audio library is needed
-by `VOODKA.exe`.
+NASM 2.16.03 is vendored under `modules/`. Python 3 is used at build time by
+the standard-library XZ compressor. libxmp 4.6.2 is also vendored, but is used
+only by the non-shipped C++ reference/oracle tools. No package manager, DOS
+compiler, TASM installation, or external runtime audio library is needed by
+`VOODKA.exe`.
 
 ### Build and test
 
@@ -287,10 +289,13 @@ data/world                 packed VIRTUAL world objects
 frames2img.exe             recorded-frame converter
 ```
 
-`VOODKA.exe` contains the byte-exact `vodka.dat` archive and `amnezja2.mod`
-soundtrack. The loose `port/data/vodka.dat` and `music/amnezja2.mod` files are
-build and validation inputs only; the shipped executable never opens them at
-runtime. To reproduce the single-file release package after building, run:
+`VOODKA.exe` contains one compressed VPK1 payload: separate XZ/LZMA2 streams
+for `vodka.dat` and `amnezja2.mod`. Startup decodes them directly into their
+final runtime buffers, and the validator proves the results are bit-identical
+to the loose canonical inputs. The loose `port/data/vodka.dat` and
+`music/amnezja2.mod` files are build and validation inputs only; the shipped
+executable never opens them at runtime. To reproduce the single-file release
+package after building, run:
 
 ```powershell
 .\port\package_release.ps1 -Config Release -Version voodka-port-v1.2.0

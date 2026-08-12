@@ -9,7 +9,7 @@ object instancing, camera, render pipeline), `PORTING_NOTES.md`
 
 Everything below was reverse-engineered from the original sources
 (`demoscene-absence-voodka-master/`, cited as `CODE/...`) and hex-verified
-against the shipped data files. Port behavior was verified by the 86-test
+against the shipped data files. Port behavior was verified by the 89-test
 suite plus frame-recorded runtime checks (2026-08-05). Documentation audit
 2026-08-06: added the full DATAS compile-time spec (§4.5), source-art-pipeline
 section (§9), resolved every inferred texture dimension, and corrected the
@@ -47,10 +47,12 @@ EOF = 2,731,687 bytes (8,000 table + 2,723,687 payload)
   placeholder *also* named `voodka.dat` (payload `0x20`).
 - **Port:** `port/tools/vodka_pack/vodka_pack.cpp` regenerates the archive
   byte-identically (CTest `vodka.golden_hash`, SHA-256
-  `8D5C31D5…6D2C18E4`); `embedded.payload` independently locates exactly one
-  byte-exact archive in the final release `VOODKA.EXE`.
-  `win32_arena.asm` accepts both spellings, copies the embedded archive into
-  the 64 MB arena (first alloc → `_file_addr = 0x40000`), idempotently. The ported
+  `8D5C31D5…6D2C18E4`). Build-time `compress_assets.py` stores it as one XZ
+  stream in the VPK1 payload; `embedded.payload` decodes that stream and
+  compares every byte with the canonical archive while rejecting raw duplicate
+  copies. `win32_arena.asm` accepts both spellings and decodes the archive
+  directly into the 64 MB arena (first alloc → `_file_addr = 0x40000`),
+  idempotently. The ported
   `vodka` macro (`port/core/inc/vodka.inc`) stores the same arena offset;
   its trailing-register state differs from the original (size never read,
   `rsi` left as offset not pointer) — unobservable: every call site in both

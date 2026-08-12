@@ -1,4 +1,4 @@
-# verify_production.ps1 - release audit for the shipped assembly-only VOODKA.
+# verify_production.ps1 - release audit for the shipped no-CRT VOODKA image.
 # Run after build.ps1 on both the Windows 10 build host and a Windows 11 host.
 
 [CmdletBinding()]
@@ -26,6 +26,7 @@ $exePath = Join-Path $binDir "VOODKA.exe"
 $archivePath = Join-Path $portRoot "data\vodka.dat"
 $modulePath = Join-Path $repoRoot "music\amnezja2.mod"
 $embeddedPayloadCheck = Join-Path $binDir "embedded_payload_check.exe"
+$compressedPayload = Join-Path $portRoot "build\$Config\generated\voodka_payload.bin"
 $projectPath = Join-Path $buildDir "platform\VOODKA.vcxproj"
 $runExePath = $exePath
 $runWorkingDirectory = $repoRoot
@@ -137,16 +138,16 @@ if (-not (Test-Path -LiteralPath $exePath)) {
 if (-not (Test-Path -LiteralPath $projectPath)) {
     Fail "missing generated production project $projectPath; configure/build first"
 }
-foreach ($payloadInput in @($archivePath, $modulePath, $embeddedPayloadCheck)) {
+foreach ($payloadInput in @($archivePath, $modulePath, $compressedPayload, $embeddedPayloadCheck)) {
     if (-not (Test-Path -LiteralPath $payloadInput)) {
         Fail "missing embedded-payload validation input $payloadInput"
     }
 }
-& $embeddedPayloadCheck $exePath $archivePath $modulePath
+& $embeddedPayloadCheck $exePath $archivePath $modulePath $compressedPayload
 if ($LASTEXITCODE -ne 0) {
-    Fail "VOODKA.exe does not contain exactly one canonical archive and module"
+    Fail "VOODKA.exe does not contain exactly one compressed payload or exact decoded archive/module"
 }
-Write-Host "Embedded payload contract: exact archive and module each occur once in VOODKA.exe"
+Write-Host "Embedded payload contract: one compressed payload; exact archive/module after decode"
 
 $os = Get-ComputerInfo -Property WindowsProductName, WindowsVersion,
     OsBuildNumber, OsArchitecture
@@ -188,7 +189,7 @@ if ($projectText -match '<ClCompile\s+Include=' -or
 }
 $nasmEntries = ([regex]::Matches($projectText, '<NASM\s')).Count
 if ($nasmEntries -eq 0) { Fail "generated VOODKA project contains no NASM entries" }
-Write-Host "Source graph: $nasmEntries NASM entries, 0 C/C++ compile entries"
+Write-Host "Source graph: $nasmEntries NASM platform entries, 0 C/C++ platform entries; freestanding XZ decoder is linked separately"
 if ($projectText -notmatch '<EntryPointSymbol>asm_voodka_process_entry</EntryPointSymbol>') {
     Fail "generated VOODKA project does not use the native NASM process entry"
 }

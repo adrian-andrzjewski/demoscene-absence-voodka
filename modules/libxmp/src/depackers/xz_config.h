@@ -10,6 +10,13 @@
 #ifndef XZ_CONFIG_H
 #define XZ_CONFIG_H
 
+#ifdef VOODKA_XZ_MINIMAL
+
+/* The no-CRT VOODKA image supplies its own allocator and byte primitives. */
+#include "../../../../port/core/eos_replace/xz_decoder_runtime.h"
+
+#else
+
 /* Uncomment to enable CRC64 support. */
 /* #define XZ_USE_CRC64 */
 
@@ -107,5 +114,7 @@ static inline void put_unaligned_be32(uint32 val, uint8 *buf)
 #ifndef get_le32
 #	define get_le32 get_unaligned_le32
 #endif
+
+#endif /* VOODKA_XZ_MINIMAL */
 
 #endif

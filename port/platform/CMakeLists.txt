@@ -29,13 +29,14 @@ set(VOODKA_PLATFORM_SOURCES
     win32_d3d_dispatch.asm
 )
 
-# The shipped image is deliberately assembly-only. Keep this invariant at
+# The shipped platform is deliberately assembly-only. Keep this invariant at
 # configure time so an accidental C/C++ source addition cannot silently put
-# runtime, STL, exception, or CRT code back into VOODKA.exe.
+# runtime, STL, exception, or CRT code back into the platform target. The
+# separately linked freestanding XZ decoder is the sole C code in VOODKA.exe.
 foreach(_voodka_production_source IN LISTS VOODKA_PLATFORM_SOURCES)
     if(_voodka_production_source MATCHES "\\.(c|cc|cpp|cxx)$")
         message(FATAL_ERROR
-            "VOODKA production target must remain assembly-only: ${_voodka_production_source}")
+            "VOODKA platform target must remain assembly-only: ${_voodka_production_source}")
     endif()
 endforeach()
 

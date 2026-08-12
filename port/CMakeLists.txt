@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.24)
 
 # =============================================================================
 # VOODKA - native Windows x64 port of the 1990s Absence demoscene demo.
-# The shipped demo is a no-CRT NASM x64 image. C++ is used only by the
-# separate reference executable and host-side validation/packaging tools.
+# The shipped demo is a no-CRT NASM x64 image plus one minimal C XZ decoder.
+# C++ remains confined to the separate reference executable and host-side
+# validation/packaging tools.
 # =============================================================================
 
 project(VOODKA LANGUAGES C CXX ASM_NASM)
@@ -46,18 +47,19 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 
-# ---- data asset generation (reproduces the original vodka.dat) --------------
+# ---- data asset generation and single-codec embedding -----------------------
 set(VOODKA_DANE "${CMAKE_SOURCE_DIR}/../demoscene-absence-voodka-master/CODE/LINKER/DANE")
 set(VOODKA_DANE_REF "${CMAKE_SOURCE_DIR}/../reference/source/demoscene-absence-voodka-master/CODE/LINKER/DANE")
 set(VOODKA_MANIFEST "${CMAKE_SOURCE_DIR}/../demoscene-absence-voodka-master/CODE/LINKER/VODKA.TXT")
 set(VOODKA_DAT "${CMAKE_SOURCE_DIR}/data/vodka.dat")
 set(VOODKA_MOD "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
 
-# The production image embeds the exact generated archive and checked-in
-# module.  Keep the wrapper in the build tree so the source tree contains no
-# generated assembly, while making both payloads explicit build dependencies.
-file(TO_CMAKE_PATH "${VOODKA_DAT}" VOODKA_DAT_NASM)
-file(TO_CMAKE_PATH "${VOODKA_MOD}" VOODKA_MOD_NASM)
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+set(VOODKA_COMPRESSOR "${CMAKE_SOURCE_DIR}/tools/compress_assets.py")
+set(VOODKA_PAYLOAD "${CMAKE_BINARY_DIR}/generated/voodka_payload.bin")
+set(VOODKA_PAYLOAD_SIZES "${CMAKE_BINARY_DIR}/generated/voodka_payload_sizes.inc")
+file(TO_CMAKE_PATH "${VOODKA_PAYLOAD}" VOODKA_PAYLOAD_NASM)
+file(TO_CMAKE_PATH "${VOODKA_PAYLOAD_SIZES}" VOODKA_PAYLOAD_SIZES_NASM)
 set(VOODKA_EMBEDDED_ASM "${CMAKE_BINARY_DIR}/generated/embedded_runtime.asm")
 configure_file(
     "${CMAKE_SOURCE_DIR}/core/eos_replace/embedded_runtime.asm.in"
@@ -104,8 +106,35 @@ add_custom_command(
     COMMENT "Packing vodka.dat from reference DANE/ (LINKER.PAS semantics)"
 )
 add_custom_target(voodka_data ALL DEPENDS "${VOODKA_DAT}")
+add_custom_command(
+    OUTPUT "${VOODKA_PAYLOAD}" "${VOODKA_PAYLOAD_SIZES}"
+    COMMAND "${Python3_EXECUTABLE}" "${VOODKA_COMPRESSOR}"
+            --archive "${VOODKA_DAT}"
+            --module "${VOODKA_MOD}"
+            --output "${VOODKA_PAYLOAD}"
+            --inc "${VOODKA_PAYLOAD_SIZES}"
+    DEPENDS "${VOODKA_COMPRESSOR}" "${VOODKA_DAT}" "${VOODKA_MOD}"
+    COMMENT "Compressing VOODKA runtime payloads with XZ/LZMA2 extreme"
+    VERBATIM)
 add_custom_target(voodka_embedded_payloads DEPENDS
-    "${VOODKA_DAT}" "${VOODKA_MOD}")
+    "${VOODKA_PAYLOAD}" "${VOODKA_PAYLOAD_SIZES}")
+
+# Minimal XZ Embedded/LZMA2 decoder used by both runtime payloads.  The
+# vendored decoder is compiled in single-call mode with a fixed no-CRT
+# workspace; no libxmp or C runtime code enters the shipped image.
+add_library(voodka_xz_decoder STATIC
+    core/eos_replace/xz_decode.c
+    core/eos_replace/xz_decoder_runtime.c
+    core/eos_replace/xz_crc32_minimal.c
+    "${CMAKE_SOURCE_DIR}/../modules/libxmp/src/depackers/xz_dec_lzma2.c"
+    "${CMAKE_SOURCE_DIR}/../modules/libxmp/src/depackers/xz_dec_stream.c")
+target_compile_definitions(voodka_xz_decoder PRIVATE VOODKA_XZ_MINIMAL=1)
+target_include_directories(voodka_xz_decoder PRIVATE
+    "${CMAKE_SOURCE_DIR}/../modules/libxmp/src/depackers"
+    "${CMAKE_SOURCE_DIR}/../modules/libxmp/include")
+if(MSVC)
+    target_compile_options(voodka_xz_decoder PRIVATE /O1 /Oi- /GS-)
+endif()
 
 # ---- VIRTUAL viewer object archive (WORLD.PAS semantics) --------------------
 set(VOODKA_WORLD_MANIFEST
@@ -581,8 +610,10 @@ add_test(NAME embedded.payload
          COMMAND embedded_payload_check
                  "$<TARGET_FILE:VOODKA>"
                  "${VOODKA_DAT}"
-                 "${VOODKA_MOD}")
+                 "${VOODKA_MOD}"
+                 "${VOODKA_PAYLOAD}")
 set_tests_properties(embedded.payload PROPERTIES LABELS unit TIMEOUT 30)
+target_link_libraries(embedded_payload_check PRIVATE voodka_xz_decoder)
 add_dependencies(embedded_payload_check VOODKA voodka_embedded_payloads)
 
 # Standalone no-CRT validation probe for the native x64 Win32/thread substrate.

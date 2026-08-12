@@ -62,8 +62,9 @@ set(VOODKA_CORE_ASM
 
 add_library(voodka_core STATIC ${VOODKA_CORE_ASM})
 add_dependencies(voodka_core voodka_embedded_payloads)
+target_link_libraries(voodka_core PUBLIC voodka_xz_decoder)
 set_source_files_properties("${VOODKA_EMBEDDED_ASM}" PROPERTIES
-    OBJECT_DEPENDS "${VOODKA_DAT};${VOODKA_MOD}")
+    OBJECT_DEPENDS "${VOODKA_PAYLOAD};${VOODKA_PAYLOAD_SIZES}")
 target_compile_options(voodka_core PRIVATE
     ${VOODKA_DEBUG_TITLE_ASM_OPTION})
 

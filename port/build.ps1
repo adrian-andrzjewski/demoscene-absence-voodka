@@ -3,8 +3,9 @@
 # Locates a Visual Studio installation (2022 preferred, 2026 accepted),
 # imports its x64 dev environment via VsDevCmd.bat, then configures and
 # builds with CMake using the vendored NASM. The C++ compiler is needed only
-# for host tools and the non-shipped reference oracle; VOODKA.exe itself is
-# assembly-only. No external package manager or DOS toolchain is required.
+# for host tools and the non-shipped reference oracle; VOODKA.exe itself is a
+# no-CRT native image with a small embedded XZ decoder. No external package
+# manager or DOS toolchain is required.
 #
 # Usage:
 #   .\build.ps1                # configure + build Debug
@@ -26,6 +27,13 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+
+# Capture Python before VsDevCmd replaces PATH. The compressor uses only
+# Python's standard-library LZMA2 encoder; Python is build-time only.
+$pythonExecutable = (Get-Command python.exe -ErrorAction SilentlyContinue).Source
+if (-not $pythonExecutable) {
+    throw "Python 3 is required to generate the deterministic compressed payload."
+}
 
 # Do not let an inherited DOS/Watcom toolchain contaminate MSVC detection.
 # VsDevCmd supplies the correct INCLUDE/LIB values for the selected VS
@@ -99,7 +107,7 @@ $scriptLines = @(
     "call `"$importFile`""
     'if errorlevel 1 exit /b 1'
     "set `"NASM=$nasmpath`""
-    "cmake -S `"$port`" -B `"$cmakeD`" -G `"Visual Studio 17 2022`" -A x64 `"-DCMAKE_ASM_NASM_COMPILER=$nasmpath`""
+    "cmake -S `"$port`" -B `"$cmakeD`" -G `"Visual Studio 17 2022`" -A x64 `"-DCMAKE_ASM_NASM_COMPILER=$nasmpath`" `"-DPython3_EXECUTABLE=$pythonExecutable`""
     'if errorlevel 1 exit /b 1'
     "cmake --build `"$cmakeD`" --config $Config --parallel"
 )

@@ -97,7 +97,7 @@ DEFAULT REL
 %define LOCAL_BYTES                 0x528
 
 extern Sleep
-extern voodka_embedded_module
+extern voodka_embedded_module_decoded
 extern voodka_embedded_module_size
 extern asm_audio_parse_mod
 extern asm_audio_trace_rows
@@ -132,7 +132,7 @@ asm_audio_service_storage_init:
         push    r15
         sub     rsp, 0x48
 
-        lea     r12, [rel voodka_embedded_module]
+        lea     r12, [rel voodka_embedded_module_decoded]
         mov     r13, rdx                    ; output descriptor
 
         mov     rdi, r13

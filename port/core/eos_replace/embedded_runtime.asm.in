@@ -1,31 +1,35 @@
-; embedded_runtime.asm - the shipped VOODKA runtime payloads.
+; embedded_runtime.asm - the one compressed shipped VOODKA payload.
 ;
-; The canonical archive and module remain byte-for-byte unchanged.  They are
-; linked once into the production image and consumed through these symbols;
-; individual files are never unpacked or staged beside VOODKA.exe.
+; The canonical archive and module are compressed at build time into one
+; deterministic VPK1 container.  Only that container is linked into the image;
+; the decoder writes each asset to its final runtime destination.
 
 BITS 64
 DEFAULT REL
 
 section .rdata align=16
 
-global voodka_embedded_archive
-global voodka_embedded_archive_end
-global voodka_embedded_archive_size
-voodka_embedded_archive:
-        incbin "@VOODKA_DAT_NASM@"
-voodka_embedded_archive_end:
-voodka_embedded_archive_size:
-        dd voodka_embedded_archive_end - voodka_embedded_archive
+%include "@VOODKA_PAYLOAD_SIZES_NASM@"
 
-align 16
-global voodka_embedded_module
-global voodka_embedded_module_end
+global voodka_embedded_payload
+global voodka_embedded_payload_end
+global voodka_embedded_payload_size
+voodka_embedded_payload:
+        incbin "@VOODKA_PAYLOAD_NASM@"
+voodka_embedded_payload_end:
+voodka_embedded_payload_size:
+        dd voodka_embedded_payload_end - voodka_embedded_payload
+
+global voodka_embedded_archive_size
 global voodka_embedded_module_size
-voodka_embedded_module:
-        incbin "@VOODKA_MOD_NASM@"
-voodka_embedded_module_end:
+voodka_embedded_archive_size:
+        dd VOODKA_ARCHIVE_UNCOMPRESSED_SIZE
 voodka_embedded_module_size:
-        dd voodka_embedded_module_end - voodka_embedded_module
+        dd VOODKA_MODULE_UNCOMPRESSED_SIZE
+
+section .bss align=16
+global voodka_embedded_module_decoded
+voodka_embedded_module_decoded:
+        resb VOODKA_MODULE_UNCOMPRESSED_SIZE
 
 section .note.GNU-stack noalloc noexec nowrite progbits

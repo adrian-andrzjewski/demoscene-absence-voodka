@@ -16,6 +16,8 @@
 **/CMakeCache.txt
 **/cmake_install.cmake
 **/compile_commands.json
+**/__pycache__/
+port/release-single/
 *.pdb
 *.ilk
 *.log

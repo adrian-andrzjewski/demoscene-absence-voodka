@@ -14,18 +14,22 @@ int main() {
     if (!base) return 2;
 
     const uint32_t first = vk::arenaAlloc(1);
-    if (first != 0x00040000) return 3;
+    // The archive is decoded into the arena during platformInit, so normal
+    // allocations begin immediately after that persistent runtime buffer.
+    if (first <= 0x00040000) return 3;
     for (uint32_t i = 0; i < 16; ++i) {
         if (base[first + i] != 0) return 4;
     }
 
     const uint32_t second = vk::arenaAlloc(17);
-    if (second != 0x00040010) return 5;
+    if (second != first + 16) return 5;
     for (uint32_t i = 0; i < 32; ++i) {
         if (base[second + i] != 0) return 6;
     }
     const uint32_t archive = vk::loadInternalFile("VoOdKa.DaT");
-    if (!archive || !vk::archiveBytes() || vk::archiveSize() == 0) return 7;
+    if (!archive) return 70;
+    if (!vk::archiveBytes()) return 71;
+    if (vk::archiveSize() == 0) return 72;
     if (archive == first || archive == second) return 8;
     if (vk::loadInternalFile("vodka.dat") != archive) return 9;
     const auto* source = static_cast<const uint8_t*>(vk::archiveBytes());

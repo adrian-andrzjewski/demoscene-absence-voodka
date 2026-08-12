@@ -84,9 +84,10 @@ $binRoot = Join-Path $portRoot "bin\$Config"
 $sourceExe = Join-Path $binRoot "VOODKA.exe"
 $sourceData = Join-Path $portRoot "data\vodka.dat"
 $sourceMusic = Join-Path $repoRoot "music\amnezja2.mod"
+$sourcePayload = Join-Path $portRoot "build\$Config\generated\voodka_payload.bin"
 $payloadCheck = Join-Path $binRoot "embedded_payload_check.exe"
 
-foreach ($requiredSource in @($sourceExe, $sourceData, $sourceMusic, $payloadCheck)) {
+foreach ($requiredSource in @($sourceExe, $sourceData, $sourceMusic, $sourcePayload, $payloadCheck)) {
     if (-not (Test-Path -LiteralPath $requiredSource)) {
         Fail "missing required build or documentation input: $requiredSource"
     }
@@ -114,9 +115,9 @@ New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
 
 Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $packageRoot "VOODKA.exe")
 
-& $payloadCheck $sourceExe $sourceData $sourceMusic
+& $payloadCheck $sourceExe $sourceData $sourceMusic $sourcePayload
 if ($LASTEXITCODE -ne 0) {
-    Fail "VOODKA.exe does not contain the exact canonical archive and module payloads"
+    Fail "VOODKA.exe does not contain the exact compressed payload and decoded canonical archive/module"
 }
 
 $expectedFiles = @(

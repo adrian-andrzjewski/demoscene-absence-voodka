@@ -1,7 +1,8 @@
 # Building & running the VOODKA Windows port
 
 The production migration is complete: `VOODKA.exe` is a native x64 NASM
-image with a custom assembly entry point and no C/C++ runtime dependency.
+image with a custom assembly entry point, a small embedded XZ/LZMA2 decoder,
+and no C/C++ runtime dependency.
 `VOODKA_REFERENCE.exe` and the host tools remain separate C++ validation
 programs so the port can continue to be compared against the original
 behavior. Nothing in that reference graph is required at runtime by the demo.
@@ -14,7 +15,8 @@ behavior. Nothing in that reference graph is required at runtime by the demo.
 | Visual Studio 2022 (Build Tools suffice) | 2026 also accepted; `build.ps1` prefers 2022 |
 | CMake >= 3.24 | on PATH |
 | PowerShell 7+ | for `build.ps1` |
-| NASM | **vendored** in `modules/` - the shipped `VOODKA.exe` is NASM-only |
+| Python 3 | build-time standard-library compressor used to generate the deterministic payload |
+| NASM | **vendored** in `modules/` - the production demo core/platform is NASM |
 | libxmp | **vendored** in `modules/` - reference/oracle tooling only; never linked into `VOODKA.exe` |
 
 No package manager, no DOS toolchain, no external SDK.
@@ -43,14 +45,14 @@ checkout is relocatable.
 ## Outputs (`port/bin/<Config>/`)
 
 ```
-VOODKA.exe          the complete demo (100% NASM x64 production image)
+VOODKA.exe          the complete demo (NASM x64 + minimal no-CRT XZ decoder)
 VOODKA_REFERENCE.exe non-shipped C++/libxmp behavioral-oracle build
 win32_runtime_probe.exe standalone no-CRT assembly Win32/thread validation probe
 VIRTUAL.exe         the standalone VR-engine test viewer (Esc quits; --check loads+exits)
 asset_viewer.exe   the V3D/V3M asset viewer (loads all 9 3D models from data/vodka.dat)
 asset_viewer_selftest.exe  parse-only validation (CTest v3d.viewer_parse)
 data/world          VIRTUAL viewer object archive (byte-identical to the original)
-embedded_payload_check.exe  verifies exact archive/module bytes in VOODKA.exe
+embedded_payload_check.exe  verifies one compressed payload and exact decoded bytes
 *_selftest.exe      cross-check test binaries + tools
 audio_oracle.exe    libxmp module/timing/PCM oracle for Phase 2 validation
 audio_mod_parse_probe.exe  NASM-vs-libxmp module parser cross-check
@@ -72,12 +74,14 @@ audio_live_wasapi_probe.exe --stress repeated live-seek/teardown stress gate
 audio_live_wasapi_probe.exe --longrun sustained 15-second live handoff gate
 ```
 
-`VOODKA.exe` is self-contained: its assembly image contains the byte-exact
-`vodka.dat` archive and `amnezja2.mod` soundtrack, and production runtime
-loading does not probe the filesystem for either payload. The loose archive
-and module remain build/validation inputs. For the playable release bundle,
-use `port\package_release.ps1`; the standalone VIRTUAL viewer remains a
-development/validation tool and is not included in the demo release.
+`VOODKA.exe` is self-contained: its image contains one deterministic VPK1
+container with two XZ/LZMA2 streams. Startup decodes those streams directly
+into the final archive arena allocation and soundtrack buffer; the resulting
+`vodka.dat` and `amnezja2.mod` bytes are verified against the canonical inputs.
+Production runtime loading does not probe the filesystem for either payload.
+The loose archive and module remain build/validation inputs. For the playable
+release bundle, use `port\package_release.ps1`; the standalone VIRTUAL viewer
+remains a development/validation tool and is not included in the demo release.
 
 ## Tagged release workflow
 
@@ -168,7 +172,8 @@ The local packaging command is equivalent to the CI packaging step:
 
 The normal packaging command also runs an isolated packaged P4 smoke. Hosted
 CI passes `-SkipHardwareSmoke`: it still validates the exact executable-only
-file set, ZIP contents, and byte-exact embedded payloads, but does not claim to
+file set, ZIP contents, the single compressed payload, and byte-exact decoded
+assets, but does not claim to
 validate a real packaged D3D11/WASAPI session. Run the command without that
 switch on a hardware-capable validation host.
 
@@ -256,15 +261,15 @@ Esc                            quit immediately from any scene/loading state
 ctest --test-dir port\build\Release -C Release --output-on-failure -L "^unit$"
 ```
 
-The command above is the 33-test portable unit suite. It contains
+The command above is the 34-test portable unit suite. It contains
 NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
 swiatynia city (P2) algorithms, toonel, palette), deterministic processorek
 raster checks, and ABI/bridge checks backed by in-process fakes. It does not
 open a repository file, depend on a generated path, create a worker/window,
 activate D3D11/WASAPI, or launch the production executable.
 
-With Python available, the complete 86-test local matrix is split into those
-34 unit tests and 52 integration tests. Without Python, the three optional
+With Python available, the complete 89-test local matrix is split into those
+34 unit tests and 55 integration tests. Without Python, the three optional
 Python provenance/relocation checks are not registered. Run the integration
 suite with `-TestSuite Integration`; it contains the external/runtime checks
 below and is expected to need a validation host:
@@ -275,8 +280,9 @@ ctest --test-dir port\build\Release -C Release --output-on-failure # unit + inte
 ```
 
 Integration coverage includes archive/provenance checks such as
-`vodka.golden_hash` (repacked archive SHA-256 == release EXE's embedded
-archive), `v3d.crosscheck` (real .V3D/.V3M decode via
+`vodka.golden_hash` (repacked archive SHA-256 == the canonical archive),
+`embedded.payload` (one compressed container, no raw duplicate, and exact XZ
+decode), and `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
 TASM text), `pal.integrity` + `pal.repro` (palette copies + optional
 OBJ-extraction reproducibility), `build.addr32` (COFF relocation hygiene),
