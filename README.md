@@ -31,6 +31,50 @@ frames per second and plays all eight scenes from beginning to end.
 XZ/LZMA2 decoder: no C++ object, CRT, STL, exception runtime, or libxmp code
 is part of the shipped demo.
 
+## Visual showcase — production port
+
+These are clean production frames captured directly from the current native
+`VOODKA.exe` with its indexed 320×200 recorder, then enlarged 4× with nearest
+neighbour sampling. There is no window chrome, debug overlay, or development
+annotation in the images. The two frames for each scene show a meaningful
+camera, effect, or animation phase; the names use the production terminology,
+with the historical `P1`–`P8` identifier in parentheses.
+
+<table>
+<tr>
+<td valign="top"><strong>oko + szklo (P1)</strong><br><img src="reference/captures/port-production/oko-szklo-head-glints.png" alt="oko + szklo: head with glints" width="320"><br><sub>Rotating head and glints</sub></td>
+<td valign="top"><strong>oko + szklo (P1)</strong><br><img src="reference/captures/port-production/oko-szklo-head-turn.png" alt="oko + szklo: head turning" width="320"><br><sub>Later head turn</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>swiatynia city (P2)</strong><br><img src="reference/captures/port-production/swiatynia-city-stadium.png" alt="swiatynia city: stadium world" width="320"><br><sub>Stadium world and reflective water</sub></td>
+<td valign="top"><strong>swiatynia city (P2)</strong><br><img src="reference/captures/port-production/swiatynia-city-close-flyby.png" alt="swiatynia city: close flyby" width="320"><br><sub>Close camera flyby</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>tunel + wygibasy (P3)</strong><br><img src="reference/captures/port-production/tunel-wygibasy-gold-loop.png" alt="tunel + wygibasy: gold loop" width="320"><br><sub>Textured gold loop</sub></td>
+<td valign="top"><strong>tunel + wygibasy (P3)</strong><br><img src="reference/captures/port-production/tunel-wygibasy-tunnel.png" alt="tunel + wygibasy: tunnel" width="320"><br><sub>Twisted tunnel phase</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>processorek Nevosolek (P4)</strong><br><img src="reference/captures/port-production/processorek-nevosolek-morphing-world.png" alt="processorek Nevosolek: morphing world" width="320"><br><sub>Morphing plate/world</sub></td>
+<td valign="top"><strong>processorek Nevosolek (P4)</strong><br><img src="reference/captures/port-production/processorek-nevosolek-logo-pass.png" alt="processorek Nevosolek: logo pass" width="320"><br><sub>Logo pass and camera shift</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>torus ustep village (P5)</strong><br><img src="reference/captures/port-production/torus-ustep-village-colosseum.png" alt="torus ustep village: colosseum" width="320"><br><sub>Colosseum ring over water</sub></td>
+<td valign="top"><strong>torus ustep village (P5)</strong><br><img src="reference/captures/port-production/torus-ustep-village-reflection.png" alt="torus ustep village: reflection" width="320"><br><sub>Torus and reflection pass</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>gratki (P6)</strong><br><img src="reference/captures/port-production/gratki-bump-map.png" alt="gratki: green bump-mapped lettering" width="320"><br><sub>2D bump-mapped lettering</sub></td>
+<td valign="top"><strong>gratki (P6)</strong><br><img src="reference/captures/port-production/gratki-bump-scroll.png" alt="gratki: scrolling bump-mapped lettering" width="320"><br><sub>Scrolling lettering phase</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>gratki + woda (P7)</strong><br><img src="reference/captures/port-production/gratki-woda-water-title.png" alt="gratki + woda: water title" width="320"><br><sub>Water texture and title</sub></td>
+<td valign="top"><strong>gratki + woda (P7)</strong><br><img src="reference/captures/port-production/gratki-woda-morph-phase.png" alt="gratki + woda: morph phase" width="320"><br><sub>Rippling title phase</sub></td>
+</tr>
+<tr>
+<td valign="top"><strong>nad czerwonym lampa (P8)</strong><br><img src="reference/captures/port-production/nad-czerwonym-lampa-ring.png" alt="nad czerwonym lampa: ring viewer" width="320"><br><sub>Rotating ring viewer</sub></td>
+<td valign="top"><strong>nad czerwonym lampa (P8)</strong><br><img src="reference/captures/port-production/nad-czerwonym-lampa-object-viewer.png" alt="nad czerwonym lampa: object viewer" width="320"><br><sub>Object viewer over the outro world</sub></td>
+</tr>
+</table>
+
 ## Why this port exists
 
 This project is personal before it is technical. I first discovered **Voodka**,
