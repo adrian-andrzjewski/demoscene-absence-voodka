@@ -1,0 +1,6 @@
+# Raw DOSBox capture output (screenshots/video) and port --record dumps.
+# Regenerable any time with reference/dosbox/capture_reference.ps1 and
+# VOODKA.exe --record. Only the curated stills + README.md here are tracked.
+raw/
+port_raw/
+port/

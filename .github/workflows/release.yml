@@ -1,0 +1,116 @@
+name: Tagged Windows x64 release
+
+on:
+  push:
+    tags:
+      - "voodka-port-v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: voodka-release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, validate, and publish ${{ github.ref_name }}
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out the tagged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate tag convention
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RELEASE_TAG -notmatch '^voodka-port-v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw "Unsupported release tag '$env:RELEASE_TAG'; expected voodka-port-v<major>.<minor>.<patch>."
+          }
+
+      - name: Build Release x64 and run CTest
+        shell: pwsh
+        run: .\port\build.ps1 -Config Release -Clean -Test
+
+      - name: Run production and isolated full-demo validation
+        shell: pwsh
+        run: >-
+          .\port\verify_production.ps1
+          -Config Release
+          -RunTests
+          -PackageRun
+          -PackageRepeats 3
+          -FullRun
+          -FullRunTimeoutSec 360
+
+      - name: Create and validate release ZIP
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & .\port\package_release.ps1 `
+            -Config Release `
+            -Version $env:RELEASE_TAG `
+            -OutputDirectory (Join-Path $env:RUNNER_TEMP 'voodka-release')
+          if ($LASTEXITCODE -ne 0) {
+            throw "Release packaging failed with exit code $LASTEXITCODE."
+          }
+
+      - name: Create or update the GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_DIR: ${{ runner.temp }}\voodka-release
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $archive = Join-Path $env:RELEASE_DIR "VOODKA-$env:RELEASE_TAG.zip"
+          if (-not (Test-Path -LiteralPath $archive)) {
+            throw "Expected release archive not found: $archive"
+          }
+
+          $notesFile = Join-Path $env:RUNNER_TEMP "voodka-release-notes.md"
+          @"
+          # VOODKA Windows x64 $env:RELEASE_TAG
+
+          Automated tagged release of the native x64 assembly port.
+
+          This release was produced by the clean Release workflow and passed
+          the complete CTest matrix, PE/import audit, isolated package smoke,
+          and full-demo audio/video timeline validation before publication.
+
+          The attached `VOODKA-$env:RELEASE_TAG.zip` contains the self-contained
+          demo runtime (`VOODKA.exe`, `data/vodka.dat`, and
+          `music/amnezja2.mod`) plus the main README. Developer source,
+          documentation, tests, and build utilities are not included.
+          "@ | Set-Content -LiteralPath $notesFile -Encoding utf8
+
+          gh release view $env:RELEASE_TAG *> $null
+          $releaseExists = ($LASTEXITCODE -eq 0)
+          if ($releaseExists) {
+            gh release edit $env:RELEASE_TAG `
+              --title "VOODKA Windows x64 $env:RELEASE_TAG" `
+              --notes-file $notesFile
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to update GitHub Release $env:RELEASE_TAG."
+            }
+            gh release upload $env:RELEASE_TAG $archive --clobber
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to upload release archive to $env:RELEASE_TAG."
+            }
+          } else {
+            gh release create $env:RELEASE_TAG $archive `
+              --verify-tag `
+              --title "VOODKA Windows x64 $env:RELEASE_TAG" `
+              --notes-file $notesFile
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to create GitHub Release $env:RELEASE_TAG."
+            }
+          }

@@ -1,0 +1,39 @@
+.DS_Store
+
+# Local editor and IDE state
+.vs/
+.vscode/
+*.user
+*.suo
+*.VC.db
+
+# Generic build, test, coverage, and packaging output
+**/build/
+**/bin/
+**/out/
+**/Testing/
+**/CMakeFiles/
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/compile_commands.json
+*.pdb
+*.ilk
+*.log
+*.tmp
+*.orig
+*.rej
+
+# Generated original-toolchain outputs. The source and archival mirrors stay
+# in the repository; compiler/linker products do not. The two intentional
+# binary exceptions below are archival/reference inputs.
+*.obj
+*.OBJ
+*.bak
+*.BAK
+*.exe
+*.EXE
+!modules/nasm/nasm.exe
+!reference/release/abc_voda/VOODKA.EXE
+
+# Local simulation, capture, and reverse-engineering scratch output
+.sim/
