@@ -80,14 +80,24 @@ int main() {
     UnregisterClassW(className, instance);
 
     // FF 40 7F FF in memory is 0xFF7F40FF as a little-endian uint32_t.
+    // Some D3D11 implementations round the exact 0.5 UNORM channel to 0x80
+    // instead of 0x7F. Keep the other channels exact and accept that one-LSB
+    // representation difference rather than treating a valid readback as a
+    // device failure.
     // A hidden validation window may return DXGI_STATUS_OCCLUDED from
     // Present. That is a successful API execution for this probe; a visible
     // application window returns S_OK instead.
     const bool presentOk = report.presentHr == 0 || report.presentHr == 0x087A0001u;
+    const uint32_t expectedPixel = 0xFF7F40FFu;
+    const uint32_t pixelBlue = (report.firstPixel >> 16) & 0xFFu;
+    const uint32_t expectedBlue = (expectedPixel >> 16) & 0xFFu;
+    const bool firstPixelOk =
+        (report.firstPixel & 0xFF00FFFFu) == (expectedPixel & 0xFF00FFFFu) &&
+        (pixelBlue == expectedBlue || pixelBlue == expectedBlue + 1u);
     const bool reportOk =
         result == 0 && report.initHr == 0 && report.getBufferHr == 0 &&
         report.rtvHr == 0 && report.stagingHr == 0 && report.mapHr == 0 &&
         presentOk && report.featureLevel == 0xB000 &&
-        report.rowPitch >= 640u * 4u && report.firstPixel == 0xFF7F40FFu;
+        report.rowPitch >= 640u * 4u && firstPixelOk;
     return reportOk ? 0 : 1;
 }

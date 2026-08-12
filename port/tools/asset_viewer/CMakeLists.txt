@@ -39,3 +39,4 @@ target_compile_definitions(asset_viewer_selftest PRIVATE
     ASSET_VIEWER_DATA_DIR="${ASSET_VIEWER_DATA_DIR}")
 add_dependencies(asset_viewer_selftest extract_v3d_assets)
 add_test(NAME v3d.viewer_parse COMMAND asset_viewer_selftest)
+set_property(TEST v3d.viewer_parse APPEND PROPERTY LABELS "integration")

@@ -24,7 +24,9 @@ No package manager, no DOS toolchain, no external SDK.
 ```powershell
 cd port
 .\build.ps1 -Config Release          # configure + build
-.\build.ps1 -Config Release -Test    # build + run the CTest suite (88 tests)
+.\build.ps1 -Config Release -Test    # build + run the portable unit suite
+.\build.ps1 -Config Release -Test -TestSuite Integration # runtime suite
+.\build.ps1 -Config Release -Test -TestSuite All # complete local matrix
 .\build.ps1 -Clean                   # wipe port/build first
 ```
 
@@ -82,15 +84,93 @@ development/validation tool and is not included in the demo release.
 The canonical release tag is `voodka-port-v<major>.<minor>.<patch>`, for
 example `voodka-port-v1.1.0`. Pushing such a tag starts
 `.github/workflows/release.yml` on a Windows x64 runner. The workflow performs
-a clean Release build, runs CTest, validates the no-CRT production PE and
-imports, runs the complete demo from an isolated runtime directory, and then
-publishes the ZIP only if every gate succeeds.
+a clean Release build, runs only the portable unit suite, validates the
+no-CRT production PE/import/source contracts, and then publishes the ZIP.
+Hosted runners are deliberately not treated as a graphics/audio validation
+host: they do not guarantee a D3D11 hardware device, a default WASAPI render
+endpoint, or an interactive desktop window station.
+
+### Unit and integration suites
+
+CTest has two explicit, non-overlapping suite labels. The default `build.ps1
+-Test` command is the unit suite; integration tests are still built, but are
+not accidentally run by the release gate.
+
+| Suite | Contents | Environment contract |
+|---|---|---|
+| `unit` | deterministic raster/math/parser checks plus ABI tests using in-process fakes | no files, generated archive paths, windows, GPU, audio endpoint, or wall-clock pacing |
+| `integration` | archive/provenance checks, libxmp comparisons, Win32 sinks/threads, D3D11, WASAPI, asset loading, and production playback | Windows runtime; selected tests additionally require source/reference files, a desktop, D3D11/GPU, or a default WASAPI render endpoint |
+
+The ABI tests that remain in `unit` deliberately replace platform callbacks
+with C/C++ fakes and exercise only the assembly contract. Tests that call a
+real Win32 service, read a repository/runtime file, create a worker, activate
+graphics/audio, or launch the demo are integration tests. No coverage was
+deleted; the integration labels preserve those checks for capable hosts.
+
+Run the suites explicitly:
+
+```powershell
+.\port\build.ps1 -Config Release -Test -TestSuite Unit
+.\port\build.ps1 -Config Release -Test -TestSuite Integration
+.\port\build.ps1 -Config Release -Test -TestSuite All
+```
+
+After a build, the equivalent CTest filters are:
+
+```powershell
+ctest --test-dir port\build\Release -C Release --output-on-failure -L "^unit$"
+ctest --test-dir port\build\Release -C Release --output-on-failure -L "^integration$"
+```
+
+The generated Visual Studio project also exposes `voodka_unit_tests`,
+`voodka_integration_tests`, and `voodka_all_tests` targets. Build the
+configuration first, then invoke the desired target from the IDE or with
+`cmake --build`. An unfiltered `ctest` remains the complete local matrix.
+
+The integration suite is the manual/validation workflow for this repository;
+it is intentionally not part of tagged release CI. Run it on a Windows host
+with the relevant resources before claiming hardware or playback coverage:
+
+```powershell
+.\port\build.ps1 -Config Release -Test -TestSuite Integration
+.\port\verify_production.ps1 -Config Release -RunTests -TestSuite Integration -PackageRun -FullRun
+```
+
+The `requires-d3d11`, `requires-wasapi`, and `requires-desktop` labels remain
+as capability annotations inside the integration suite:
+
+| Capability label | Boundary exercised | Requirement |
+|---|---|---|
+| `requires-d3d11` | D3D11 probes and real `VOODKA` scene tests | working D3D11 device, swap chain, GPU readback, and window |
+| `requires-wasapi` | WASAPI probes, live ring tests, and audio scene tests | default Windows render endpoint and usable device clock |
+| `requires-desktop` | real HWND/message-pump and scene tests | interactive Windows desktop/window station |
+
+These labels explain an integration failure; they are not a way to turn a
+legitimate unit failure into a pass.
+
+`verify_production.ps1 -SkipHardwareRuns` performs the static PE/source/import
+audit used by hosted CI and refuses to combine that mode with `-PackageRun` or
+`-FullRun`, so a skipped hardware gate cannot be mistaken for a passing
+playback validation.
+
+`pal.repro` is provenance-sensitive rather than hardware-sensitive: it
+re-extracts palettes from the original DOS OMF `.OBJ` files. Those generated
+objects are intentionally not part of the normal checkout. If they are
+absent, CTest reports `pal.repro` as skipped with an explicit diagnostic; on a
+provenance-enabled validation host, the same test runs and fails on any
+byte-level mismatch.
 
 The local packaging command is equivalent to the CI packaging step:
 
 ```powershell
 .\port\package_release.ps1 -Config Release -Version voodka-port-v1.1.0
 ```
+
+The normal packaging command also runs an isolated packaged P4 smoke. Hosted
+CI passes `-SkipHardwareSmoke`: it still validates the exact staged file set,
+ZIP contents, and non-empty runtime inputs, but does not claim to validate a
+real packaged D3D11/WASAPI session. Run the command without that switch on a
+hardware-capable validation host.
 
 The resulting archive is named `VOODKA-voodka-port-v1.1.0.zip` and contains:
 
@@ -118,12 +198,12 @@ run the PE/source/import checks and the live P4 smoke with:
 
 ```powershell
 .\port\verify_production.ps1 -Config Release
-.\port\verify_production.ps1 -Config Release -RunTests -PackageRun -FullRun
+.\port\verify_production.ps1 -Config Release -RunTests -TestSuite Integration -PackageRun -FullRun
 ```
 
 The verifier also checks the x64/PE32+ GUI image contract, native entry,
 ASLR, high-entropy VA, NX compatibility, and forbidden runtime imports. The
-second command runs the CTest matrix, the live P4 gate, and the complete
+second command runs the integration CTest suite, the live P4 gate, and the complete
 production playback from an isolated package containing only `VOODKA.exe`,
 `data\vodka.dat`, and `music\amnezja2.mod`; it records an A/V timeline under
 `port/build/`, verifies frame/audio monotonicity and terminal ModPos `0x2803`,
@@ -177,15 +257,33 @@ Esc                            quit immediately from any scene/loading state
 ## Tests
 
 ```powershell
-ctest --test-dir port\build\Release -C Release --output-on-failure
+ctest --test-dir port\build\Release -C Release --output-on-failure -L "^unit$"
 ```
 
-88 tests: NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
-swiatynia city (P2) data, toonel, palette), `vodka.golden_hash` (repacked archive SHA-256 ==
-release EXE's embedded archive), `v3d.crosscheck` (real .V3D/.V3M decode via
+The command above is the 33-test portable unit suite. It contains
+NASM-vs-C++ cross-checks (engine, txtr rasterizer, VR pipeline,
+swiatynia city (P2) algorithms, toonel, palette), deterministic processorek
+raster checks, and ABI/bridge checks backed by in-process fakes. It does not
+open a repository file, depend on a generated path, create a worker/window,
+activate D3D11/WASAPI, or launch the production executable.
+
+With Python available, the complete 88-test local matrix is split into those
+33 unit tests and 55 integration tests. Without Python, the three optional
+Python provenance/relocation checks are not registered. Run the integration
+suite with `-TestSuite Integration`; it contains the external/runtime checks
+below and is expected to need a validation host:
+
+```powershell
+ctest --test-dir port\build\Release -C Release --output-on-failure -L "^integration$"
+ctest --test-dir port\build\Release -C Release --output-on-failure # unit + integration
+```
+
+Integration coverage includes archive/provenance checks such as
+`vodka.golden_hash` (repacked archive SHA-256 == release EXE's embedded
+archive), `v3d.crosscheck` (real .V3D/.V3M decode via
 the ported loader), `tablica3.crosscheck` (generated NASM tables vs original
-TASM text), `pal.integrity` + `pal.repro` (palette copies + OBJ-extraction
-reproducibility), `build.addr32` (COFF relocation hygiene),
+TASM text), `pal.integrity` + `pal.repro` (palette copies + optional
+OBJ-extraction reproducibility), `build.addr32` (COFF relocation hygiene),
 `virtual.world_golden` + `virtual.load` (the viewer's archive is
 byte-identical to the original and decodes), and `v3d.viewer_parse` (the
 asset viewer's parser vs all 27 original 3D assets: 9 archive V3D/V3M

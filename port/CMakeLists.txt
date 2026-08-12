@@ -428,6 +428,7 @@ if(Python3_Interpreter_FOUND)
     add_test(NAME pal.repro
              COMMAND "${Python3_EXECUTABLE}"
                      "${CMAKE_SOURCE_DIR}/tools/validate/pal_repro_check.py")
+    set_tests_properties(pal.repro PROPERTIES SKIP_RETURN_CODE 77)
     # swiatynia city (P2) world-palette provenance: jjdj.pal == original CODE/P2/WORLD.P!
     # (guards the swiatynia city (P2) palette fix: swiatynia city (P2) must install jjdj, not vodka-37 2WORLD.PAL)
     add_test(NAME jjdj.repro
@@ -1067,5 +1068,178 @@ set_tests_properties(audio.production_reference_rejected PROPERTIES
     WILL_FAIL TRUE
     PASS_REGULAR_EXPRESSION
         "libxmp reference path is unavailable in VOODKA.exe;reference audio initialization failed")
+
+# ---- test-suite classification ---------------------------------------------
+# The default suite is the portable unit layer.  These tests use deterministic
+# inputs and C ABI fakes for platform services; they do not open files, create
+# windows, activate D3D11/WASAPI, or run the production executable.  Keep this
+# list explicit: adding a new test requires an intentional suite decision.
+set(VOODKA_UNIT_TESTS
+    engine.crosscheck
+    txtr.crosscheck
+    palette.crosscheck
+    toonel.crosscheck
+    mrotate.crosscheck
+    cammat.crosscheck
+    persp.crosscheck
+    v2d.crosscheck
+    normals.crosscheck
+    loader.crosscheck
+    vrot.crosscheck
+    vvis.crosscheck
+    vprep.crosscheck
+    vr_object_draw.crosscheck
+    vr_world_loop.crosscheck
+    win32.log_format
+    win32.pause_abi
+    win32.progress_abi
+    win32.application_abi
+    win32.app_modes
+    win32.app_startup
+    win32.app_host
+    win32.platform_abi
+    processorek_nevosolek.raster
+    audio.dispatch
+    audio.lookup
+    audio.seek_controller
+    bridge.services
+    bridge.timing_audio
+    bridge.file
+    bridge.input
+    bridge.shutdown
+    bridge.log)
+
+# Everything below crosses a machine, filesystem, archive, real-time, Win32,
+# graphics, audio, or packaged-runtime boundary.  These remain in the build
+# and are available with -TestSuite Integration or the voodka_integration_tests
+# target; they are deliberately not part of the release CI unit gate.
+set(VOODKA_INTEGRATION_TESTS
+    virtual.world_golden
+    swiatynia_city.path.crosscheck
+    swiatynia_city.world.crosscheck
+    vodka.golden_hash
+    v3d.crosscheck
+    tablica3.crosscheck
+    pal.integrity
+    audio.oracle
+    audio.mod_parse
+    audio.mod_trace
+    audio.mod_events
+    audio.mod_voices
+    audio.mod_ticks
+    audio.mod_pcm
+    audio.mod_stream
+    audio.live_tracker
+    audio.live_ring
+    win32.runtime_probe
+    win32.crash_report
+    win32.log_sink
+    win32.log_api
+    win32.timeline_sink
+    win32.arena_service
+    win32.input_abi
+    win32.music_path
+    win32.d3d_dispatch
+    audio.sync
+    audio.seek
+    audio.controller
+    audio.lifecycle
+    timer.asm_probe
+    audio.workers
+    d3d11.asm_probe
+    d3d11.asm_present_probe
+    audio.wasapi_asm_probe
+    audio.thread_asm_probe
+    audio.pcm_thread_probe
+    audio.live_wasapi_probe
+    audio.live_wasapi_control
+    audio.live_wasapi_seek
+    audio.live_wasapi_stress
+    audio.live_wasapi_longrun
+    audio.assembly_demo_oko_szklo
+    render.assembly_p4_scene
+    audio.assembly_demo_pause
+    audio.assembly_demo_close
+    win32.production_entry
+    audio.assembly_audio_fail_device
+    audio.reference_demo_close
+    audio.production_reference_rejected)
+if(Python3_Interpreter_FOUND)
+    list(APPEND VOODKA_INTEGRATION_TESTS pal.repro jjdj.repro build.addr32)
+endif()
+
+set_property(TEST ${VOODKA_UNIT_TESTS} APPEND PROPERTY LABELS "unit")
+set_property(TEST ${VOODKA_INTEGRATION_TESTS} APPEND PROPERTY LABELS "integration")
+
+# Sub-suite targets keep local invocation discoverable for IDEs and command
+# line users.  The build script builds the project first, then invokes the same
+# filters; raw ctest without a label remains the complete local matrix.
+add_custom_target(voodka_unit_tests
+    COMMAND "${CMAKE_CTEST_COMMAND}"
+            --test-dir "${CMAKE_BINARY_DIR}"
+            -C "$<CONFIG>"
+            --output-on-failure
+            --label-regex "^unit$"
+    USES_TERMINAL)
+add_custom_target(voodka_integration_tests
+    COMMAND "${CMAKE_CTEST_COMMAND}"
+            --test-dir "${CMAKE_BINARY_DIR}"
+            -C "$<CONFIG>"
+            --output-on-failure
+            --label-regex "^integration$"
+    USES_TERMINAL)
+add_custom_target(voodka_all_tests
+    COMMAND "${CMAKE_CTEST_COMMAND}"
+            --test-dir "${CMAKE_BINARY_DIR}"
+            -C "$<CONFIG>"
+            --output-on-failure
+    USES_TERMINAL)
+
+# ---- environment-dependent integration capabilities -----------------------
+# requires-desktop: creates a real HWND/message-pump window. The D3D11 probes
+# additionally need a D3D11-capable device and GPU readback.
+set_property(TEST
+    win32.runtime_probe
+    d3d11.asm_probe
+    d3d11.asm_present_probe
+    audio.assembly_demo_oko_szklo
+    render.assembly_p4_scene
+    audio.assembly_demo_pause
+    audio.assembly_demo_close
+    win32.production_entry
+    audio.assembly_audio_fail_device
+    audio.reference_demo_close
+    APPEND PROPERTY LABELS "requires-desktop")
+
+set_property(TEST
+    d3d11.asm_probe
+    d3d11.asm_present_probe
+    audio.assembly_demo_oko_szklo
+    render.assembly_p4_scene
+    audio.assembly_demo_pause
+    audio.assembly_demo_close
+    win32.production_entry
+    audio.reference_demo_close
+    APPEND PROPERTY LABELS "requires-d3d11")
+
+# These probes activate the machine's default WASAPI render endpoint and
+# validate real event-driven buffer service. They cannot be replaced by a
+# deterministic mock without ceasing to test the WASAPI boundary itself.
+set_property(TEST
+    audio.wasapi_asm_probe
+    audio.thread_asm_probe
+    audio.pcm_thread_probe
+    audio.live_wasapi_probe
+    audio.live_wasapi_control
+    audio.live_wasapi_seek
+    audio.live_wasapi_stress
+    audio.live_wasapi_longrun
+    audio.assembly_demo_oko_szklo
+    render.assembly_p4_scene
+    audio.assembly_demo_pause
+    audio.assembly_demo_close
+    win32.production_entry
+    audio.reference_demo_close
+    APPEND PROPERTY LABELS "requires-wasapi")
 
 message(STATUS "VOODKA x64 port configured. NASM: ${CMAKE_ASM_NASM_COMPILER}")

@@ -12,7 +12,8 @@ param(
     [Parameter(Mandatory = $true)]
     [ValidatePattern("^voodka-port-v[0-9]+\.[0-9]+\.[0-9]+$")]
     [string]$Version,
-    [string]$OutputDirectory
+    [string]$OutputDirectory,
+    [switch]$SkipHardwareSmoke
 )
 
 $ErrorActionPreference = "Stop"
@@ -136,7 +137,11 @@ foreach ($runtimeFile in @("VOODKA.exe", "data/vodka.dat", "music/amnezja2.mod")
     }
 }
 
-Invoke-IsolatedSmoke (Join-Path $packageRoot "VOODKA.exe") $packageRoot
+if ($SkipHardwareSmoke) {
+    Write-Host "Skipping packaged P4 runtime smoke (hardware/session capability not guaranteed)"
+} else {
+    Invoke-IsolatedSmoke (Join-Path $packageRoot "VOODKA.exe") $packageRoot
+}
 
 # The executable writes diagnostics beside itself during a run. They are
 # useful during validation but are not release inputs and must never enter the

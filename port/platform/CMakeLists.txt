@@ -132,3 +132,4 @@ add_custom_command(TARGET VIRTUAL POST_BUILD
             "$<TARGET_FILE_DIR:VIRTUAL>/data/world"
 )
 add_test(NAME virtual.load COMMAND VIRTUAL --check)
+set_property(TEST virtual.load APPEND PROPERTY LABELS "integration")

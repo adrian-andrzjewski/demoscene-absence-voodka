@@ -10,16 +10,36 @@
 #   .\build.ps1                # configure + build Debug
 #   .\build.ps1 -Config Release
 #   .\build.ps1 -Clean
-#   .\build.ps1 -Test          # run CTest after building
+#   .\build.ps1 -Test                       # portable unit suite
+#   .\build.ps1 -Test -TestSuite Integration # runtime/filesystem integration suite
+#   .\build.ps1 -Test -TestSuite All         # complete local matrix
 
 param(
     [ValidateSet("Debug", "Release")]
     [string]$Config = "Debug",
     [switch]$Clean,
-    [switch]$Test
+    [switch]$Test,
+    [ValidateSet("Unit", "Integration", "All")]
+    [string]$TestSuite = "Unit",
+    # Compatibility alias for callers of the former hardware-exclusion mode.
+    [switch]$CiSafeTests
 )
 
 $ErrorActionPreference = "Stop"
+
+# Do not let an inherited DOS/Watcom toolchain contaminate MSVC detection.
+# VsDevCmd supplies the correct INCLUDE/LIB values for the selected VS
+# installation after these legacy variables are removed.
+foreach ($envName in @("WATCOM", "WATCOMC", "EDPATH", "INCLUDE", "LIB", "CC", "CXX")) {
+    Remove-Item -LiteralPath ("Env:{0}" -f $envName) -ErrorAction SilentlyContinue
+}
+
+if ($CiSafeTests) {
+    if ($TestSuite -ne "Unit") {
+        throw "-CiSafeTests is an alias for -TestSuite Unit and cannot be combined with another test suite."
+    }
+    Write-Warning "-CiSafeTests is deprecated; the default -TestSuite Unit is now the portable unit suite."
+}
 # Repo root derived from this script's location (port/build.ps1 -> repo root);
 # keeps the build relocatable across machines/checkouts.
 $root = Split-Path -Parent $PSScriptRoot
@@ -81,7 +101,17 @@ $scriptLines = @(
     "cmake --build `"$cmakeD`" --config $Config --parallel"
 )
 if ($Test) {
-    $scriptLines += "ctest --test-dir `"$cmakeD`" -C $Config --output-on-failure"
+    switch ($TestSuite) {
+        "Unit" {
+            $scriptLines += "ctest --test-dir `"$cmakeD`" -C $Config --output-on-failure --label-regex `"^unit$`""
+        }
+        "Integration" {
+            $scriptLines += "ctest --test-dir `"$cmakeD`" -C $Config --output-on-failure --label-regex `"^integration$`""
+        }
+        "All" {
+            $scriptLines += "ctest --test-dir `"$cmakeD`" -C $Config --output-on-failure"
+        }
+    }
     $scriptLines += 'if errorlevel 1 exit /b 1'
 }
 $driver = Join-Path $buildDir "run_build.cmd"

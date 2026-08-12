@@ -6,8 +6,11 @@ param(
     [ValidateSet("Debug", "Release")]
     [string]$Config = "Release",
     [switch]$RunTests,
+    [ValidateSet("Unit", "Integration", "All")]
+    [string]$TestSuite = "Unit",
     [switch]$FullRun,
     [switch]$PackageRun,
+    [switch]$SkipHardwareRuns,
     [ValidateRange(1, 20)]
     [int]$PackageRepeats = 3,
     [int]$P4SmokeMs = 3000,
@@ -202,12 +205,27 @@ Write-Host "Imports: expected Win32/D3D11/COM surface only; no CRT/C++/libxmp"
 if ($RunTests) {
     $ctest = Get-Command ctest.exe -ErrorAction SilentlyContinue
     if (-not $ctest) { Fail "ctest.exe not found" }
-    & $ctest.Source --test-dir $buildDir -C $Config --output-on-failure
+    $ctestArgs = @("--test-dir", $buildDir, "-C", $Config, "--output-on-failure")
+    if ($SkipHardwareRuns -and $TestSuite -ne "Unit") {
+        Fail "-SkipHardwareRuns is only compatible with -TestSuite Unit"
+    }
+    if ($SkipHardwareRuns -or $TestSuite -eq "Unit") {
+        $ctestArgs += @("--label-regex", "^unit$")
+    } elseif ($TestSuite -eq "Integration") {
+        $ctestArgs += @("--label-regex", "^integration$")
+    }
+    & $ctest.Source @ctestArgs
     if ($LASTEXITCODE -ne 0) { Fail "CTest returned $LASTEXITCODE" }
 }
 
+if ($SkipHardwareRuns -and ($FullRun -or $PackageRun)) {
+    Fail "-SkipHardwareRuns cannot be combined with -FullRun or -PackageRun"
+}
+
 try {
-    if ($PackageRun) {
+    if ($SkipHardwareRuns) {
+        Write-Host "Hosted-runner-safe verification: skipping real D3D11/WASAPI/window playback"
+    } elseif ($PackageRun) {
         $archivePath = Join-Path $binDir "data\vodka.dat"
         $musicPath = Join-Path $binDir "music\amnezja2.mod"
         foreach ($requiredPackageFile in @($archivePath, $musicPath)) {
@@ -233,25 +251,27 @@ try {
         Write-Host "Package: isolated VOODKA.exe + data\vodka.dat + music\amnezja2.mod"
     }
 
-    $packageSmokeRepeats = if ($PackageRun) { $PackageRepeats } else { 1 }
-    for ($packageSmokeIndex = 1; $packageSmokeIndex -le $packageSmokeRepeats; ++$packageSmokeIndex) {
-        $smokeName = "P4 scene smoke"
-        if ($packageSmokeRepeats -gt 1) {
-            $smokeName = "P4 scene smoke ($packageSmokeIndex/$packageSmokeRepeats)"
+    if (-not $SkipHardwareRuns) {
+        $packageSmokeRepeats = if ($PackageRun) { $PackageRepeats } else { 1 }
+        for ($packageSmokeIndex = 1; $packageSmokeIndex -le $packageSmokeRepeats; ++$packageSmokeIndex) {
+            $smokeName = "P4 scene smoke"
+            if ($packageSmokeRepeats -gt 1) {
+                $smokeName = "P4 scene smoke ($packageSmokeIndex/$packageSmokeRepeats)"
+            }
+            Invoke-ProductionRun $smokeName @(
+                "--part", "4", "--auto-close-ms", $P4SmokeMs.ToString()
+            ) 30 $runExePath $runWorkingDirectory
         }
-        Invoke-ProductionRun $smokeName @(
-            "--part", "4", "--auto-close-ms", $P4SmokeMs.ToString()
-        ) 30 $runExePath $runWorkingDirectory
-    }
 
-    if ($FullRun) {
-        $timeline = Join-Path -Path $timelineRoot -ChildPath ("production_verify_{0:yyyyMMdd_HHmmss}.log" -f (Get-Date))
-        Invoke-ProductionRun "full production playback" @(
-            "--timeline", $timeline
-        ) $FullRunTimeoutSec $runExePath $runWorkingDirectory
-        Assert-ProductionTimeline $timeline
-    } else {
-        Write-Host "Full production playback not requested; use -FullRun for certification."
+        if ($FullRun) {
+            $timeline = Join-Path -Path $timelineRoot -ChildPath ("production_verify_{0:yyyyMMdd_HHmmss}.log" -f (Get-Date))
+            Invoke-ProductionRun "full production playback" @(
+                "--timeline", $timeline
+            ) $FullRunTimeoutSec $runExePath $runWorkingDirectory
+            Assert-ProductionTimeline $timeline
+        } else {
+            Write-Host "Full production playback not requested; use -FullRun for certification."
+        }
     }
 } finally {
     if ($packageRoot -and (Test-Path -LiteralPath $packageRoot)) {

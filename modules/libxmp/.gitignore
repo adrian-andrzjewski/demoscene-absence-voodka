@@ -46,6 +46,7 @@ Makefile.vc.tmp
 *.umx
 *.gtk
 mod.*
+!src/loaders/mod.h
 AS.*
 *.xz
 
