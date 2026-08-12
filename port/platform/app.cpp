@@ -68,6 +68,8 @@ constexpr const wchar_t* kWinClass = L"VOODKA";
 // (nearest-neighbour, no filtering), so each source texel is a clean 4x4 block.
 constexpr int kWinW = 1280;
 constexpr int kWinH = 800;
+constexpr int kFullscreenTargetW = 1920;
+constexpr int kFullscreenTargetH = 1080;
 #if defined(VOODKA_REFERENCE_BUILD)
 HWND g_hwnd = nullptr;
 HINSTANCE g_hInst = nullptr;
@@ -295,6 +297,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
     long autoPauseMs = -1;
     long autoCloseMs = -1;
 #if defined(VOODKA_REFERENCE_BUILD)
+    bool fullscreen = false;
     auto argDirOf = [](const std::string& cmd, const char* flag) -> const char* {
         std::string f = "--" + std::string(flag);
         auto p = cmd.find(f);
@@ -325,6 +328,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         diagDir = argDirOf(cmd, "diag");
         musicOverride = argDirOf(cmd, "music");
         timelinePath = argDirOf(cmd, "timeline");
+        fullscreen = cmd.find("--fullscreen-1920x1080") != std::string::npos;
         const bool explicitAsmPresenter =
             cmd.find("--asm-present") != std::string::npos;
 #if defined(VOODKA_REFERENCE_BUILD)
@@ -356,6 +360,11 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         else vk::logPrint("[app] no --record\n");
         if (diagDir) vk::logPrint("[app] readback diag to '%s'\n", diagDir);
         if (timelinePath) vk::logPrint("[app] A/V timeline to '%s'\n", timelinePath);
+#if defined(VOODKA_REFERENCE_BUILD)
+        if (fullscreen)
+            vk::logPrint("[app] borderless fullscreen profile requested (%dx%d)\n",
+                         kFullscreenTargetW, kFullscreenTargetH);
+#endif
         if (asmPresenter)
             vk::logPrint("[app] native x64 assembly presenter selected%s\n",
 #if defined(VOODKA_REFERENCE_BUILD)
@@ -390,23 +399,43 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
         vk::shutdownAll();
         return 1;
     }
+    DWORD windowStyle = WS_OVERLAPPEDWINDOW;
     RECT rc{0, 0, kWinW, kWinH};
-    AdjustWindowRectEx(&rc, WS_OVERLAPPEDWINDOW, FALSE, WS_EX_TOPMOST);
-    int winW = rc.right - rc.left;
-    int winH = rc.bottom - rc.top;
+    int winW = kWinW;
+    int winH = kWinH;
 
-    // Center the window on the primary (active/default) display's work area.
-    // Derived from the primary monitor every launch, so placement is identical
-    // regardless of monitor configuration/resolution (and never CW_USEDEFAULT's
-    // cascade). rcWork keeps the taskbar visible; fall back to the whole
-    // primary screen if GetMonitorInfo fails.
-    {
+    POINT origin{0, 0};
+    HMONITOR mon = MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY);
+    MONITORINFO mi{};
+    mi.cbSize = sizeof(mi);
+    const bool haveMonitor = mon && GetMonitorInfoW(mon, &mi) != FALSE;
+
+    if (fullscreen) {
+        // Borderless mode covers the complete primary monitor, including the
+        // taskbar area. The output size is taken from the monitor so the D3D11
+        // surface and the black bars cover the actual display.
+        windowStyle = WS_POPUP;
+        if (haveMonitor) {
+            rc = mi.rcMonitor;
+        } else {
+            rc.left = 0;
+            rc.top = 0;
+            rc.right = GetSystemMetrics(SM_CXSCREEN);
+            rc.bottom = GetSystemMetrics(SM_CYSCREEN);
+        }
+        winW = rc.right - rc.left;
+        winH = rc.bottom - rc.top;
+        vk::logPrint("[app] borderless fullscreen output %dx%d at %d,%d\n",
+                     winW, winH, rc.left, rc.top);
+    } else {
+        AdjustWindowRectEx(&rc, windowStyle, FALSE, WS_EX_TOPMOST);
+        winW = rc.right - rc.left;
+        winH = rc.bottom - rc.top;
+
+        // Center the window on the primary display's work area. The taskbar
+        // remains visible in the normal windowed mode.
         RECT wa{};
-        POINT origin{0, 0};
-        HMONITOR mon = MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY);
-        MONITORINFO mi{};
-        mi.cbSize = sizeof(mi);
-        if (mon && GetMonitorInfoW(mon, &mi)) {
+        if (haveMonitor) {
             wa = mi.rcWork;
         } else {
             wa.left = 0;
@@ -433,7 +462,7 @@ extern "C" int vk_voodka_host_main(HINSTANCE hInst, LPSTR lpCmd, int) {
 #else
                                 vk::kProductionWindowTitle,
 #endif
-                                WS_OVERLAPPEDWINDOW,
+                                windowStyle,
                                 rc.left, rc.top, winW, winH,
                                 nullptr, nullptr, hInst, nullptr);
     if (!hwnd) {

@@ -5,6 +5,7 @@
 #include <cstring>
 
 extern "C" int asm_parse_command_line(const char* commandLine);
+extern "C" int asm_voodka_arg_fullscreen(void);
 extern "C" int asm_voodka_host_main(void* hInst, const char*, int);
 
 namespace {
@@ -74,7 +75,8 @@ int main() {
     if (!asm_parse_command_line(
             "--record capture --diag readback --timeline av.raw "
             "--music override.mod --libxmp-audio --auto-pause-ms 125 "
-            "--auto-close-ms 900")) return 1;
+            "--auto-close-ms 900 --fullscreen-1920x1080")) return 1;
+    if (asm_voodka_arg_fullscreen() == 0) return 9;
     reset();
     if (asm_voodka_host_main(reinterpret_cast<void*>(0xBEEF), nullptr, 0) != 73 ||
         !seq("JLLLLLLLLLMWHIKARS") ||
@@ -89,6 +91,7 @@ int main() {
         g.runSize != 0x04000000ull) return 2;
 
     if (!asm_parse_command_line("")) return 3;
+    if (asm_voodka_arg_fullscreen() != 0) return 10;
     reset();
     if (asm_voodka_host_main(reinterpret_cast<void*>(0xBEEF), nullptr, 0) != 73 ||
         !seq("JLLLLLMWHIKARS") ||

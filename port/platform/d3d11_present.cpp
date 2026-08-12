@@ -7,6 +7,7 @@
 // pacing the 70Hz retrace as part of the swapchain vblank.
 
 #include "platform_abi.h"
+#include "presentation_layout.h"
 #include <d3d11.h>
 #include <d3dcompiler.h>
 #include <windows.h>
@@ -36,6 +37,8 @@ ID3D11SamplerState*     g_samp = nullptr;
 ID3D11RenderTargetView* g_rtv = nullptr;
 ID3D11RasterizerState*  g_ras = nullptr;
 D3D11_VIEWPORT          g_vp{};
+UINT                    g_outputWidth = 0;
+UINT                    g_outputHeight = 0;
 
 // platform-side copy of the 256-entry palette (fades update it constantly)
 uint8_t g_pal[768] = {};
@@ -79,8 +82,20 @@ void setAssemblyPresenter(bool enabled) {
 bool initPresent(void* hwnd, int winW, int winH) {
     logPrint("[d3d] initPresent(%p,%d,%d)\n", hwnd, winW, winH);
 
-    g_vp.Width = (FLOAT)winW;
-    g_vp.Height = (FLOAT)winH;
+    const PresentationLayout layout =
+        computePresentationLayout(winW, winH);
+    if (!layout.valid()) {
+        logPrint("[d3d] output is smaller than the 320x200 source (%dx%d)\n",
+                 winW, winH);
+        return false;
+    }
+
+    g_outputWidth = (UINT)winW;
+    g_outputHeight = (UINT)winH;
+    g_vp.TopLeftX = (FLOAT)layout.x;
+    g_vp.TopLeftY = (FLOAT)layout.y;
+    g_vp.Width = (FLOAT)layout.width;
+    g_vp.Height = (FLOAT)layout.height;
     g_vp.MinDepth = 0.0f;
     g_vp.MaxDepth = 1.0f;
 
@@ -341,8 +356,8 @@ static void diagCapture(const uint8_t* srcFrame) {
     fflush(g_diagSrc); fflush(g_diagPal);
 
     if (g_asmPresenter) {
-        const uint32_t w = (uint32_t)g_vp.Width;
-        const uint32_t h = (uint32_t)g_vp.Height;
+        const uint32_t w = g_outputWidth;
+        const uint32_t h = g_outputHeight;
         std::vector<uint8_t> pixels((size_t)w * h * 4);
         if (asm_present_readback(pixels.data(), (uint32_t)pixels.size()) == 0) {
             fwrite(pixels.data(), 1, pixels.size(), g_diagIn);

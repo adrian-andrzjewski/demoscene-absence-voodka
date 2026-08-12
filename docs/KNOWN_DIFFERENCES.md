@@ -339,12 +339,13 @@ vs `bialy` substitutions below, now fixed:
   large for one frame; the original shows a momentary animation jump (and in
   nad czerwonym lampa (P8)'s case read harmless garbage in DOS). The port wraps the sprite index
   instead — visually cleaner, same steady state.
-- **Windowed 1280x800 D3D11 vs fullscreen mode 13h**; integer 4x upscale,
-  point-sampled, 6-bit palette DAC behavior reproduced (round(v*255/63),
-  no gamma encode - sRGB displays approximate the CRT's native gamma;
-  ASSET_FORMATS.md section 7). Square pixels vs the CRT's 1.2:1 tall-pixel
-  stretch (same choice as DOSBox's default). Possible one-line tearing under
-  Present(0), as on real VGA.
+- **Windowed 1280x800 or opt-in borderless 1920x1080-profile D3D11 vs
+  fullscreen mode 13h**; both use centered integer scaling, point sampling,
+  black bars, and 6-bit palette DAC behavior reproduced
+  (round(v*255/63), no gamma encode - sRGB displays approximate the CRT's
+  native gamma; ASSET_FORMATS.md section 7). Square pixels vs the CRT's 1.2:1
+  tall-pixel stretch (same choice as DOSBox's default). Possible one-line
+  tearing under Present(0), as on real VGA.
 - **Audio:** dedicated NASM tracker/mixer vs the custom DIAMOND player
   (14-channel FastTracker module). Playback-rate difference noted above;
   mixing/filter nuances are those of the port's 44.1 kHz WASAPI path vs

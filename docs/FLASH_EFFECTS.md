@@ -192,7 +192,8 @@ presented arena framebuffer (framebuffer_off)
         -- vk_present_frame -->
 D3D11 R8 index texture + 256x1 palette texture
         -- point-sampled pixel-shader lookup -->
-1280x800 window and DXGI Present(0)
+centered integer-scaled content in the default 1280x800 window or the
+borderless --fullscreen-1920x1080 output, then DXGI Present(0)
 ```
 
 The two important arena offsets are `kBackbufferOffset` (`010000h`) and
@@ -200,6 +201,9 @@ The two important arena offsets are `kBackbufferOffset` (`010000h`) and
 `Ekran` macro copies it to `framebuffer_off` before calling
 `vk_present_frame`. A palette update alone changes only the platform-side
 palette state; it does not automatically redraw or present the indexed frame.
+The fullscreen presenter clears the complete output before drawing its content
+rectangle, so unused bars stay pure black and palette flashes affect only the
+demo image.
 
 ### Why the explicit flash primitive is required
 

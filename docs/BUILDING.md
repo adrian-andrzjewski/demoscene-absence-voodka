@@ -235,6 +235,8 @@ not part of the production source or link graph.
 
 ```
 VOODKA.exe                     full demo, all eight scenes (~70 fps, 1280x800 window)
+VOODKA.exe --fullscreen-1920x1080
+                                borderless monitor output; centered integer scale
 VOODKA.exe --scene <slug>      canonical scene selector (for example, gratki-woda)
 VOODKA.exe --part N             historical numeric scene selector alias (1..8)
 VOODKA.exe --modpos N          start at ModPos N  ((order<<8)|row)
@@ -252,6 +254,12 @@ VOODKA.exe --selftest          render the built-in test pattern
 Space                          pause/resume (freezes retrace + audio)
 Esc                            quit immediately from any scene/loading state
 ```
+
+The default presentation remains the 1280×800 window. The explicit
+`--fullscreen-1920x1080` option uses a borderless primary-monitor window; on a
+1920×1080 display it presents the 320×200 image at integer 5× scale (1600×1000)
+with centered pure-black bars. The presenter chooses the largest integer scale
+for other monitor sizes, so the image keeps its aspect ratio and sharp pixels.
 
 `frames2img.exe` converts a `--record` `frames.raw` into PNG stills.
 

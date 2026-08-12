@@ -189,6 +189,11 @@ pres_mapped:            resb 16
 pres_out_feature:       resd 1
 pres_width:             resd 1
 pres_height:            resd 1
+pres_scale:             resd 1
+pres_view_x:            resd 1
+pres_view_y:            resd 1
+pres_view_width:        resd 1
+pres_view_height:       resd 1
 pres_palette:           resb 768
 
 section .data
@@ -459,7 +464,45 @@ asm_present_init:
         mov     [rel pres_width], r14d
         mov     [rel pres_height], r15d
 
+        ; The source is 320x200. Reject an output that cannot show the full
+        ; image, otherwise select the largest clean integer scale and center
+        ; the resulting rectangle inside the cleared render target.
+        cmp     r14d, 320
+        jb      .init_fail
+        cmp     r15d, 200
+        jb      .init_fail
+
         call    pres_release_all
+
+        mov     eax, r14d
+        xor     edx, edx
+        mov     ecx, 320
+        div     ecx
+        mov     r12d, eax
+        mov     eax, r15d
+        xor     edx, edx
+        mov     ecx, 200
+        div     ecx
+        cmp     eax, r12d
+        cmovb   r12d, eax
+        test    r12d, r12d
+        jz      .init_fail
+        mov     [rel pres_scale], r12d
+
+        mov     eax, r12d
+        imul    eax, 320
+        mov     [rel pres_view_width], eax
+        mov     eax, r12d
+        imul    eax, 200
+        mov     [rel pres_view_height], eax
+        mov     eax, r14d
+        sub     eax, [rel pres_view_width]
+        shr     eax, 1
+        mov     [rel pres_view_x], eax
+        mov     eax, r15d
+        sub     eax, [rel pres_view_height]
+        shr     eax, 1
+        mov     [rel pres_view_y], eax
 
         lea     rdi, [rel pres_swap_desc]
         xor     eax, eax
@@ -818,12 +861,16 @@ asm_present_draw:
         mov     rax, [rcx]
         call    qword [rax + CONTEXT_CLEAR_RTV * 8]
 
-        mov     dword [rel pres_viewport + 0], 0
-        mov     dword [rel pres_viewport + 4], 0
-        mov     eax, [rel pres_width]
+        mov     eax, [rel pres_view_x]
+        cvtsi2ss xmm0, eax
+        movss    [rel pres_viewport + 0], xmm0
+        mov     eax, [rel pres_view_y]
+        cvtsi2ss xmm0, eax
+        movss    [rel pres_viewport + 4], xmm0
+        mov     eax, [rel pres_view_width]
         cvtsi2ss xmm0, eax
         movss    [rel pres_viewport + VIEWPORT_WIDTH], xmm0
-        mov     eax, [rel pres_height]
+        mov     eax, [rel pres_view_height]
         cvtsi2ss xmm0, eax
         movss    [rel pres_viewport + VIEWPORT_HEIGHT], xmm0
         mov     dword [rel pres_viewport + 16], 0

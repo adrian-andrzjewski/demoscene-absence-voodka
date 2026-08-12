@@ -43,8 +43,13 @@ extern vk_app_log_present_failure
 extern vk_app_log_automation_failure
 extern vk_app_log_automation
 extern asm_lifecycle_start
+extern GetClientRect
 
 global asm_voodka_initialize_subsystems
+
+section .bss
+align 4
+app_client_rect: resb 16
 
 section .text
 
@@ -116,9 +121,24 @@ asm_voodka_initialize_subsystems:
 .audio_live:
         mov     ecx, [r12 + CFG_ASM_PRESENTER]
         call    vk_app_set_assembly_presenter
+        ; The window bootstrap owns the selected geometry. Query the actual
+        ; client area so borderless and windowed modes use the same output
+        ; dimensions in the D3D11 swap chain.
         mov     rcx, [r12 + CFG_HWND]
+        lea     rdx, [rel app_client_rect]
+        call    GetClientRect
+        test    eax, eax
+        jz      .present_default_size
+        mov     edx, [rel app_client_rect + 8]
+        sub     edx, [rel app_client_rect + 0]
+        mov     r8d, [rel app_client_rect + 12]
+        sub     r8d, [rel app_client_rect + 4]
+        jmp     .present_size_ready
+.present_default_size:
         mov     edx, 1280
         mov     r8d, 800
+.present_size_ready:
+        mov     rcx, [r12 + CFG_HWND]
         call    vk_app_present_init
         test    eax, eax
         jnz     .present_ok

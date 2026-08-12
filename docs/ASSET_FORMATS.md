@@ -616,8 +616,14 @@ exactly where naive brightening would be most visible.
   `E_INVALIDARG` and the pipeline silently ran D3D11's *default* sampler,
   `MIN_MAG_MIP_LINEAR` — a blurred bilinear upscale. Fixed 2026-08-05; the
   GPU readback now contains only exact palette texels, no blend colours).
-- Window is **1280×800 = exact integer 4×** of 320×200: every source pixel
-  becomes a uniform 4×4 block, no fractional resampling anywhere.
+- The default window is **1280×800 = exact integer 4×** of 320×200: every
+  source pixel becomes a uniform 4×4 block, with no fractional resampling.
+- `--fullscreen-1920x1080` creates a borderless monitor-sized output and keeps
+  the same pixel contract. On an actual 1920×1080 output the scale is 5×, so
+  the 320×200 image occupies a centered 1600×1000 rectangle with pure-black
+  bars 160 pixels wide on the sides and 40 pixels high above and below. Other
+  output sizes use the largest integer scale that fits; the image is never
+  stretched to fill 16:9.
 - Aspect: real mode 13h on a 4:3 CRT displayed 320×200 with 1.2:1
   (tall) pixels — a 4:3-stretched image. The port presents square pixels
   (16:10 content), the same choice DOSBox and most emulators make by default;
@@ -625,7 +631,9 @@ exactly where naive brightening would be most visible.
   to keep integer scaling. The demo's art is pixel-native (fonts, logos drawn
   for square-ish editing tools), so the difference is a mild vertical
   compression vs a 1996 CRT, not a distortion of layout.
-- Presentation: `Present(0)` (immediate). The demo is paced by the EOS
+- Presentation: the full output is cleared to pure black, then the centered
+  integer-scaled content rectangle is drawn. `Present(0)` (immediate). The
+  demo is paced by the EOS
   `wait_vbl` emulation (QPC, 70.0 Hz target, sleep+spin) — vsync-locking the
   swapchain summed two clocks (70 Hz software + 60 Hz display) to ~31 fps.
   Like real VGA writes, a one-line tear is possible; delta-driven animation

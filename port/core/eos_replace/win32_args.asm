@@ -23,6 +23,7 @@ DEFAULT REL
 %define ARG_ORDER                  0x00000800
 %define ARG_PART                   0x00001000
 %define ARG_SCENE                  0x00002000
+%define ARG_FULLSCREEN_1080P       0x00004000
 
 extern asm_find_command_flag
 extern asm_copy_command_value
@@ -43,6 +44,7 @@ global asm_voodka_arg_order
 global asm_voodka_arg_part
 global asm_voodka_arg_scene
 global asm_voodka_arg_audiocheck_seconds
+global asm_voodka_arg_fullscreen
 
 section .bss
 align 8
@@ -75,6 +77,7 @@ arg_ms_s:           db "--ms", 0
 arg_order_s:        db "--order", 0
 arg_part_s:         db "--part", 0
 arg_scene_s:        db "--scene", 0
+arg_fullscreen_s:   db "--fullscreen-1920x1080", 0
 
 section .text
 
@@ -102,6 +105,13 @@ asm_parse_command_line:
         mov     byte [rel asm_arg_timeline_buf], 0
         test    r12, r12
         jz      .done
+
+        mov     rcx, r12
+        lea     rdx, [rel arg_fullscreen_s]
+        call    asm_find_command_flag
+        test    rax, rax
+        jz      .selftest
+        or      dword [rel asm_arg_flags], ARG_FULLSCREEN_1080P
 
         mov     rcx, r12
         lea     rdx, [rel arg_libxmp_s]
@@ -446,6 +456,7 @@ asm_parse_command_value:
 ARG_FLAG_GETTER asm_voodka_arg_libxmp,       ARG_LIBXMP
 ARG_FLAG_GETTER asm_voodka_arg_selftest,     ARG_SELFTEST
 ARG_FLAG_GETTER asm_voodka_arg_audiocheck,   ARG_AUDIOCHECK
+ARG_FLAG_GETTER asm_voodka_arg_fullscreen,   ARG_FULLSCREEN_1080P
 
 %macro ARG_VALUE_GETTER 2
 %1:

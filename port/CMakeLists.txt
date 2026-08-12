@@ -1011,6 +1011,14 @@ target_link_libraries(d3d11_asm_present_probe PRIVATE
 )
 add_test(NAME d3d11.asm_present_probe COMMAND d3d11_asm_present_probe)
 
+add_executable(presentation_layout_test
+    tools/validate/presentation_layout_test.cpp)
+target_compile_definitions(presentation_layout_test PRIVATE
+    NOMINMAX WIN32_LEAN_AND_MEAN)
+target_include_directories(presentation_layout_test PRIVATE platform)
+add_test(NAME presentation.layout COMMAND presentation_layout_test)
+set_tests_properties(presentation.layout PROPERTIES TIMEOUT 10)
+
 # Phase 2G feasibility gate: the C++ host only prints the report. NASM owns
 # COM initialization, WASAPI endpoint activation, event-driven client setup,
 # render-buffer acquisition/release, and ordered teardown.

@@ -32,8 +32,6 @@ static uint8_t vgaTo8(uint8_t value) {
 }
 
 int main() {
-    constexpr uint32_t kWidth = 640;
-    constexpr uint32_t kHeight = 400;
     constexpr uint32_t kLogicWidth = 320;
     constexpr uint32_t kLogicHeight = 200;
     constexpr uint32_t kFramebufferOffset = 0x20000;
@@ -47,15 +45,6 @@ int main() {
     wc.lpszClassName = className;
     if (!RegisterClassW(&wc)) {
         std::fprintf(stderr, "RegisterClassW failed: %lu\n", GetLastError());
-        return 1;
-    }
-
-    HWND hwnd = CreateWindowExW(0, className, L"VOODKA assembly presenter probe",
-                                WS_OVERLAPPEDWINDOW, 0, 0, kWidth, kHeight,
-                                nullptr, nullptr, instance, nullptr);
-    if (!hwnd) {
-        std::fprintf(stderr, "CreateWindowExW failed: %lu\n", GetLastError());
-        UnregisterClassW(className, instance);
         return 1;
     }
 
@@ -76,51 +65,101 @@ int main() {
         }
     }
 
-    const uint32_t init = asm_present_init(hwnd, kWidth, kHeight);
-    uint32_t draw = 1;
-    uint32_t readback = 1;
-    int32_t present = -1;
-    size_t mismatches = 0;
-    std::vector<uint8_t> gpu(kWidth * kHeight * 4u);
+    struct Case { uint32_t width; uint32_t height; };
+    const Case cases[] = {{640, 400}, {1920, 1080}};
+    size_t totalMismatches = 0;
+    bool allPassed = true;
+    uint32_t lastInit = 1;
+    uint32_t lastDraw = 1;
+    uint32_t lastReadback = 1;
+    uint32_t lastPresent = 0xffffffffu;
 
-    if (init == 0) {
-        asm_present_set_palette(palette.data());
-        draw = asm_present_draw(arena.data(), kFramebufferOffset);
-        if (draw == 0)
-            readback = asm_present_readback(gpu.data(),
-                                            static_cast<uint32_t>(gpu.size()));
+    for (const Case test : cases) {
+        HWND hwnd = CreateWindowExW(0, className,
+                                    L"VOODKA assembly presenter probe",
+                                    WS_POPUP, 0, 0,
+                                    static_cast<int>(test.width),
+                                    static_cast<int>(test.height),
+                                    nullptr, nullptr, instance, nullptr);
+        if (!hwnd) {
+            std::fprintf(stderr, "CreateWindowExW failed: %lu\n", GetLastError());
+            allPassed = false;
+            continue;
+        }
 
-        if (readback == 0) {
-            for (uint32_t y = 0; y < kHeight; ++y) {
-                for (uint32_t x = 0; x < kWidth; ++x) {
-                    const uint32_t sx = x / 2u;
-                    const uint32_t sy = y / 2u;
-                    const uint8_t index = static_cast<uint8_t>(
-                        ((sx / 80u) + (sy / 50u) * 2u) & 7u);
-                    const uint8_t* rgb = &palette[index * 3u];
-                    const size_t pixel = (static_cast<size_t>(y) * kWidth + x) * 4u;
-                    const uint8_t expected[4] = {
-                        vgaTo8(rgb[0]), vgaTo8(rgb[1]), vgaTo8(rgb[2]), 255};
-                    for (uint32_t c = 0; c < 4; ++c)
-                        mismatches += gpu[pixel + c] != expected[c];
+        const uint32_t init = asm_present_init(hwnd, test.width, test.height);
+        uint32_t draw = 1;
+        uint32_t readback = 1;
+        int32_t present = -1;
+        size_t mismatches = 0;
+        std::vector<uint8_t> gpu(static_cast<size_t>(test.width) *
+                                 test.height * 4u);
+
+        if (init == 0) {
+            asm_present_set_palette(palette.data());
+            draw = asm_present_draw(arena.data(), kFramebufferOffset);
+            if (draw == 0)
+                readback = asm_present_readback(
+                    gpu.data(), static_cast<uint32_t>(gpu.size()));
+
+            const uint32_t scaleX = test.width / kLogicWidth;
+            const uint32_t scaleY = test.height / kLogicHeight;
+            const uint32_t scale = scaleX < scaleY ? scaleX : scaleY;
+            const uint32_t contentWidth = kLogicWidth * scale;
+            const uint32_t contentHeight = kLogicHeight * scale;
+            const uint32_t offsetX = (test.width - contentWidth) / 2u;
+            const uint32_t offsetY = (test.height - contentHeight) / 2u;
+
+            if (readback == 0) {
+                for (uint32_t y = 0; y < test.height; ++y) {
+                    for (uint32_t x = 0; x < test.width; ++x) {
+                        const bool inContent =
+                            x >= offsetX && x < offsetX + contentWidth &&
+                            y >= offsetY && y < offsetY + contentHeight;
+                        uint8_t expected[4] = {0, 0, 0, 255};
+                        if (inContent) {
+                            const uint32_t sx = (x - offsetX) / scale;
+                            const uint32_t sy = (y - offsetY) / scale;
+                            const uint8_t index = static_cast<uint8_t>(
+                                ((sx / 80u) + (sy / 50u) * 2u) & 7u);
+                            const uint8_t* rgb = &palette[index * 3u];
+                            expected[0] = vgaTo8(rgb[0]);
+                            expected[1] = vgaTo8(rgb[1]);
+                            expected[2] = vgaTo8(rgb[2]);
+                        }
+                        const size_t pixel =
+                            (static_cast<size_t>(y) * test.width + x) * 4u;
+                        for (uint32_t c = 0; c < 4; ++c)
+                            mismatches += gpu[pixel + c] != expected[c];
+                    }
                 }
             }
+            present = asm_present_present();
         }
-        present = asm_present_present();
+
+        asm_present_shutdown();
+        DestroyWindow(hwnd);
+
+        const uint32_t presentBits = static_cast<uint32_t>(present);
+        const bool presentOk = presentBits == 0 ||
+                               presentBits == kDxgiStatusOccluded;
+        allPassed &= init == 0 && draw == 0 && readback == 0 && presentOk &&
+                     mismatches == 0;
+        totalMismatches += mismatches;
+        lastInit = init;
+        lastDraw = draw;
+        lastReadback = readback;
+        lastPresent = presentBits;
+        std::printf("asm_present_case %ux%u init=%u draw=%u readback=%u "
+                    "present=%08X mismatches=%zu\n",
+                    test.width, test.height, init, draw, readback,
+                    presentBits, mismatches);
     }
 
-    asm_present_shutdown();
     if (comInitialized)
         CoUninitialize();
-    DestroyWindow(hwnd);
     UnregisterClassW(className, instance);
-
-    const uint32_t presentBits = static_cast<uint32_t>(present);
-    const bool presentOk = presentBits == 0 || presentBits == kDxgiStatusOccluded;
-    std::printf("asm_present_probe init=%u draw=%u readback=%u present=%08X "
-                "mismatches=%zu\n",
-                init, draw, readback, presentBits, mismatches);
-    return init == 0 && draw == 0 && readback == 0 && presentOk && mismatches == 0
-               ? 0
-               : 1;
+    std::printf("asm_present_probe total_mismatches=%zu last=%u/%u/%u/%08X\n",
+                totalMismatches, lastInit, lastDraw, lastReadback, lastPresent);
+    return allPassed ? 0 : 1;
 }

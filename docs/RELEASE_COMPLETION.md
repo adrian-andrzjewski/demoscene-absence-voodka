@@ -73,8 +73,10 @@ The assembly modules are organized by ownership:
   namespace ABI.
 - `win32_d3d_dispatch.asm` and `d3d11_asm_present.asm` create the D3D11
   device and palette/indexed presenter. The 320x200 indexed framebuffer is
-  point-sampled to the 1280x800 window; palette values are expanded from
-  VGA 6-bit components to 8-bit shader values.
+  point-sampled to the default 1280x800 window or the opt-in
+  `--fullscreen-1920x1080` borderless output. At 1920x1080 the centered image
+  is 1600x1000 at integer 5x scale and the remaining area is pure black;
+  palette values are expanded from VGA 6-bit components to 8-bit shader values.
 - `audio_mod.asm`, `audio_tracker.asm`, `audio_event.asm`,
   `audio_effects.asm`, `audio_voice.asm`, `audio_pcm.asm`,
   `audio_workers.asm`, and the audio controller/ring modules implement

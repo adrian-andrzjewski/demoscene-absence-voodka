@@ -164,9 +164,12 @@ pointer advancement.**
   (`core/inc/video.inc`) copies backbuffer -> framebuffer and calls
   `vk_present_frame`.
 - `d3d11_asm_present.asm` uploads the 64,000-byte index frame to an R8
-  texture and the 768-byte palette to a 256x1 texture; a point-sampled
-  fullscreen quad maps indices through the palette - pixel-identical to VGA
-  DAC behavior, 4x integer upscale into a 1280x800 window. The shipped
+  texture and the 768-byte palette to a 256x1 texture; a point-sampled quad
+  maps indices through the palette - pixel-identical to VGA DAC behavior. It
+  draws into the largest centered integer-scaled 320x200 rectangle inside the
+  output and clears the remainder to black. The default is a 4x upscale into a
+  1280x800 window; `--fullscreen-1920x1080` selects the borderless monitor path.
+  The shipped
   `win32_d3d_dispatch.asm` exposes the platform ABI; recording, diagnostics,
   and the complete presenter lifecycle are NASM-owned. The C++ presenter is
   retained only in `VOODKA_REFERENCE.exe` for differential validation.

@@ -15,6 +15,7 @@ DEFAULT REL
 %define IDC_ARROW                   0x00007F00
 %define BLACK_BRUSH                 4
 %define WS_OVERLAPPEDWINDOW         0x00CF0000
+%define WS_POPUP                    0x80000000
 %define WS_EX_TOPMOST               0x00000008
 %define SW_SHOW                     5
 %define HWND_TOPMOST                -1
@@ -36,6 +37,7 @@ DEFAULT REL
 
 ; MONITORINFO and RECT layouts are fixed-width Win32 structures.
 %define MI_CBSIZE                   0
+%define MI_RCMONITOR                4              ; rcMonitor.left
 %define MI_RCWORK                   20             ; rcWork.left
 
 extern asm_voodka_wndproc
@@ -56,6 +58,7 @@ extern SetActiveWindow
 extern SetFocus
 extern IsWindow
 extern DestroyWindow
+extern asm_voodka_arg_fullscreen
 
 global asm_create_voodka_window
 global asm_destroy_voodka_window
@@ -66,6 +69,7 @@ app_wndclass:       resb WC_BYTES
 app_client_rect:    resb 16
 app_work_rect:      resb 16
 app_monitor_info:   resb 40
+app_window_style:   resd 1
 
 section .data
 align 2
@@ -119,7 +123,14 @@ asm_create_voodka_window:
         test    eax, eax
         jz      .fail
 
-        ; RECT client dimensions: 320x200 logic upscaled exactly 4x.
+        ; Select the explicit borderless 1080p profile before calculating
+        ; window geometry. The default remains the existing centered window.
+        mov     dword [rel app_window_style], WS_OVERLAPPEDWINDOW
+        call    asm_voodka_arg_fullscreen
+        test    eax, eax
+        jnz     .fullscreen_geometry
+
+        ; Windowed client dimensions: 320x200 logic upscaled exactly 4x.
         mov     dword [rel app_client_rect + 0], 0
         mov     dword [rel app_client_rect + 4], 0
         mov     dword [rel app_client_rect + 8], 1280
@@ -197,12 +208,62 @@ asm_create_voodka_window:
         mov     eax, [rel app_client_rect + 4]
         add     eax, r15d
         mov     [rel app_client_rect + 12], eax
+        jmp     .geometry_ready
+
+.fullscreen_geometry:
+        mov     dword [rel app_window_style], WS_POPUP
+
+        ; Borderless mode covers the complete primary monitor, including the
+        ; taskbar area, so the swap chain clears every unused display pixel.
+        xor     ecx, ecx                    ; POINT {0,0}
+        mov     edx, MONITOR_DEFAULTTOPRIMARY
+        call    MonitorFromPoint
+        mov     rbx, rax
+        test    rbx, rbx
+        jz      .fullscreen_fallback
+        mov     dword [rel app_monitor_info + MI_CBSIZE], 40
+        mov     rcx, rbx
+        lea     rdx, [rel app_monitor_info]
+        call    GetMonitorInfoW
+        test    eax, eax
+        jz      .fullscreen_fallback
+        lea     rsi, [rel app_monitor_info + MI_RCMONITOR]
+        jmp     .fullscreen_rect
+
+.fullscreen_fallback:
+        mov     dword [rel app_work_rect + 0], 0
+        mov     dword [rel app_work_rect + 4], 0
+        mov     ecx, SM_CXSCREEN
+        call    GetSystemMetrics
+        mov     [rel app_work_rect + 8], eax
+        mov     ecx, SM_CYSCREEN
+        call    GetSystemMetrics
+        mov     [rel app_work_rect + 12], eax
+        lea     rsi, [rel app_work_rect]
+
+.fullscreen_rect:
+        mov     eax, [rsi + 0]
+        mov     [rel app_client_rect + 0], eax
+        mov     eax, [rsi + 4]
+        mov     [rel app_client_rect + 4], eax
+        mov     eax, [rsi + 8]
+        mov     [rel app_client_rect + 8], eax
+        mov     eax, [rsi + 12]
+        mov     [rel app_client_rect + 12], eax
+        mov     eax, [rsi + 8]
+        sub     eax, [rsi + 0]
+        mov     r14d, eax
+        mov     eax, [rsi + 12]
+        sub     eax, [rsi + 4]
+        mov     r15d, eax
+
+.geometry_ready:
 
         ; CreateWindowExW has eight stack arguments after the first four.
         mov     ecx, WS_EX_TOPMOST
         lea     rdx, [rel app_class_name]
         lea     r8,  [rel app_window_title]
-        mov     r9d, WS_OVERLAPPEDWINDOW
+        mov     r9d, [rel app_window_style]
         mov     eax, [rel app_client_rect + 0]
         mov     [rsp + 0x20], rax             ; x
         mov     eax, [rel app_client_rect + 4]

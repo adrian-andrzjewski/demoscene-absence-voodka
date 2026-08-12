@@ -25,8 +25,12 @@ The build produces the production `VOODKA.exe` in `port/bin/Release/`; the
 same directory also contains development and validation tools. The executable
 contains the packed data and soundtrack, so it runs from an otherwise empty
 directory. The window is 1280×800: an exact 4×, point-sampled presentation of
-the original 320×200 logical framebuffer. The demo runs at approximately 70
-frames per second and plays all eight scenes from beginning to end.
+the original 320×200 logical framebuffer. Use
+`VOODKA.exe --fullscreen-1920x1080` for an opt-in borderless fullscreen
+presentation. On a 1920×1080 display it uses a centered 5× image (1600×1000)
+with 160-pixel side bars and 40-pixel top/bottom bars; all unused output
+pixels are pure black. The demo runs at approximately 70 frames per second
+and plays all eight scenes from beginning to end.
 `VOODKA.exe` is built from NASM x64 modules plus one small freestanding C
 XZ/LZMA2 decoder: no C++ object, CRT, STL, exception runtime, or libxmp code
 is part of the shipped demo.
@@ -366,6 +370,8 @@ VOODKA.exe --modpos N           start at an absolute (order<<8)|row position
 VOODKA.exe --order N            start at a module order
 VOODKA.exe --ms N               start at a millisecond offset
 VOODKA.exe --music <file>       compatibility label; playback remains embedded
+VOODKA.exe --fullscreen-1920x1080
+                                borderless fullscreen output, integer-scaled
 VOODKA.exe --record <directory> record each 320x200 frame and its palette
 VOODKA.exe --diag <directory>   enable GPU readback diagnostics
 VOODKA.exe --audiocheck [sec]   exercise the audio path without the demo
@@ -472,9 +478,12 @@ For the source-level details, see:
 The port aims for behavioral and visual fidelity, but it is not pretending to
 be the same hardware:
 
-- The presentation is a windowed 1280×800 D3D11 surface rather than fullscreen
-  VGA mode 13h. It uses square pixels; the original CRT/DOS display had a
-  different physical pixel aspect.
+- The default presentation is a windowed 1280×800 D3D11 surface rather than
+  fullscreen VGA mode 13h. `--fullscreen-1920x1080` selects a borderless
+  monitor-sized D3D11 surface and preserves the source aspect ratio with the
+  largest centered integer scale; black bars fill the remainder. Both paths
+  use square pixels and point sampling, while the original CRT/DOS display had
+  a different physical pixel aspect.
 - The original uses its binary-only DIAMOND player and Sound Blaster output.
   The port uses its dedicated assembly player at 44.1 kHz through WASAPI. The
   retained libxmp build is a reference oracle only. Under DOSBox/SB16 the
