@@ -11,7 +11,6 @@ This repository contains both the modern port and the original source and
 release as archival material. The original trees are provenance, not build
 scratch space; all active development happens under `port/` and `docs/`.
 
-![The original and ported VOODKA torus ustep village scene](reference/captures/port_p5_torus.png)
 
 ## The short version
 
