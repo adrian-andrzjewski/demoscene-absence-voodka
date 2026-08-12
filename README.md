@@ -1,4 +1,4 @@
-# VOODKA — 30th Anniversary Windows x64 Port (1996–2026)
+# VOODKA - 30th Anniversary Windows x64 Port (1996–2026)
 
 **VOODKA** is the 30th Anniversary Windows x64 port of the 1996 MS-DOS demo by the
 Polish demogroup **Absence**. The original was written in 32-bit x86 assembly
@@ -11,7 +11,6 @@ This repository contains both the modern port and the original source and
 release as archival material. The original trees are provenance, not build
 scratch space; all active development happens under `port/` and `docs/`.
 
-![The original and ported VOODKA torus ustep village scene](reference/captures/port_p5_torus.png)
 
 ## The short version
 
@@ -35,7 +34,7 @@ and plays all eight scenes from beginning to end.
 XZ/LZMA2 decoder: no C++ object, CRT, STL, exception runtime, or libxmp code
 is part of the shipped demo.
 
-## Visual showcase — production port
+## Visual showcase - production port
 
 These are clean production frames captured directly from the current native
 `VOODKA.exe` with its indexed 320×200 recorder, then enlarged 4× with nearest
@@ -233,7 +232,7 @@ and host-side differential tests.
 
 ## Original authors: tribute and credits
 
-> **The work that made VOODKA possible belongs to Absence and its original
+> **The work that made VOODKA belongs to Absence and its original
 > collaborators.** The Windows port is a preservation and appreciation
 > project. It does not replace, re-author, or claim ownership of the 1996
 > production, its code, its graphics, its music, or its tools.
