@@ -82,10 +82,11 @@ jobs:
           D3D11/WASAPI/interactive desktop contract, so packaged runtime smoke
           and full hardware playback remain separate validation-host gates.
 
-          The attached `VOODKA-$env:RELEASE_TAG.zip` contains the self-contained
-          demo runtime (`VOODKA.exe`, `data/vodka.dat`, and
-          `music/amnezja2.mod`) plus the main README. Developer source,
-          documentation, tests, and build utilities are not included.
+          The attached `VOODKA-$env:RELEASE_TAG.zip` contains the complete
+          self-contained demo as one `VOODKA.exe`. The byte-exact archive and
+          soundtrack are embedded in that executable; no external data files
+          are required. Developer source, documentation, tests, and build
+          utilities are not included.
           "@ | Set-Content -LiteralPath $notesFile -Encoding utf8
 
           gh release view $env:RELEASE_TAG *> $null

@@ -1,9 +1,8 @@
 # package_release.ps1 - build the self-contained playable VOODKA release.
 #
-# The production executable has exactly two repository-owned runtime inputs:
-# data\vodka.dat and music\amnezja2.mod. This script stages those inputs next
-# to VOODKA.exe, adds the main README, validates the staged tree in isolation,
-# and creates a versioned ZIP archive.
+# The production executable is the complete runtime artifact. This script
+# packages only VOODKA.exe, validates its embedded payloads, runs it from an
+# otherwise empty directory, and creates a versioned ZIP archive.
 
 [CmdletBinding()]
 param(
@@ -83,11 +82,11 @@ $repoRoot = [IO.Path]::GetFullPath((Split-Path -Parent $PSScriptRoot))
 $portRoot = Join-Path $repoRoot "port"
 $binRoot = Join-Path $portRoot "bin\$Config"
 $sourceExe = Join-Path $binRoot "VOODKA.exe"
-$sourceData = Join-Path $binRoot "data\vodka.dat"
-$sourceMusic = Join-Path $binRoot "music\amnezja2.mod"
-$sourceReadme = Join-Path $repoRoot "README.md"
+$sourceData = Join-Path $portRoot "data\vodka.dat"
+$sourceMusic = Join-Path $repoRoot "music\amnezja2.mod"
+$payloadCheck = Join-Path $binRoot "embedded_payload_check.exe"
 
-foreach ($requiredSource in @($sourceExe, $sourceData, $sourceMusic, $sourceReadme)) {
+foreach ($requiredSource in @($sourceExe, $sourceData, $sourceMusic, $payloadCheck)) {
     if (-not (Test-Path -LiteralPath $requiredSource)) {
         Fail "missing required build or documentation input: $requiredSource"
     }
@@ -112,25 +111,22 @@ if (Test-Path -LiteralPath $archivePath) {
 }
 
 New-Item -ItemType Directory -Force -Path $packageRoot | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "data") | Out-Null
-New-Item -ItemType Directory -Force -Path (Join-Path $packageRoot "music") | Out-Null
 
 Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $packageRoot "VOODKA.exe")
-Copy-Item -LiteralPath $sourceData -Destination (Join-Path $packageRoot "data\vodka.dat")
-Copy-Item -LiteralPath $sourceMusic -Destination (Join-Path $packageRoot "music\amnezja2.mod")
-Copy-Item -LiteralPath $sourceReadme -Destination (Join-Path $packageRoot "README.md")
+
+& $payloadCheck $sourceExe $sourceData $sourceMusic
+if ($LASTEXITCODE -ne 0) {
+    Fail "VOODKA.exe does not contain the exact canonical archive and module payloads"
+}
 
 $expectedFiles = @(
-    "VOODKA.exe",
-    "data/vodka.dat",
-    "music/amnezja2.mod",
-    "README.md"
+    "VOODKA.exe"
 )
-$expectedDirectories = @("data", "music")
+$expectedDirectories = @()
 
 Assert-FileSet $packageRoot $expectedFiles
 Assert-DirectorySet $packageRoot $expectedDirectories
-foreach ($runtimeFile in @("VOODKA.exe", "data/vodka.dat", "music/amnezja2.mod")) {
+foreach ($runtimeFile in @("VOODKA.exe")) {
     $runtimePath = Join-Path $packageRoot ($runtimeFile.Replace('/', '\'))
     if ((Get-Item -LiteralPath $runtimePath).Length -le 0) {
         Fail "runtime file is empty: $runtimeFile"

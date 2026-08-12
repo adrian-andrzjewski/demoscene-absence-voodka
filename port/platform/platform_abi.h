@@ -64,7 +64,7 @@ bool     platformInit();              // allocate arena + layout overlay regions
 void     platformShutdown();          // release the arena and archive
 uint32_t arenaAlloc(uint32_t bytes);  // allocate zeroed block -> offset (linear)
 void     arenaFree(uint32_t offset);  // no-op free (mark released)
-// packaged data archive (vodka.dat): Load_internal_file equivalent.
+// embedded data archive (vodka.dat): Load_internal_file equivalent.
 // name is a NUL-terminated ASCII path (e.g. "voodka.dat"). Returns offset
 // into arena, or 0 on failure.
 uint32_t loadInternalFile(const char* name);

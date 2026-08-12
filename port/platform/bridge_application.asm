@@ -595,7 +595,7 @@ vk_app_resolve_music_path:
         push    rbp
         mov     rbp, rsp
         sub     rsp, 0x20
-        lea     rdx, [rel voodka_repo_root]
+        xor     edx, edx                    ; embedded module needs no root
         call    asm_voodka_resolve_music_path
         add     rsp, 0x20
         pop     rbp
@@ -634,6 +634,5 @@ vk_platform_quit_requested:
         ret
 
 section .rdata
-%include "voodka_repo_root.inc"
 
 section .note.GNU-stack noalloc noexec nowrite progbits

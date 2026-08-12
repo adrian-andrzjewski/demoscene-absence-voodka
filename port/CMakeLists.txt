@@ -23,9 +23,9 @@ set(VOODKA_DEBUG_TITLE_ASM_OPTION
 # Tests are registered throughout this file; enable before the first add_test.
 enable_testing()
 
-# Repo root at configure time: used only for dev-tree fallbacks (music path,
-# reference data for cross-check tests). The staged bin/ output is
-# self-contained and never needs it at runtime on another machine.
+# Repo root at configure time: used only for reference data and host-side
+# cross-check tests. The shipped VOODKA.exe embeds all runtime payloads and
+# never needs this path on another machine.
 get_filename_component(VOODKA_REPO_ROOT "${CMAKE_SOURCE_DIR}/.." ABSOLUTE)
 add_compile_definitions(VOODKA_REPO_ROOT="${VOODKA_REPO_ROOT}")
 
@@ -51,6 +51,17 @@ set(VOODKA_DANE "${CMAKE_SOURCE_DIR}/../demoscene-absence-voodka-master/CODE/LIN
 set(VOODKA_DANE_REF "${CMAKE_SOURCE_DIR}/../reference/source/demoscene-absence-voodka-master/CODE/LINKER/DANE")
 set(VOODKA_MANIFEST "${CMAKE_SOURCE_DIR}/../demoscene-absence-voodka-master/CODE/LINKER/VODKA.TXT")
 set(VOODKA_DAT "${CMAKE_SOURCE_DIR}/data/vodka.dat")
+set(VOODKA_MOD "${VOODKA_REPO_ROOT}/music/amnezja2.mod")
+
+# The production image embeds the exact generated archive and checked-in
+# module.  Keep the wrapper in the build tree so the source tree contains no
+# generated assembly, while making both payloads explicit build dependencies.
+file(TO_CMAKE_PATH "${VOODKA_DAT}" VOODKA_DAT_NASM)
+file(TO_CMAKE_PATH "${VOODKA_MOD}" VOODKA_MOD_NASM)
+set(VOODKA_EMBEDDED_ASM "${CMAKE_BINARY_DIR}/generated/embedded_runtime.asm")
+configure_file(
+    "${CMAKE_SOURCE_DIR}/core/eos_replace/embedded_runtime.asm.in"
+    "${VOODKA_EMBEDDED_ASM}" @ONLY)
 
 add_executable(vodka_pack tools/vodka_pack/vodka_pack.cpp)
 add_executable(tabl2nasm  tools/vodka_pack/tabl2nasm.cpp)
@@ -75,9 +86,6 @@ file(MAKE_DIRECTORY "${VOODKA_GENERATED_DIR}")
 configure_file(
     "${CMAKE_SOURCE_DIR}/core/eos_replace/d3d11_shader_paths.inc.in"
     "${VOODKA_GENERATED_DIR}/d3d11_shader_paths.inc" @ONLY)
-configure_file(
-    "${CMAKE_SOURCE_DIR}/core/eos_replace/voodka_repo_root.inc.in"
-    "${VOODKA_GENERATED_DIR}/voodka_repo_root.inc" @ONLY)
 add_custom_command(
     OUTPUT "${VOODKA_D3D11_VS_CSO}" "${VOODKA_D3D11_PS_CSO}"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${VOODKA_GENERATED_DIR}"
@@ -96,6 +104,8 @@ add_custom_command(
     COMMENT "Packing vodka.dat from reference DANE/ (LINKER.PAS semantics)"
 )
 add_custom_target(voodka_data ALL DEPENDS "${VOODKA_DAT}")
+add_custom_target(voodka_embedded_payloads DEPENDS
+    "${VOODKA_DAT}" "${VOODKA_MOD}")
 
 # ---- VIRTUAL viewer object archive (WORLD.PAS semantics) --------------------
 set(VOODKA_WORLD_MANIFEST
@@ -560,6 +570,21 @@ add_subdirectory(tools/asset_viewer)
 add_subdirectory(core)
 add_subdirectory(platform)
 
+# Validate that the final PE contains one exact copy of each canonical
+# runtime payload, rather than merely checking the build inputs.
+add_executable(embedded_payload_check
+    tools/validate/embedded_payload_check.cpp)
+if(MSVC)
+    target_compile_options(embedded_payload_check PRIVATE /W4)
+endif()
+add_test(NAME embedded.payload
+         COMMAND embedded_payload_check
+                 "$<TARGET_FILE:VOODKA>"
+                 "${VOODKA_DAT}"
+                 "${VOODKA_MOD}")
+set_tests_properties(embedded.payload PROPERTIES LABELS unit TIMEOUT 30)
+add_dependencies(embedded_payload_check VOODKA voodka_embedded_payloads)
+
 # Standalone no-CRT validation probe for the native x64 Win32/thread substrate.
 add_executable(win32_runtime_probe WIN32
     core/eos_replace/win32_runtime_probe.asm)
@@ -693,7 +718,7 @@ add_test(NAME win32.application_abi COMMAND win32_application_abi_probe)
 set_tests_properties(win32.application_abi PROPERTIES TIMEOUT 10)
 
 # Validation witness: exercise the production NASM soundtrack-path
-# resolver, including override identity and staged executable-directory data.
+# resolver, including override identity and the embedded-module identity.
 add_executable(win32_music_path_probe tools/validate/win32_music_path_probe.cpp)
 target_compile_definitions(win32_music_path_probe PRIVATE
     NOMINMAX WIN32_LEAN_AND_MEAN)

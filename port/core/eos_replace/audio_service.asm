@@ -97,10 +97,8 @@ DEFAULT REL
 %define LOCAL_BYTES                 0x528
 
 extern Sleep
-extern CreateFileA
-extern GetFileSize
-extern ReadFile
-extern CloseHandle
+extern voodka_embedded_module
+extern voodka_embedded_module_size
 extern asm_audio_parse_mod
 extern asm_audio_trace_rows
 extern asm_audio_trace_tick_states
@@ -119,9 +117,9 @@ section .text
 
 ; uint32_t asm_audio_service_storage_init(const char* modulePath,
 ;                                          AudioAssemblyStorage* storage)
-; Load the MOD and prepare immutable tracker/timeline tables into the fixed
-; assembly-owned buffers below. The host receives only pointers and scalar
-; counts through the descriptor.
+; Prepare immutable tracker/timeline tables from the module embedded in the
+; image. The module pointer is retained directly in the descriptor; no file
+; handle or second module buffer is needed.
 asm_audio_service_storage_init:
         push    rbp
         mov     rbp, rsp
@@ -134,54 +132,21 @@ asm_audio_service_storage_init:
         push    r15
         sub     rsp, 0x48
 
-        mov     r12, rcx                    ; module path
+        lea     r12, [rel voodka_embedded_module]
         mov     r13, rdx                    ; output descriptor
-        xor     r14d, r14d                  ; file handle, if opened
 
         mov     rdi, r13
         xor     eax, eax
         mov     ecx, 14                     ; 112-byte descriptor
         rep     stosq
 
-        mov     rcx, r12
-        mov     edx, 0x80000000             ; GENERIC_READ
-        mov     r8d, 1                      ; FILE_SHARE_READ
-        xor     r9d, r9d                    ; security attributes
-        mov     qword [rsp + 0x20], 3       ; OPEN_EXISTING
-        mov     qword [rsp + 0x28], 0x80    ; FILE_ATTRIBUTE_NORMAL
-        mov     qword [rsp + 0x30], 0       ; template handle
-        call    CreateFileA
-        cmp     rax, -1
-        je      .storage_fail_file
-        mov     r14, rax
-
-        mov     rcx, r14
-        xor     edx, edx                    ; high DWORD pointer unused
-        call    GetFileSize
-        cmp     eax, 0xffffffff
-        je      .storage_fail_size
-        test    eax, eax
-        jz      .storage_fail_size
-        cmp     eax, AUDIO_MODULE_CAPACITY
+        mov     ebx, dword [rel voodka_embedded_module_size]
+        test    ebx, ebx
+        jz      .storage_fail_file
+        cmp     ebx, AUDIO_MODULE_CAPACITY
         ja      .storage_fail_size
-        mov     ebx, eax                    ; module size
 
-        mov     rcx, r14
-        lea     rdx, [rel audio_storage_module]
-        mov     r8d, ebx
-        lea     r9, [rel audio_storage_bytes_read]
-        mov     qword [rsp + 0x20], 0       ; OVERLAPPED
-        call    ReadFile
-        test    eax, eax
-        jz      .storage_fail_read
-        cmp     dword [rel audio_storage_bytes_read], ebx
-        jne     .storage_fail_read
-
-        mov     rcx, r14
-        call    CloseHandle
-        xor     r14d, r14d
-
-        lea     rcx, [rel audio_storage_module]
+        mov     rcx, r12
         mov     edx, ebx
         lea     r8, [rel audio_storage_summary]
         call    asm_audio_parse_mod
@@ -198,7 +163,7 @@ asm_audio_service_storage_init:
         ja      .storage_fail_parse
         mov     dword [r13 + STORAGE_ROWS_PER_LOOP], eax
 
-        lea     rcx, [rel audio_storage_module]
+        mov     rcx, r12
         mov     edx, ebx
         lea     r8, [rel audio_storage_states]
         mov     r9d, AUDIO_STATE_CAPACITY
@@ -250,7 +215,7 @@ asm_audio_service_storage_init:
         ja      .storage_fail
         mov     dword [r13 + STORAGE_SCRATCH_FRAMES], r15d
 
-        lea     rcx, [rel audio_storage_module]
+        mov     rcx, r12
         mov     edx, dword [r13 + STORAGE_MODULE_SIZE]
         lea     r8, [rel audio_storage_rows]
         mov     r9d, AUDIO_TRACE_CAPACITY
@@ -291,7 +256,7 @@ asm_audio_service_storage_init:
         jmp     .storage_timeline_loop
 
 .storage_descriptor:
-        lea     rax, [rel audio_storage_module]
+        mov     rax, r12
         mov     [r13 + STORAGE_MODULE], rax
         lea     rax, [rel audio_storage_tick_starts]
         mov     [r13 + STORAGE_TICK_STARTS], rax
@@ -316,18 +281,8 @@ asm_audio_service_storage_init:
         xor     eax, eax
         jmp     .storage_return
 
-.storage_fail_close:
-        test    r14, r14
-        jz      .storage_fail_io
-        mov     rcx, r14
-        call    CloseHandle
-.storage_fail_io:
-        mov     eax, 2
-        jmp     .storage_return
 .storage_fail_size:
-        jmp     .storage_fail_close
-.storage_fail_read:
-        mov     eax, 3
+        mov     eax, 2
         jmp     .storage_return
 .storage_fail_parse:
         mov     eax, 4
@@ -356,7 +311,6 @@ asm_audio_service_storage_init:
         jmp     .storage_return
 
 section .bss align=16
-audio_storage_module:          resb AUDIO_MODULE_CAPACITY
 audio_storage_states:          resb (AUDIO_STATE_CAPACITY * TICK_STATE_BYTES)
 audio_storage_tick_starts:     resd (AUDIO_STATE_CAPACITY + 1)
 audio_storage_modpos:          resd AUDIO_STATE_CAPACITY
@@ -368,7 +322,6 @@ audio_storage_producer_pcm:    resw (AUDIO_SCRATCH_FRAMES * 2)
 audio_storage_history:         resb 224
 audio_storage_summary:         resb 1204
 audio_storage_rows:            resb (AUDIO_TRACE_CAPACITY * TRACE_ENTRY_BYTES)
-audio_storage_bytes_read:      resd 1
 
 section .text
 

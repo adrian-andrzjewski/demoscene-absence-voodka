@@ -21,11 +21,13 @@ cd port
 .\bin\Release\VOODKA.exe
 ```
 
-The build produces a self-contained `port/bin/Release/` directory with the
-demo, packed data, and soundtrack. The window is 1280×800: an exact 4×,
-point-sampled presentation of the original 320×200 logical framebuffer. The
-demo runs at approximately 70 frames per second and plays all eight scenes from
-beginning to end. `VOODKA.exe` is built entirely from NASM x64 modules: no C or
+The build produces the production `VOODKA.exe` in `port/bin/Release/`; the
+same directory also contains development and validation tools. The executable
+contains the packed data and soundtrack, so it runs from an otherwise empty
+directory. The window is 1280×800: an exact 4×, point-sampled presentation of
+the original 320×200 logical framebuffer. The demo runs at approximately 70
+frames per second and plays all eight scenes from beginning to end.
+`VOODKA.exe` is built entirely from NASM x64 modules: no C or
 C++ object, CRT, STL, exception runtime, or libxmp code is part of the shipped
 demo.
 
@@ -246,7 +248,7 @@ For a clean rebuild:
 
 The script initializes the Visual Studio environment, configures CMake for
 x64, explicitly selects the vendored NASM, builds the demo and tools, and can
-run the complete CTest suite. The finished port has **88 tests** covering
+run the complete CTest suite. The finished port has **86 tests** covering
 assembly/reference equivalence, archive and palette reproducibility, real
 V3D/V3M decoding, water tables, tracker/mixer PCM, WASAPI lifecycle, A/V
 timeline behavior, shutdown, relocation hygiene, and asset-viewer parsing.
@@ -273,32 +275,30 @@ no local tag or commit is created by CI.
 
 ### Build output
 
-`port/bin/Release/` contains:
+`port/bin/Release/` contains development and validation outputs:
 
 ```text
 VOODKA.exe                 the complete demo
 VOODKA_REFERENCE.exe       non-shipped C++/libxmp behavioral oracle
 VIRTUAL.exe                standalone VR-engine loader/viewer harness
 asset_viewer.exe           explorer for the original 3D assets
-data/vodka.dat             packed demo assets
 data/world                 packed VIRTUAL world objects
-music/amnezja2.mod         the original soundtrack
 *_selftest.exe              validation tools used by CTest
 frames2img.exe             recorded-frame converter
 ```
 
-The demo directory is self-contained. To reproduce the release package after
-building, run:
+`VOODKA.exe` contains the byte-exact `vodka.dat` archive and `amnezja2.mod`
+soundtrack. The loose `port/data/vodka.dat` and `music/amnezja2.mod` files are
+build and validation inputs only; the shipped executable never opens them at
+runtime. To reproduce the single-file release package after building, run:
 
 ```powershell
-.\port\package_release.ps1 -Config Release -Version voodka-port-v1.1.0
+.\port\package_release.ps1 -Config Release -Version voodka-port-v1.2.0
 ```
 
-This creates `port/release/VOODKA-voodka-port-v1.1.0.zip`. The archive keeps
-`VOODKA.exe`, `data/vodka.dat`, and `music/amnezja2.mod` in the same release
-directory layout expected by the application and includes the root README. It
-does not include `docs/`, source code, tests, development utilities, debug
-files, or intermediate build artifacts.
+This creates `port/release/VOODKA-voodka-port-v1.2.0.zip` containing only
+`VOODKA.exe`. Copying that executable to an otherwise empty directory is
+sufficient to run the complete demo.
 
 ## Running the demo
 
@@ -316,7 +316,7 @@ VOODKA.exe --part N             historical numeric scene selector (1..8)
 VOODKA.exe --modpos N           start at an absolute (order<<8)|row position
 VOODKA.exe --order N            start at a module order
 VOODKA.exe --ms N               start at a millisecond offset
-VOODKA.exe --music <file>       use a different module file
+VOODKA.exe --music <file>       compatibility label; playback remains embedded
 VOODKA.exe --record <directory> record each 320x200 frame and its palette
 VOODKA.exe --diag <directory>   enable GPU readback diagnostics
 VOODKA.exe --audiocheck [sec]   exercise the audio path without the demo
@@ -371,7 +371,7 @@ VOODKA.exe
                                         Win32/D3D11/WASAPI platform, audio,
                                         renderer, scenes, and shutdown
   Windows import libraries             Win32, COM, D3D11, DXGI, WASAPI support
-  generated shaders + vodka.dat        self-contained runtime assets
+  generated shaders + embedded payloads self-contained runtime assets
 
 VOODKA_REFERENCE.exe + host tools      C++ differential/oracle and packaging
                                         programs; never linked into VOODKA.exe
@@ -457,7 +457,8 @@ demoscene-absence-voodka-master/   working archival source tree
 reference/source/                  byte-identical read-only source mirror
 reference/release/                 shipped 1996 release and original NFO
 reference/captures/                DOSBox reference frames and comparisons
-music/amnezja2.mod                 original soundtrack used by the port
+music/amnezja2.mod                 canonical build/validation input; embedded
+                                   once into the shipped VOODKA.exe
 modules/                           vendored NASM and libxmp
 port/                              active native Windows x64 implementation
 docs/                              reconstruction and validation notes

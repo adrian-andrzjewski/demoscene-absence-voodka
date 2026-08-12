@@ -23,6 +23,9 @@ $portRoot = Join-Path $repoRoot "port"
 $binDir = Join-Path $portRoot "bin\$Config"
 $buildDir = Join-Path $portRoot "build\$Config"
 $exePath = Join-Path $binDir "VOODKA.exe"
+$archivePath = Join-Path $portRoot "data\vodka.dat"
+$modulePath = Join-Path $repoRoot "music\amnezja2.mod"
+$embeddedPayloadCheck = Join-Path $binDir "embedded_payload_check.exe"
 $projectPath = Join-Path $buildDir "platform\VOODKA.vcxproj"
 $runExePath = $exePath
 $runWorkingDirectory = $repoRoot
@@ -134,6 +137,16 @@ if (-not (Test-Path -LiteralPath $exePath)) {
 if (-not (Test-Path -LiteralPath $projectPath)) {
     Fail "missing generated production project $projectPath; configure/build first"
 }
+foreach ($payloadInput in @($archivePath, $modulePath, $embeddedPayloadCheck)) {
+    if (-not (Test-Path -LiteralPath $payloadInput)) {
+        Fail "missing embedded-payload validation input $payloadInput"
+    }
+}
+& $embeddedPayloadCheck $exePath $archivePath $modulePath
+if ($LASTEXITCODE -ne 0) {
+    Fail "VOODKA.exe does not contain exactly one canonical archive and module"
+}
+Write-Host "Embedded payload contract: exact archive and module each occur once in VOODKA.exe"
 
 $os = Get-ComputerInfo -Property WindowsProductName, WindowsVersion,
     OsBuildNumber, OsArchitecture
@@ -226,29 +239,18 @@ try {
     if ($SkipHardwareRuns) {
         Write-Host "Hosted-runner-safe verification: skipping real D3D11/WASAPI/window playback"
     } elseif ($PackageRun) {
-        $archivePath = Join-Path $binDir "data\vodka.dat"
-        $musicPath = Join-Path $binDir "music\amnezja2.mod"
-        foreach ($requiredPackageFile in @($archivePath, $musicPath)) {
-            if (-not (Test-Path -LiteralPath $requiredPackageFile)) {
-                Fail "missing staged package file $requiredPackageFile"
-            }
-        }
-
         $packageRoot = Join-Path $buildDir ("production_package_{0:yyyyMMdd_HHmmssfff}" -f (Get-Date))
         $resolvedBuildDir = [IO.Path]::GetFullPath($buildDir).TrimEnd('\')
         $resolvedPackageRoot = [IO.Path]::GetFullPath($packageRoot)
         if (-not $resolvedPackageRoot.StartsWith($resolvedBuildDir + '\', [StringComparison]::OrdinalIgnoreCase)) {
             Fail "refusing to create package outside the release build directory"
         }
-        New-Item -ItemType Directory -Path (Join-Path $packageRoot "data") | Out-Null
-        New-Item -ItemType Directory -Path (Join-Path $packageRoot "music") | Out-Null
+        New-Item -ItemType Directory -Path $packageRoot | Out-Null
         Copy-Item -LiteralPath $exePath -Destination (Join-Path $packageRoot "VOODKA.exe")
-        Copy-Item -LiteralPath $archivePath -Destination (Join-Path $packageRoot "data\vodka.dat")
-        Copy-Item -LiteralPath $musicPath -Destination (Join-Path $packageRoot "music\amnezja2.mod")
         $runExePath = Join-Path $packageRoot "VOODKA.exe"
         $runWorkingDirectory = $packageRoot
         $timelineRoot = $packageRoot
-        Write-Host "Package: isolated VOODKA.exe + data\vodka.dat + music\amnezja2.mod"
+        Write-Host "Package: isolated executable-only VOODKA.exe"
     }
 
     if (-not $SkipHardwareRuns) {

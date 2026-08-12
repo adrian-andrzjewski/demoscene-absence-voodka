@@ -30,7 +30,10 @@ $ErrorActionPreference = "Stop"
 # Do not let an inherited DOS/Watcom toolchain contaminate MSVC detection.
 # VsDevCmd supplies the correct INCLUDE/LIB values for the selected VS
 # installation after these legacy variables are removed.
-foreach ($envName in @("WATCOM", "WATCOMC", "EDPATH", "INCLUDE", "LIB", "CC", "CXX")) {
+# PowerShell can inherit both PATH and Path from the host.  MSBuild treats
+# those case variants as duplicate environment keys and refuses to launch
+# cl.exe, so remove both before VsDevCmd reconstructs one canonical PATH.
+foreach ($envName in @("WATCOM", "WATCOMC", "EDPATH", "INCLUDE", "LIB", "CC", "CXX", "PATH", "Path")) {
     Remove-Item -LiteralPath ("Env:{0}" -f $envName) -ErrorAction SilentlyContinue
 }
 

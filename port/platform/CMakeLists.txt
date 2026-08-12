@@ -90,21 +90,10 @@ target_link_libraries(${target} PRIVATE
     winmm ole32 oleaut32 uuid avrt kernel32 user32 gdi32
 )
 
-# ensure the packed data archive is generated before building the app
+# Ensure the canonical payloads are generated before assembling the app.
+# They are linked into VOODKA.exe; no runtime data is staged beside it.
 add_dependencies(${target} voodka_data)
-
-# Stage runtime data next to the exe so bin/<Config> is self-contained:
-#   data/vodka.dat      (packed archive, byte-identical to the release's)
-#   music/amnezja2.mod  (the 14-channel ProTracker module the demo plays)
-add_custom_command(TARGET ${target} POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E make_directory
-            "$<TARGET_FILE_DIR:${target}>/data" "$<TARGET_FILE_DIR:${target}>/music"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${VOODKA_DAT}"
-            "$<TARGET_FILE_DIR:${target}>/data/vodka.dat"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "${VOODKA_REPO_ROOT}/music/amnezja2.mod"
-            "$<TARGET_FILE_DIR:${target}>/music/amnezja2.mod"
-)
+add_dependencies(${target} voodka_embedded_payloads)
 endfunction()
 
 configure_voodka_platform_target(VOODKA)

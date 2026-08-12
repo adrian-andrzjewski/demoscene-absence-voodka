@@ -8,7 +8,6 @@ BITS 64
 DEFAULT REL
 
 %include "win64_abi.inc"
-%include "voodka_repo_root.inc"
 
 extern asm_arena_platform_init
 extern asm_arena_platform_shutdown
@@ -56,7 +55,7 @@ section .text
         push    r12
         sub     rsp, 0x28
 
-        lea     rcx, [rel voodka_repo_root]
+        xor     ecx, ecx                    ; repository fallback is unused
         call    asm_arena_platform_init
         test    eax, eax
         jz      .failed

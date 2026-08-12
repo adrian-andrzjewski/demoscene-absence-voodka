@@ -333,8 +333,8 @@ int main() {
 
     const char* fallback = vk_app_resolve_music_path(nullptr);
     CHECK(g_resolveCalls == 1 && g_resolveOverride == nullptr &&
-              g_resolveRoot && g_resolveRoot[0] && fallback == g_resolveRoot,
-          "music resolver must pass override and generated repository root");
+              g_resolveRoot == nullptr && fallback == g_resolveRoot,
+          "music resolver must use the embedded module without a repository root");
     const char* overridePath = "C:/music/custom.mod";
     CHECK(vk_app_resolve_music_path(overridePath) == overridePath &&
               g_resolveCalls == 2 && g_resolveOverride == overridePath,

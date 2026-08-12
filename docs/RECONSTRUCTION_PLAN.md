@@ -62,8 +62,8 @@ render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.
   duplicate `p8.asm` fixed; `enable_testing()` ordering; stale comments;
   empty `port/tests/` removed; `D:\Project\voodka2` hardcoding replaced by
   script/configure-time paths (`VOODKA_REPO_ROOT`); `--music` override;
-  `bin/<Config>` self-contained (post-build staging of vodka.dat + module);
-  18/18 tests green; `--audiocheck` passes from the staged dir.
+  `VOODKA.exe` self-contained (embedded vodka.dat + module payloads);
+  86/86 tests green; executable-only P4 and full-playback gates pass.
 - [x] **Phase 2 - documentation**: this file, `ASSETS.md`,
   `PORTING_NOTES.md`, `BUILDING.md`, root `README.md`.
 - [x] **Phase 3 - DOSBox reference validation**: release runs clean under

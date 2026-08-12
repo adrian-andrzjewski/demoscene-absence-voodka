@@ -369,7 +369,7 @@ vs `bialy` substitutions below, now fixed:
   MROTATE matrices, camera matrix, projection, normals, object loader, VR
   visibility/sort/prepare, the swiatynia city (P2) camera path and world data, and the toonel
   table: byte-exact vs C++ references re-deriving the original arithmetic
-  (88 CTests, incl. all five water drop tables, the V3D/V3M decode, audio and
+  (86 CTests, incl. all five water drop tables, the V3D/V3M decode, audio and
   lifecycle gates, and the asset viewer's own v3d.viewer_parse).
 - Asset-level runtime checks (2026-08-05, frame-recorded): tunel + wygibasy (P3) palette ramp
   matches the original's 8-bit make_pal semantics for all 720 bytes; the swiatynia city (P2)

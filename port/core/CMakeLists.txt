@@ -1,6 +1,7 @@
 # core/CMakeLists.txt - the NASM production core and its validated data tables.
 
 set(VOODKA_CORE_ASM
+    "${VOODKA_EMBEDDED_ASM}"
     eos_replace/eos_dispatch.asm
     eos_replace/audio_mod.asm
     eos_replace/audio_tracker.asm
@@ -60,6 +61,9 @@ set(VOODKA_CORE_ASM
   )
 
 add_library(voodka_core STATIC ${VOODKA_CORE_ASM})
+add_dependencies(voodka_core voodka_embedded_payloads)
+set_source_files_properties("${VOODKA_EMBEDDED_ASM}" PROPERTIES
+    OBJECT_DEPENDS "${VOODKA_DAT};${VOODKA_MOD}")
 target_compile_options(voodka_core PRIVATE
     ${VOODKA_DEBUG_TITLE_ASM_OPTION})
 

@@ -27,9 +27,9 @@ the index map + recovery notes.
   i.e. the first payload starts at 8000.
 - Total size: 2,731,687 bytes (8,000 header + 2,723,687 payload).
 - Spelling quirk (do **not** "fix"): LINKER.PAS writes `vodka.dat`, while
-  `DEMO.AS^` loads `voodka.dat` via EOS `Load_internal_file`. The release
-  sidesteps this by embedding the archive in the EXE; the port accepts both
-  names (`arena.cpp loadInternalFile`).
+  `DEMO.AS^` loads `voodka.dat` via EOS `Load_internal_file`. The production
+  release embeds the archive in the EXE; `win32_arena.asm` accepts both names
+  at the existing EOS service boundary.
 
 ## The 76-entry index map
 

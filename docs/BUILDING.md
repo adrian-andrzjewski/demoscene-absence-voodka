@@ -49,9 +49,8 @@ win32_runtime_probe.exe standalone no-CRT assembly Win32/thread validation probe
 VIRTUAL.exe         the standalone VR-engine test viewer (Esc quits; --check loads+exits)
 asset_viewer.exe   the V3D/V3M asset viewer (loads all 9 3D models from data/vodka.dat)
 asset_viewer_selftest.exe  parse-only validation (CTest v3d.viewer_parse)
-data/vodka.dat      packed assets, byte-identical to the 1996 release archive
 data/world          VIRTUAL viewer object archive (byte-identical to the original)
-music/amnezja2.mod  the 14-channel module the demo plays
+embedded_payload_check.exe  verifies exact archive/module bytes in VOODKA.exe
 *_selftest.exe      cross-check test binaries + tools
 audio_oracle.exe    libxmp module/timing/PCM oracle for Phase 2 validation
 audio_mod_parse_probe.exe  NASM-vs-libxmp module parser cross-check
@@ -73,10 +72,11 @@ audio_live_wasapi_probe.exe --stress repeated live-seek/teardown stress gate
 audio_live_wasapi_probe.exe --longrun sustained 15-second live handoff gate
 ```
 
-`bin/<Config>` is self-contained: `VOODKA.exe` finds `data\vodka.dat` and
-`music\amnezja2.mod` next to itself (dev-tree fallbacks exist for running
-from elsewhere). For the playable release bundle, use
-`port\package_release.ps1`; the standalone VIRTUAL viewer remains a
+`VOODKA.exe` is self-contained: its assembly image contains the byte-exact
+`vodka.dat` archive and `amnezja2.mod` soundtrack, and production runtime
+loading does not probe the filesystem for either payload. The loose archive
+and module remain build/validation inputs. For the playable release bundle,
+use `port\package_release.ps1`; the standalone VIRTUAL viewer remains a
 development/validation tool and is not included in the demo release.
 
 ## Tagged release workflow
@@ -163,32 +163,28 @@ byte-level mismatch.
 The local packaging command is equivalent to the CI packaging step:
 
 ```powershell
-.\port\package_release.ps1 -Config Release -Version voodka-port-v1.1.0
+.\port\package_release.ps1 -Config Release -Version voodka-port-v1.2.0
 ```
 
 The normal packaging command also runs an isolated packaged P4 smoke. Hosted
-CI passes `-SkipHardwareSmoke`: it still validates the exact staged file set,
-ZIP contents, and non-empty runtime inputs, but does not claim to validate a
-real packaged D3D11/WASAPI session. Run the command without that switch on a
-hardware-capable validation host.
+CI passes `-SkipHardwareSmoke`: it still validates the exact executable-only
+file set, ZIP contents, and byte-exact embedded payloads, but does not claim to
+validate a real packaged D3D11/WASAPI session. Run the command without that
+switch on a hardware-capable validation host.
 
-The resulting archive is named `VOODKA-voodka-port-v1.1.0.zip` and contains:
+The resulting archive is named `VOODKA-voodka-port-v1.2.0.zip` and contains:
 
 ```text
-VOODKA-voodka-port-v1.1.0/
+VOODKA-voodka-port-v1.2.0/
   VOODKA.exe
-  data/vodka.dat
-  music/amnezja2.mod
-  README.md
-  docs/*.md
 ```
 
-The executable and its two repository-owned runtime inputs are the only files
-required from the release bundle. Windows system libraries such as Win32,
+`VOODKA.exe` is the only repository-owned file in the release bundle. Windows
+system libraries such as Win32,
 COM, D3D11, DXGI, and WASAPI are supplied by the supported Windows platform;
 the shipped executable does not intentionally depend on the C/C++ runtime,
-STL, exception runtime, or libxmp. The packaging script starts the staged P4
-scene with the package as its working directory, checks the exact file set,
+STL, exception runtime, or libxmp. The packaging script starts the executable-only
+P4 scene with the package as its working directory, checks the exact file set,
 and expands the final ZIP again to verify that the archive preserves the same
 self-contained layout. Development tools, reference binaries, source trees,
 and test executables are not included.
@@ -204,8 +200,8 @@ run the PE/source/import checks and the live P4 smoke with:
 The verifier also checks the x64/PE32+ GUI image contract, native entry,
 ASLR, high-entropy VA, NX compatibility, and forbidden runtime imports. The
 second command runs the integration CTest suite, the live P4 gate, and the complete
-production playback from an isolated package containing only `VOODKA.exe`,
-`data\vodka.dat`, and `music\amnezja2.mod`; it records an A/V timeline under
+production playback from an isolated package containing only `VOODKA.exe`; it
+records an A/V timeline under
 `port/build/`, verifies frame/audio monotonicity and terminal ModPos `0x2803`,
 repeats the packaged P4 smoke three times, then cleans up the temporary package.
 
@@ -267,8 +263,8 @@ raster checks, and ABI/bridge checks backed by in-process fakes. It does not
 open a repository file, depend on a generated path, create a worker/window,
 activate D3D11/WASAPI, or launch the production executable.
 
-With Python available, the complete 88-test local matrix is split into those
-33 unit tests and 55 integration tests. Without Python, the three optional
+With Python available, the complete 86-test local matrix is split into those
+34 unit tests and 52 integration tests. Without Python, the three optional
 Python provenance/relocation checks are not registered. Run the integration
 suite with `-TestSuite Integration`; it contains the external/runtime checks
 below and is expected to need a validation host:
@@ -389,12 +385,12 @@ Python-based tests skip cleanly if no interpreter is found.
 | `win32_log_format_probe` | Phase 3B.6.4-5 byte-level MSVC-oracle comparison for NASM integer/string/pointer/fixed-float formatting (CTest `win32.log_format`) |
 | `win32_log_api_probe` | Phase 3B.6.4 real production `vk::logPrint` va_list/formatter/sink integration witness (CTest `win32.log_api`) |
 | `win32_timeline_probe` | Phase 3B.6.6 byte-level production NASM timeline formatter/file-sink witness (CTest `win32.timeline_sink`) |
-| `win32_arena_probe` | Phase 3B.6.7A/C.6.1 production NASM arena/archive discovery, decorated `vk::` namespace ABI, copy, alignment, and teardown witness (CTest `win32.arena_service`) |
+| `win32_arena_probe` | Phase 3B.6.7A/C.6.1 production NASM arena/embedded-archive service, decorated `vk::` namespace ABI, copy, alignment, and teardown witness (CTest `win32.arena_service`) |
 | `win32_input_abi_probe` | Phase 3B.6.7C.6.2 production decorated `vk::` input ABI, worker, key-map, ESC, and quit-state witness (CTest `win32.input_abi`) |
 | `win32_pause_abi_probe` | Phase 3B.6.7C.6.3 production decorated `vk::` pause ABI, atomic transitions, logging, and audio-pump witness (CTest `win32.pause_abi`) |
 | `win32_progress_abi_probe` | Phase 3B.6.7C.6.4 production decorated `vk::` progress ABI, scene/timeline/formatting and transition-log witness (CTest `win32.progress_abi`) |
 | `win32_application_abi_probe` | Phase 3B.6.7C.6.5 complete NASM application bridge, scene/seek/log/startup/WndProc/shutdown/path ABI witness (CTest `win32.application_abi`) |
-| `win32_music_path_probe` | Phase 3B.6.7B.1 production NASM soundtrack-path override, executable-directory, and fallback witness (CTest `win32.music_path`) |
+| `win32_music_path_probe` | Phase 3B.6.7B.1 production NASM soundtrack override and embedded-module identity witness (CTest `win32.music_path`) |
 | `win32_app_modes_probe` | Phase 3B.6.7B.2 production NASM seek precedence, part-start, self-test, audio-check, and result ABI witness (CTest `win32.app_modes`) |
 | `win32_app_startup_probe` | Phase 3B.6.7B.3 production NASM subsystem order, Win64 POD arguments, quit checkpoints, and rollback witness (CTest `win32.app_startup`) |
 | `win32_app_host_probe` | Phase 3B.6.7B.4 production NASM host configuration, window/startup failure, seek/run, arena-size, and final-shutdown witness (CTest `win32.app_host`) |
@@ -424,8 +420,8 @@ Python-based tests skip cleanly if no interpreter is found.
 | `VOODKA` shutdown coordinator | Phase 3B.6.1 production NASM atomic shutdown claim, teardown ordering, window destruction, log close, and quit-to-ExitProcess handoff; reference retains C++ behavior |
 | `VOODKA` crash formatter | Phase 3B.6.2 production NASM exception-record/context formatting and log-flush handoff; reference retains the C++ formatter |
 | `VOODKA` log sink | Phase 3B.6.3 production NASM path/file/critical-section/write/flush/close sink; Phase 3B.6.4-6 NASM integer/string/pointer/fixed-float/timeline formatting and file output; reference/VIRTUAL retain C++ paths |
-| `VOODKA` arena/archive service | Phase 3B.6.7A production NASM 64 MiB arena, Win32 archive discovery/read, aligned zeroed allocation, and cached `Load_internal_file`; reference/VIRTUAL retain C++ paths |
-| `VOODKA` soundtrack path service | Phase 3B.6.7B.1 production NASM module-path resolution and stable `const char*` audio handoff; reference retains the C++ resolver |
+| `VOODKA` arena/archive service | Phase 3B.6.7A production NASM 64 MiB arena, embedded archive access, aligned zeroed allocation, and cached `Load_internal_file`; reference/VIRTUAL retain C++ paths |
+| `VOODKA` soundtrack path service | Phase 3B.6.7B.1 production NASM embedded-module identity and stable `const char*` audio handoff; reference retains the C++ resolver |
 | `VOODKA` mode/entry dispatcher | Phase 3B.6.7B.2 production NASM selector precedence, part-start ModPos table, self-test/audio-check modes, crash-filter handoff, and DemoStart32 result propagation |
 | `VOODKA` startup coordinator | Phase 3B.6.7B.3 production NASM progress/input/arena/timing/audio/presenter/diagnostic/automation order and ordinary-failure rollback; reference retains C++ behavior |
 | `VOODKA --scene nad-czerwonym-lampa --auto-close-ms 30000` | Phase 1C shipped production assembly presenter later-scene lifecycle witness |
