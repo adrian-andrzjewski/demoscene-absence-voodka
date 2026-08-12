@@ -74,7 +74,7 @@ jobs:
           @"
           # VOODKA Windows x64 $env:RELEASE_TAG
 
-          Automated tagged release of the native x64 assembly port.
+          Automated tagged release of the native x64 port.
 
           This release was produced by the clean Release workflow and passed
           the portable unit-test suite, PE/import/source-contract audit, and exact
@@ -83,10 +83,10 @@ jobs:
           and full hardware playback remain separate validation-host gates.
 
           The attached `VOODKA-$env:RELEASE_TAG.zip` contains the complete
-          self-contained demo as one `VOODKA.exe`. The byte-exact archive and
-          soundtrack are embedded in that executable; no external data files
-          are required. Developer source, documentation, tests, and build
-          utilities are not included.
+          self-contained demo as one `VOODKA.exe`. The archive and soundtrack
+          are losslessly embedded and decode byte-for-byte at startup; no
+          external data files are required. Developer source, documentation,
+          tests, and build utilities are not included.
           "@ | Set-Content -LiteralPath $notesFile -Encoding utf8
 
           gh release view $env:RELEASE_TAG *> $null

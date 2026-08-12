@@ -250,7 +250,7 @@ For a clean rebuild:
 
 The script initializes the Visual Studio environment, configures CMake for
 x64, explicitly selects the vendored NASM, builds the demo and tools, and can
-run the complete CTest suite. The finished port has **86 tests** covering
+run the complete CTest suite. The finished port has **89 tests** covering
 assembly/reference equivalence, archive and palette reproducibility, real
 V3D/V3M decoding, water tables, tracker/mixer PCM, WASAPI lifecycle, A/V
 timeline behavior, shutdown, relocation hygiene, and asset-viewer parsing.
