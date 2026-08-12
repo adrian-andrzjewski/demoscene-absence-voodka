@@ -228,7 +228,7 @@ and host-side differential tests.
 
 ## Original authors: tribute and credits
 
-> **The work that made VOODKA possible belongs to Absence and its original
+> **The work that made VOODKA belongs to Absence and its original
 > collaborators.** The Windows port is a preservation and appreciation
 > project. It does not replace, re-author, or claim ownership of the 1996
 > production, its code, its graphics, its music, or its tools.
