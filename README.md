@@ -1,4 +1,4 @@
-# VOODKA — 30th Anniversary Windows x64 Port (1996–2026)
+# VOODKA - 30th Anniversary Windows x64 Port (1996–2026)
 
 **VOODKA** is the 30th Anniversary Windows x64 port of the 1996 MS-DOS demo by the
 Polish demogroup **Absence**. The original was written in 32-bit x86 assembly
@@ -30,7 +30,7 @@ frames per second and plays all eight scenes from beginning to end.
 XZ/LZMA2 decoder: no C++ object, CRT, STL, exception runtime, or libxmp code
 is part of the shipped demo.
 
-## Visual showcase — production port
+## Visual showcase - production port
 
 These are clean production frames captured directly from the current native
 `VOODKA.exe` with its indexed 320×200 recorder, then enlarged 4× with nearest
