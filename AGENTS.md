@@ -21,6 +21,11 @@ no CI, no tests. Everything runs under DOS/DOSBox on 386+ with an FPU and 8MB RA
   the port reads its data from there and rebuilds `vodka.dat`.
 - `modules/` — vendored NASM 2.16.03 (`nasm.exe`) and libxmp 4.6.2 (MOD player).
 
+There is no root-level `CODE/`, `VIRTUAL/`, or `NFO/` tree. Those were
+duplicate checkouts of the working source tree and were removed during
+cleanup. The single source of truth is `demoscene-absence-voodka-master/`
+above, with its byte-identical mirror under `reference/source/`.
+
 ## Windows port (port/) — how to build & debug
 
 - **Build:** run `port/build.ps1 -Config Release -Test` (auto-locates
@@ -144,16 +149,19 @@ p2draw.asm + `prep_sort` in the swiatynia city / torus ustep village (P2/P5) ini
   repacks `data/world` byte-identically to the shipped object archive
   (golden CTest); the exe decodes both torus objects through the real ported
   loader (`--check` = load+exit for CI; Escape/window-close to quit).
-- **Docs:** `docs/` holds the reconstruction documentation -
-  `RECONSTRUCTION_PLAN.md` (audit/decisions/phase status), `ASSETS.md`
+- **Docs:** `docs/` holds the reconstruction documentation. Start at
+  `docs/README.md` (index): `RECONSTRUCTION_PLAN.md`
+  (audit/decisions/phase status), `ASSETS.md`
   (vodka.dat format + 76-asset index map + recovery), `ASSET_FORMATS.md`
   (per-format reverse-engineering bible: structures, encodings, consumption,
   port parity, presentation color/scaling pipeline), `WORLD_ARCHITECTURE.md`
   (the VR scene engine: world records, object instancing, camera paths,
   per-frame pipeline, render-to-texture water, port parity), `PORTING_NOTES.md`
   (architecture/ABI/memory model/case studies), `BUILDING.md` (build/run/
-  test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output). Keep
-  them in sync with the work.
+  test), `KNOWN_DIFFERENCES.md` (port vs original, Phase 3 output).
+  Superseded assembly-migration phase records and the migration plan are
+  archived under `docs/history/` and are not primary references.
+  Keep them in sync with the work.
 - **V3D asset viewer:** `port/tools/asset_viewer/` is a standalone
   Win32+D3D11 tool that loads and renders **every 3D asset the original
   demo ships** — the 9 V3D/V3M packed in `vodka.dat` (archive entries

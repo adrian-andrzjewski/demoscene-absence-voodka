@@ -1,1 +1,0 @@
-tasmx /kh32768 p2.as^

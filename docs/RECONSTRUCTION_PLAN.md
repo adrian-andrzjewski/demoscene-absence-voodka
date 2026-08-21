@@ -14,7 +14,8 @@ Historical status snapshots: 2026-08-05 (Phase 7 asset-format audit complete). U
 2026-08-08: Phase 10 world-architecture analysis complete
 (`docs/WORLD_ARCHITECTURE.md`). This
 document records the audit, the decisions taken, and the historical work
-ledger; the final release state is recorded in `RELEASE_COMPLETION.md`.
+ledger; the final release state is recorded in
+[`history/RELEASE_COMPLETION.md`](history/RELEASE_COMPLETION.md).
 Per-topic depth lives in `ASSETS.md`, `ASSET_FORMATS.md`,
 `WORLD_ARCHITECTURE.md` (the VR scene engine: worlds, objects, camera,
 render pipeline), `PORTING_NOTES.md`, `BUILDING.md`, `KNOWN_DIFFERENCES.md`.

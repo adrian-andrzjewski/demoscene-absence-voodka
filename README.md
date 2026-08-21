@@ -454,7 +454,8 @@ The major platform substitutions are:
   still supplies the scene timeline, so visual timing and soundtrack remain
   coupled.
 
-For the source-level details, see:
+For the source-level details, see [`docs/README.md`](docs/README.md) (an index
+of the active reconstruction documentation) and the key notes below:
 
 - [`docs/BUILDING.md`](docs/BUILDING.md) — build, run, test, and tool reference
 - [`docs/PORTING_NOTES.md`](docs/PORTING_NOTES.md) — architecture and hard-won
@@ -471,6 +472,10 @@ For the source-level details, see:
 - [`docs/KNOWN_DIFFERENCES.md`](docs/KNOWN_DIFFERENCES.md) — measured port
   differences and validation notes
 - [`docs/FLASH_EFFECTS.md`](docs/FLASH_EFFECTS.md) — palette/DAC flash timing
+
+Historical migration-phase records (the assembly-migration plan and the Phase
+0–3 assembly-oracle logs) are archived under `docs/history/` and are not linked
+as active documentation.
 
 ## Known differences from the 1996 release
 
@@ -510,7 +515,7 @@ than hidden.
 ## Repository map and provenance
 
 ```text
-demoscene-absence-voodka-master/   working archival source tree
+demoscene-absence-voodka-master/   working archival source tree (build source)
 reference/source/                  byte-identical read-only source mirror
 reference/release/                 shipped 1996 release and original NFO
 reference/captures/                DOSBox reference frames and comparisons
@@ -521,7 +526,17 @@ port/                              active native Windows x64 implementation
 docs/                              reconstruction and validation notes
 ```
 
-Please preserve the original source and release trees. They are part of the
+The `CODE/`, `VIRTUAL/`, and `NFO/` directories under the repository root are
+not part of the layout: the original 1996 source trees live once under
+`demoscene-absence-voodka-master/` (the build's archive source) with a
+byte-identical mirror under `reference/source/`, and the original release
+(including `VOODKA.NFO`) under `reference/release/`. `docs/` is indexed by
+[`docs/README.md`](docs/README.md); superseded migration-phase records remain
+available under `docs/history/` for provenance. The
+[Migration completion](#migration-completion) section and `docs/` point to the
+current architecture.
+
+Please preserve the base source and release trees. They are part of the
 historical record, and the port is most useful when its modern code can still
 be compared directly with the material that inspired it.
 

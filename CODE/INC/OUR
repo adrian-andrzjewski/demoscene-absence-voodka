@@ -1,3 +1,0 @@
-
-extrn 	getModPos	: NEAR
-extrn 	ModPos		: WORD
